@@ -110,10 +110,18 @@ const startServer = async () => {
         LogManager.system('Collecting initial performance metrics...');
         PerformanceManager.logMetrics();
         LogManager.success('Server initialization complete');
+        LogManager.system("Metrics logs will be shown every 5 minutes");
+        const metricsInterval = setInterval(() => {
+            PerformanceManager.logMetrics();
+        }, 300000);
 
         // Graceful shutdown
         const shutdown = async () => {
             LogManager.system('Received shutdown signal');
+
+            // Clear metrics interval
+            clearInterval(metricsInterval);
+            LogManager.info('Cleared metrics interval');
             
             // Close WebSocket connections
             LogManager.info('Closing WebSocket connections...');
