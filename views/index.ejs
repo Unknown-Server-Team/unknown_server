@@ -1,8 +1,4 @@
 <canvas id="particles" class="particles-bg"></canvas>
-<div class="loading-overlay">
-    <div class="loading-circle"></div>
-    <div class="loading-text">Loading Unknown Server...</div>
-</div>
 
 <div class="hero animate__animated animate__fadeIn">
     <div class="hero-background"></div>
@@ -60,24 +56,6 @@
     if (canvas) {
         window.particleSystem = new ParticleSystem(canvas);
     }
-
-    // Wait for both DOM content and resources to load
-    Promise.all([
-        new Promise(resolve => {
-            if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', resolve);
-            } else {
-                resolve();
-            }
-        }),
-        new Promise(resolve => window.addEventListener('load', resolve))
-    ]).then(() => {
-        const overlay = document.querySelector('.loading-overlay');
-        overlay.style.opacity = '0';
-        setTimeout(() => {
-            overlay.style.display = 'none';
-        }, 500);
-    });
 
     // Add hover effect to list items
     document.querySelectorAll('.hover-effect').forEach(item => {

@@ -44,7 +44,7 @@ class PageTransition {
     }
 
     async navigateTo(url, isPopState = false) {
-        this.showProgress();
+        this.showLoading();
         
         try {
             const response = await fetch(url);
@@ -69,11 +69,13 @@ class PageTransition {
         } catch (error) {
             console.error('Navigation error:', error);
         } finally {
-            this.hideProgress();
+            this.hideLoading();
         }
     }
 
-    showProgress() {
+    showLoading() {
+        // Show both progress bar and overlay
+        this.loadingOverlay.classList.remove('hidden');
         const bar = this.progressBar.querySelector('.loading-progress-bar');
         bar.style.width = '0%';
         
@@ -88,13 +90,15 @@ class PageTransition {
         this.progressInterval = interval;
     }
 
-    hideProgress() {
+    hideLoading() {
         clearInterval(this.progressInterval);
         const bar = this.progressBar.querySelector('.loading-progress-bar');
         bar.style.width = '100%';
         
+        // Hide both progress bar and overlay with a slight delay
         setTimeout(() => {
             bar.style.width = '0%';
+            this.loadingOverlay.classList.add('hidden');
         }, 300);
     }
 
