@@ -1,0 +1,94 @@
+<canvas id="particles" class="particles-bg"></canvas>
+<div class="loading-overlay">
+    <div class="loading-circle"></div>
+    <div class="loading-text">Loading Unknown Server...</div>
+</div>
+
+<div class="hero animate__animated animate__fadeIn">
+    <div class="hero-background"></div>
+    <h1 class="server-title">Unknown Server</h1>
+    <p class="subtitle animate__animated animate__fadeIn animate__delay-1s">Your server is up and running!</p>
+    <div class="pulse-circle"></div>
+</div>
+
+<div class="content-section animate__animated animate__fadeInUp animate__delay-2s">
+    <h2>Getting Started</h2>
+    <div class="cards-container">
+        <div class="instruction-card" data-tilt>
+            <div class="card-icon">🚀</div>
+            <h3>Quick Start</h3>
+            <ol>
+                <li class="hover-effect">Replace this default page in <code>views/index.ejs</code></li>
+                <li class="hover-effect">Set up your database configuration in <code>.env</code></li>
+                <li class="hover-effect">Add your routes in the <code>routers/</code> directory</li>
+                <li class="hover-effect">Configure your queries in <code>database/mainQueries.js</code></li>
+            </ol>
+        </div>
+
+        <div class="instruction-card" data-tilt>
+            <div class="card-icon">🛠️</div>
+            <h3>Project Structure</h3>
+            <ul>
+                <li class="hover-effect"><code>routers/api/</code> - REST API endpoints</li>
+                <li class="hover-effect"><code>routers/main/</code> - Web routes</li>
+                <li class="hover-effect"><code>managers/</code> - Core functionality managers</li>
+                <li class="hover-effect"><code>views/</code> - EJS templates</li>
+                <li class="hover-effect"><code>public/</code> - Static assets</li>
+            </ul>
+        </div>
+
+        <div class="instruction-card" data-tilt>
+            <div class="card-icon">💡</div>
+            <h3>Features Available</h3>
+            <ul>
+                <li class="hover-effect">Pretty Console Logging</li>
+                <li class="hover-effect">Database Connection Pool</li>
+                <li class="hover-effect">Rate Limiting</li>
+                <li class="hover-effect">Performance Monitoring</li>
+                <li class="hover-effect">WebSocket Support</li>
+                <li class="hover-effect">EJS Templating</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/vanilla-tilt/1.7.0/vanilla-tilt.min.js"></script>
+<script src="/scripts/particles.js"></script>
+<script>
+    // Initialize particle system
+    const canvas = document.getElementById('particles');
+    if (canvas) {
+        window.particleSystem = new ParticleSystem(canvas);
+    }
+
+    // Wait for both DOM content and resources to load
+    Promise.all([
+        new Promise(resolve => {
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', resolve);
+            } else {
+                resolve();
+            }
+        }),
+        new Promise(resolve => window.addEventListener('load', resolve))
+    ]).then(() => {
+        const overlay = document.querySelector('.loading-overlay');
+        overlay.style.opacity = '0';
+        setTimeout(() => {
+            overlay.style.display = 'none';
+        }, 500);
+    });
+
+    // Add hover effect to list items
+    document.querySelectorAll('.hover-effect').forEach(item => {
+        item.addEventListener('mouseover', function() {
+            this.style.transform = 'translateX(10px)';
+            this.style.color = getComputedStyle(document.documentElement).getPropertyValue('--primary-color');
+        });
+        
+        item.addEventListener('mouseout', function() {
+            this.style.transform = 'translateX(0)';
+            this.style.color = '';
+        });
+    });
+</script>

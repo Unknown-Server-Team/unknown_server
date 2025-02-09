@@ -1,0 +1,163 @@
+<canvas id="particles" class="particles-bg"></canvas>
+
+<div class="not-found-container animate__animated animate__fadeIn">
+    <div class="glitch-wrapper">
+        <h1 class="glitch" data-text="404">404</h1>
+    </div>
+    <p class="not-found-message">Looks like you've ventured too far into space</p>
+    <div class="space-scene">
+        <div class="stars"></div>
+        <div class="astronaut">
+            👨‍🚀
+            <div class="astronaut-trail"></div>
+        </div>
+    </div>
+    <a href="/" class="home-button animate__animated animate__pulse animate__infinite">Return to Base</a>
+</div>
+
+<style>
+.not-found-container {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 2rem;
+    position: relative;
+    overflow: hidden;
+}
+
+.glitch-wrapper {
+    position: relative;
+    margin-bottom: 2rem;
+}
+
+.glitch {
+    font-size: 8rem;
+    font-weight: 800;
+    position: relative;
+    text-shadow: 0.05em 0 0 rgba(255, 0, 0, 0.75),
+                -0.025em -0.05em 0 rgba(0, 255, 0, 0.75),
+                0.025em 0.05em 0 rgba(0, 0, 255, 0.75);
+    animation: glitch 500ms infinite;
+    background: linear-gradient(45deg, var(--gradient-start), var(--gradient-end));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+.glitch::before,
+.glitch::after {
+    content: attr(data-text);
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--background-color);
+}
+
+.glitch::before {
+    left: 2px;
+    text-shadow: -2px 0 var(--primary-color);
+    animation: glitch-1 200ms infinite;
+    clip-path: inset(0 33% 0 0);
+}
+
+.glitch::after {
+    left: -2px;
+    text-shadow: -2px 0 var(--secondary-color);
+    animation: glitch-2 300ms infinite;
+    clip-path: inset(0 0 0 33%);
+}
+
+@keyframes glitch {
+    0% { text-shadow: 0.05em 0 0 rgba(255, 0, 0, 0.75),
+                    -0.05em -0.025em 0 rgba(0, 255, 0, 0.75),
+                    -0.025em 0.05em 0 rgba(0, 0, 255, 0.75); }
+    15% { text-shadow: -0.05em -0.025em 0 rgba(255, 0, 0, 0.75),
+                    0.025em 0.025em 0 rgba(0, 255, 0, 0.75),
+                    -0.05em -0.05em 0 rgba(0, 0, 255, 0.75); }
+    50% { text-shadow: 0.025em 0.05em 0 rgba(255, 0, 0, 0.75),
+                    0.05em 0 0 rgba(0, 255, 0, 0.75),
+                    0 -0.05em 0 rgba(0, 0, 255, 0.75); }
+}
+
+.not-found-message {
+    font-size: 1.8rem;
+    color: var(--text-muted);
+    margin-bottom: 3rem;
+}
+
+.space-scene {
+    position: relative;
+    width: 200px;
+    height: 200px;
+    margin: 2rem 0;
+}
+
+.astronaut {
+    font-size: 4rem;
+    position: absolute;
+    animation: float 6s ease-in-out infinite;
+}
+
+.astronaut-trail {
+    position: absolute;
+    width: 100%;
+    height: 20px;
+    background: linear-gradient(90deg, 
+        rgba(155, 75, 255, 0.2) 0%,
+        transparent 100%);
+    transform: rotate(-45deg);
+    animation: trail 2s linear infinite;
+}
+
+@keyframes trail {
+    0% { opacity: 0.8; transform: rotate(-45deg) translateX(0); }
+    100% { opacity: 0; transform: rotate(-45deg) translateX(-20px); }
+}
+
+.stars {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background: 
+        radial-gradient(circle at 20% 20%, rgba(155, 75, 255, 0.2) 0%, transparent 50%),
+        radial-gradient(circle at 80% 80%, rgba(232, 75, 255, 0.2) 0%, transparent 50%);
+    animation: twinkle 4s ease-in-out infinite;
+}
+
+@keyframes twinkle {
+    0%, 100% { opacity: 0.5; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.1); }
+}
+
+@keyframes float {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    50% { transform: translateY(-20px) rotate(10deg); }
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1); opacity: 0.5; }
+    50% { transform: scale(1.2); opacity: 0.8; }
+}
+
+.home-button {
+    margin-top: 2rem;
+    padding: 1rem 2rem;
+    background: linear-gradient(45deg, var(--gradient-start), var(--gradient-end));
+    color: white;
+    text-decoration: none;
+    border-radius: 30px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(155, 75, 255, 0.3);
+}
+
+.home-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(155, 75, 255, 0.4);
+}
+</style>

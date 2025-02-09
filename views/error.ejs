@@ -1,0 +1,87 @@
+<div class="error-container animate__animated animate__fadeIn">
+    <div class="error-content">
+        <h1 class="error-title"><%- locals.error?.status || 500 %></h1>
+        <p class="error-message"><%- locals.error?.message || 'Something went wrong' %></p>
+        <% if (process.env.NODE_ENV === 'development') { %>
+            <pre class="error-stack"><%- locals.error?.stack || '' %></pre>
+        <% } %>
+        <a href="/" class="error-home-link">Return Home</a>
+    </div>
+</div>
+
+<style>
+.error-container {
+    min-height: 80vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+
+.error-content {
+    padding: 2rem;
+    border-radius: 15px;
+    background: var(--card-background);
+    box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+    border: 1px solid rgba(255,255,255,0.1);
+    max-width: 600px;
+    width: 90%;
+}
+
+.error-title {
+    font-size: 6rem;
+    margin: 0;
+    background: linear-gradient(45deg, var(--gradient-start), var(--gradient-end));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    font-weight: 800;
+}
+
+.error-message {
+    font-size: 1.5rem;
+    color: var(--text-muted);
+    margin: 1.5rem 0;
+    font-weight: 300;
+}
+
+.error-stack {
+    text-align: left;
+    background: var(--code-background);
+    padding: 1.5rem;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    font-family: 'Fira Code', monospace;
+    overflow-x: auto;
+    margin: 1.5rem 0;
+    color: var(--text-color);
+    border: 1px solid rgba(255,255,255,0.05);
+}
+
+.error-home-link {
+    display: inline-block;
+    padding: 1rem 2rem;
+    background: linear-gradient(45deg, var(--gradient-start), var(--gradient-end));
+    color: white;
+    text-decoration: none;
+    border-radius: 30px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(155, 75, 255, 0.3);
+}
+
+.error-home-link:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(155, 75, 255, 0.4);
+}
+
+@media (max-width: 768px) {
+    .error-title {
+        font-size: 4rem;
+    }
+    
+    .error-message {
+        font-size: 1.2rem;
+    }
+}
+</style>

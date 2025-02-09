@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unknown Server</title>
+    
+    <!-- Meta tags -->
+    <meta name="description" content="Unknown Server - A Modern Express.js Server">
+    <meta name="theme-color" content="#1a1a1a">
+    <meta name="color-scheme" content="dark">
+    
+    <!-- Preload resources -->
+    <link rel="preload" href="/styles/style.css" as="style">
+    <link rel="preload" href="/styles/loading.css" as="style">
+    <link rel="preload" href="/scripts/particles.js" as="script">
+    <link rel="preload" href="/scripts/transitions.js" as="script">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="/styles/style.css">
+    <link rel="stylesheet" href="/styles/loading.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
+    
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vanilla-tilt/1.7.0/vanilla-tilt.min.js"></script>
+    <script src="/scripts/transitions.js" defer></script>
+</head>
+<body>
+    <div class="container">
+        <%- body %>
+    </div>
+    <footer class="footer">
+        <p>Powered by Unknown Server with 💜</p>
+        <small class="version">v1.0.0</small>
+    </footer>
+</body>
+</html>

@@ -1,0 +1,428 @@
+:root {
+    --primary-color: #9B4BFF;
+    --secondary-color: #E84BFF;
+    --background-color: #1a1a1a;
+    --card-background: #242424;
+    --text-color: #e1e1e1;
+    --text-muted: #888;
+    --code-background: #2d2d2d;
+    --card-hover: #2a2a2a;
+    --gradient-start: #9B4BFF;
+    --gradient-end: #E84BFF;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background-color: var(--background-color);
+    color: var(--text-color);
+    line-height: 1.6;
+    min-height: 100vh;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+    animation: fadeIn 0.5s ease-in-out;
+    position: relative;
+    z-index: 1;
+}
+
+.hero {
+    text-align: center;
+    padding: 6rem 0;
+    position: relative;
+    overflow: hidden;
+}
+
+.hero::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle at center, 
+        rgba(155, 75, 255, 0.1) 0%,
+        rgba(232, 75, 255, 0.05) 30%,
+        transparent 70%);
+    z-index: 0;
+}
+
+.server-title {
+    font-size: 5rem;
+    font-weight: 800;
+    margin: 0;
+    background: linear-gradient(45deg, var(--gradient-start), var(--gradient-end));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+    position: relative;
+    z-index: 1;
+}
+
+.subtitle {
+    font-size: 1.8rem;
+    color: var(--text-muted);
+    margin-top: 1rem;
+    font-weight: 300;
+    position: relative;
+    z-index: 1;
+}
+
+.content-section {
+    margin-top: 4rem;
+    padding: 0 2rem;
+}
+
+.content-section h2 {
+    text-align: center;
+    margin-bottom: 3rem;
+    color: var(--primary-color);
+    font-size: 2.5rem;
+}
+
+.cards-container {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.instruction-card {
+    background: var(--card-background);
+    border-radius: 15px;
+    padding: 2rem;
+    margin: 1rem 0;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+    border: 1px solid rgba(255,255,255,0.1);
+    position: relative;
+    overflow: hidden;
+    transform-style: preserve-3d;
+    transform: perspective(1000px);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+}
+
+.instruction-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--gradient-start), var(--gradient-end));
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.instruction-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        125deg,
+        transparent 0%,
+        transparent 40%,
+        rgba(255, 255, 255, 0.1) 45%,
+        rgba(255, 255, 255, 0.1) 50%,
+        transparent 55%,
+        transparent 100%
+    );
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.instruction-card:hover {
+    transform: translateY(-5px);
+    background: var(--card-hover);
+    box-shadow: 0 8px 12px rgba(0,0,0,0.2);
+}
+
+.instruction-card:hover::before {
+    opacity: 1;
+}
+
+.instruction-card:hover::after {
+    opacity: 1;
+}
+
+h2 {
+    color: var(--primary-color);
+    margin-bottom: 2rem;
+    font-size: 2.5rem;
+    text-align: center;
+    font-weight: 700;
+}
+
+h3 {
+    color: var(--secondary-color);
+    margin-top: 0;
+    font-size: 1.8rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+code {
+    background: var(--code-background);
+    padding: 0.3rem 0.6rem;
+    border-radius: 4px;
+    font-size: 0.9em;
+    color: var(--primary-color);
+    font-family: 'Fira Code', monospace;
+    box-shadow: inset 0 0 4px rgba(0,0,0,0.2);
+}
+
+ul, ol {
+    padding-left: 1.5rem;
+    margin: 1.5rem 0;
+}
+
+li {
+    margin: 0.8rem 0;
+    line-height: 1.6;
+    position: relative;
+}
+
+.footer {
+    text-align: center;
+    padding: 3rem;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    margin-top: 4rem;
+    background: linear-gradient(180deg, 
+        transparent 0%,
+        rgba(155, 75, 255, 0.05) 100%);
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+    width: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--background-color);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--primary-color);
+    border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--secondary-color);
+}
+
+/* Feature cards animation */
+.instruction-card {
+    animation: cardAppear 0.6s ease-out backwards;
+}
+
+@keyframes cardAppear {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Add animation delay for cards */
+.instruction-card:nth-child(1) { animation-delay: 0.2s; }
+.instruction-card:nth-child(2) { animation-delay: 0.4s; }
+.instruction-card:nth-child(3) { animation-delay: 0.6s; }
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .server-title {
+        font-size: 3.5rem;
+    }
+    
+    .subtitle {
+        font-size: 1.4rem;
+    }
+    
+    .hero {
+        padding: 4rem 0;
+    }
+    
+    .content-section {
+        grid-template-columns: 1fr;
+        padding: 0 1rem;
+    }
+}
+
+@media (max-width: 1024px) {
+    .cards-container {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* Hero background effect */
+.hero-background {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: 
+        radial-gradient(circle at 20% 30%, rgba(155, 75, 255, 0.1) 0%, transparent 50%),
+        radial-gradient(circle at 80% 70%, rgba(232, 75, 255, 0.1) 0%, transparent 50%);
+    z-index: 0;
+    animation: backgroundShift 15s ease-in-out infinite;
+}
+
+@keyframes backgroundShift {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+}
+
+/* Pulse circle effect */
+.pulse-circle {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 12px;
+    height: 12px;
+    background: var(--primary-color);
+    border-radius: 50%;
+}
+
+.pulse-circle::before,
+.pulse-circle::after {
+    content: '';
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background: var(--primary-color);
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+}
+
+.pulse-circle::after {
+    animation-delay: 0.5s;
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+        opacity: 0.8;
+    }
+    100% {
+        transform: scale(3);
+        opacity: 0;
+    }
+}
+
+/* Card icon styles */
+.card-icon {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+    filter: drop-shadow(0 0 10px rgba(155, 75, 255, 0.3));
+}
+
+/* Enhanced hover effects */
+.hover-effect {
+    transition: all 0.3s ease;
+    padding: 0.5rem;
+    border-radius: 8px;
+}
+
+.hover-effect:hover code {
+    background: var(--primary-color);
+    color: white;
+}
+
+/* Particles background */
+.particles-bg {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    pointer-events: none;
+    opacity: 0.6;
+}
+
+/* Loading overlay */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--background-color);
+    z-index: 9999;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: opacity 0.5s ease;
+}
+
+.loader {
+    width: 50px;
+    height: 50px;
+    border: 3px solid transparent;
+    border-radius: 50%;
+    border-top-color: var(--primary-color);
+    border-bottom-color: var(--secondary-color);
+    animation: spin 1s ease infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Enhanced focus styles for accessibility */
+:focus {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}
+
+/* Enhanced selection style */
+::selection {
+    background: var(--primary-color);
+    color: white;
+}
+
+/* Mobile optimizations */
+@media (max-width: 480px) {
+    .particles-bg {
+        opacity: 0.3;
+    }
+    
+    .hero::before {
+        opacity: 0.5;
+    }
+}
