@@ -56,6 +56,9 @@ app.set('view engine', 'ejs');
 app.use(expressLayouts);
 app.set('layout', 'layouts/main');
 
+// Add request logging middleware
+app.use(LogManager.requestLogger());
+
 // Performance monitoring middleware
 app.use((req, res, next) => {
     const start = process.hrtime();
@@ -83,7 +86,7 @@ app.use((req, res) => {
 
 // Error handling
 app.use((err, req, res, next) => {
-    LogManager.error('Server Error:', err);
+    LogManager.error('Server Error', err);
     PerformanceManager.trackError(err, req.path);
 
     // Check if the request is for the API
@@ -98,55 +101,58 @@ app.use((err, req, res, next) => {
 const startServer = async () => {
     try {
         // Display ASCII art
-        LogManager.ascii();
+        const banner = await LogManager.figlet('UNKNOWN');
+        console.log(banner);
 
         // Startup sequence
-        LogManager.system('Initializing Unknown Server...');
-        LogManager.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
-
+        LogManager.info('Initializing Unknown Server...', { env: process.env.NODE_ENV || 'development' });
+        
         // Database initialization
-        LogManager.system('Initializing database connection...');
+        LogManager.info('Initializing database connection...');
         await initializeQueries();
         LogManager.success('Database initialized successfully');
 
         // Create HTTP server
         const server = app.listen(PORT, () => {
             LogManager.success(`Server is running on port ${PORT}`);
-            LogManager.info(`Local:   http://localhost:${PORT}`);
-            LogManager.info(`Network: http://${require('os').hostname()}:${PORT}`);
+            LogManager.info('Server URLs:', {
+                local: `http://localhost:${PORT}`,
+                network: `http://${require('os').hostname()}:${PORT}`
+            });
         });
 
         // Initialize WebSocket with new logging
-        LogManager.system('Initializing WebSocket server...');
+        LogManager.info('Initializing WebSocket server...');
         WebsocketManager.initialize(server);
         WebsocketManager.startHeartbeat();
         LogManager.success('WebSocket server is ready');
 
         // Log initial performance metrics
-        LogManager.system('Collecting initial performance metrics...');
+        LogManager.info('Collecting initial performance metrics...');
         PerformanceManager.logMetrics();
         LogManager.success('Server initialization complete');
-        LogManager.system("Metrics logs will be shown every 5 minutes");
+        LogManager.info("Metrics logs will be shown every 5 minutes");
+        
         const metricsInterval = setInterval(() => {
             PerformanceManager.logMetrics();
         }, 300000);
 
         // Graceful shutdown
         const shutdown = async () => {
-            LogManager.system('Received shutdown signal');
+            LogManager.info('Received shutdown signal');
 
             // Clear metrics interval
             clearInterval(metricsInterval);
             LogManager.info('Cleared metrics interval');
-
+            
             // Close WebSocket connections
             LogManager.info('Closing WebSocket connections...');
             WebsocketManager.close();
-
+            
             // Close database connections
             LogManager.info('Closing database connections...');
             await db.close();
-
+            
             // Close HTTP server
             server.close(() => {
                 LogManager.success('All connections closed successfully');
@@ -155,7 +161,7 @@ const startServer = async () => {
 
             // Force exit after 5 seconds
             setTimeout(() => {
-                LogManager.error('Could not close connections in time, forcing shutdown');
+                LogManager.error('Could not close connections in time', new Error('Shutdown timeout'));
                 process.exit(1);
             }, 5000);
         };

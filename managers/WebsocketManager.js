@@ -27,7 +27,10 @@ class WebsocketManager {
         }
 
         this.connections.add(ws);
-        LogManager.info(`New WebSocket connection from ${req.socket.remoteAddress}`);
+        LogManager.info('New WebSocket connection', { 
+            ip: req.socket.remoteAddress,
+            totalConnections: this.connections.size
+        });
 
         ws.isAlive = true;
         ws.rooms = new Set();
@@ -41,7 +44,7 @@ class WebsocketManager {
                 const message = JSON.parse(data);
                 await this.handleMessage(ws, message);
             } catch (error) {
-                LogManager.error('Error handling WebSocket message:', error);
+                LogManager.error('Error handling WebSocket message', error);
                 ws.send(JSON.stringify({ error: 'Invalid message format' }));
             }
         });
@@ -51,7 +54,7 @@ class WebsocketManager {
         });
 
         ws.on('error', (error) => {
-            LogManager.error('WebSocket error:', error);
+            LogManager.error('WebSocket error', error);
             this.handleDisconnection(ws);
         });
 
@@ -66,7 +69,9 @@ class WebsocketManager {
         });
 
         this.connections.delete(ws);
-        LogManager.info('Client disconnected from WebSocket');
+        LogManager.info('Client disconnected', {
+            remainingConnections: this.connections.size
+        });
     }
 
     async handleMessage(ws, message) {
@@ -98,7 +103,9 @@ class WebsocketManager {
 
     use(middleware) {
         this.middlewares.push(middleware);
-        LogManager.info('Added new WebSocket middleware');
+        LogManager.info('Added new WebSocket middleware', {
+            totalMiddlewares: this.middlewares.length
+        });
     }
 
     runMiddlewares(ws, req) {
@@ -107,7 +114,7 @@ class WebsocketManager {
 
     registerEvent(event, callback) {
         this.events.set(event, callback);
-        LogManager.info(`Registered WebSocket event: ${event}`);
+        LogManager.info('Registered WebSocket event', { event });
     }
 
     broadcast(data, exclude = null) {
@@ -125,7 +132,10 @@ class WebsocketManager {
         }
         this.rooms.get(room).add(ws);
         ws.rooms.add(room);
-        LogManager.debug(`Client joined room: ${room}`);
+        LogManager.debug('Client joined room', { 
+            room,
+            clients: this.rooms.get(room).size 
+        });
     }
 
     leaveRoom(ws, room) {
@@ -136,7 +146,10 @@ class WebsocketManager {
             }
         }
         ws.rooms.delete(room);
-        LogManager.debug(`Client left room: ${room}`);
+        LogManager.debug('Client left room', { 
+            room,
+            remainingClients: this.rooms.has(room) ? this.rooms.get(room).size : 0
+        });
     }
 
     broadcastToRoom(room, data, exclude = null) {
@@ -181,7 +194,9 @@ class WebsocketManager {
 
     close() {
         this.wss.close(() => {
-            LogManager.info('WebSocket server closed');
+            LogManager.info('WebSocket server closed', {
+                closedConnections: this.connections.size
+            });
         });
     }
 }

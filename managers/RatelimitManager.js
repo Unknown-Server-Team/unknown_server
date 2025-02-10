@@ -30,11 +30,11 @@ class RatelimitManager {
     static shouldSkipRateLimit(req) {
         const ip = req.ip;
         if (this.whitelist.has(ip)) {
-            LogManager.debug(`Skipping rate limit for whitelisted IP: ${ip}`);
+            LogManager.debug('Skipping rate limit for whitelisted IP', { ip });
             return true;
         }
         if (this.blacklist.has(ip)) {
-            LogManager.warn(`Blocked request from blacklisted IP: ${ip}`);
+            LogManager.warning('Blocked request from blacklisted IP', { ip });
             return false;
         }
         return false;
@@ -42,7 +42,11 @@ class RatelimitManager {
 
     static handleLimitReached(req, res) {
         const ip = req.ip;
-        LogManager.warn(`Rate limit exceeded for IP: ${ip}, Path: ${req.path}`);
+        LogManager.warning('Rate limit exceeded', { 
+            ip,
+            path: req.path,
+            method: req.method
+        });
         
         // Track repeated offenders
         const offenderKey = `${ip}:offenses`;
@@ -52,7 +56,10 @@ class RatelimitManager {
         
         if (currentOffenses >= 5) {
             this.blacklist.add(ip);
-            LogManager.warn(`IP ${ip} has been blacklisted due to repeated rate limit violations`);
+            LogManager.warning('IP blacklisted due to repeated violations', {
+                ip,
+                offenses: currentOffenses
+            });
         }
 
         this.customStores.set('offenders', offenses);
@@ -86,19 +93,19 @@ class RatelimitManager {
     static whitelistIP(ip) {
         this.whitelist.add(ip);
         this.blacklist.delete(ip); // Remove from blacklist if present
-        LogManager.info(`IP ${ip} has been whitelisted`);
+        LogManager.info('IP whitelisted', { ip });
     }
 
     static blacklistIP(ip) {
         this.blacklist.add(ip);
         this.whitelist.delete(ip); // Remove from whitelist if present
-        LogManager.warn(`IP ${ip} has been blacklisted`);
+        LogManager.warning('IP blacklisted', { ip });
     }
 
     static removeIP(ip) {
         this.whitelist.delete(ip);
         this.blacklist.delete(ip);
-        LogManager.info(`IP ${ip} has been removed from whitelist/blacklist`);
+        LogManager.info('IP removed from whitelist/blacklist', { ip });
     }
 
     static getIPStatus(ip) {
@@ -111,13 +118,13 @@ class RatelimitManager {
         const offenders = this.customStores.get('offenders');
         if (offenders) {
             offenders.delete(`${ip}:offenses`);
-            LogManager.info(`Reset rate limit offenses for IP: ${ip}`);
+            LogManager.info('Rate limit offenses reset', { ip });
         }
     }
 
     static setCustomStore(name, store) {
         this.customStores.set(name, store);
-        LogManager.info(`Custom rate limit store '${name}' has been set`);
+        LogManager.info('Custom rate limit store set', { name });
     }
 }
 

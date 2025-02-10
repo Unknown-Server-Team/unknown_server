@@ -110,7 +110,10 @@ class PerformanceManager {
         if (memoryUsage > this.thresholds.memoryWarning && 
             (!this.metrics.alerts.has('memory') || 
              now - this.metrics.alerts.get('memory') > this.thresholds.alertCooldown)) {
-            LogManager.warn(`High memory usage: ${(memoryUsage * 100).toFixed(2)}%`);
+            LogManager.warning('High memory usage', {
+                usage: `${(memoryUsage * 100).toFixed(2)}%`,
+                threshold: `${(this.thresholds.memoryWarning * 100).toFixed(2)}%`
+            });
             this.metrics.alerts.set('memory', now);
         }
 
@@ -118,7 +121,10 @@ class PerformanceManager {
         if (cpuUsage > this.thresholds.highCpuUsage && 
             (!this.metrics.alerts.has('cpu') || 
              now - this.metrics.alerts.get('cpu') > this.thresholds.alertCooldown)) {
-            LogManager.warn(`High CPU usage: ${(cpuUsage * 100).toFixed(2)}%`);
+            LogManager.warning('High CPU usage', {
+                usage: `${(cpuUsage * 100).toFixed(2)}%`,
+                threshold: `${(this.thresholds.highCpuUsage * 100).toFixed(2)}%`
+            });
             this.metrics.alerts.set('cpu', now);
         }
     }
@@ -181,13 +187,17 @@ class PerformanceManager {
                 responseTime,
                 timestamp: now
             });
-            LogManager.warn(`Slow response time for ${endpoint}: ${responseTime}ms`);
+            LogManager.warning('Slow response time detected', {
+                endpoint,
+                responseTime: `${responseTime}ms`,
+                threshold: `${this.thresholds.slowResponseTime}ms`
+            });
         }
     }
 
     trackError(error, endpoint) {
         this.metrics.errors++;
-        LogManager.error(`Error in endpoint ${endpoint}:`, error);
+        LogManager.error(`Error in endpoint ${endpoint}`, error);
     }
 
     getUptime() {
@@ -240,20 +250,20 @@ class PerformanceManager {
 
     logMetrics() {
         const metrics = this.getMetrics();
-        LogManager.info('=== Server Performance Metrics ===');
-        LogManager.info(`Uptime: ${metrics.uptime}`);
-        LogManager.info(`Total Requests: ${metrics.requests}`);
-        LogManager.info(`Error Rate: ${(metrics.errors / metrics.requests * 100).toFixed(2)}%`);
-        LogManager.info(`Success Rate: ${metrics.successRate}`);
-        LogManager.info(`Average Response Time: ${metrics.avgResponseTime.toFixed(2)}ms`);
-        LogManager.info(`Memory Usage: ${metrics.memoryUsage.heapUsed} / ${metrics.memoryUsage.heapTotal}`);
-        LogManager.info(`Current CPU Usage: ${metrics.currentCpuUsage}`);
-        LogManager.info('=== End Metrics ===');
+        LogManager.info('=== Server Performance Metrics ===', {
+            uptime: metrics.uptime,
+            totalRequests: metrics.requests,
+            errorRate: `${(metrics.errors / metrics.requests * 100).toFixed(2)}%`,
+            successRate: metrics.successRate,
+            avgResponseTime: `${metrics.avgResponseTime.toFixed(2)}ms`,
+            memoryUsage: metrics.memoryUsage,
+            cpuUsage: metrics.currentCpuUsage
+        });
     }
 
     setThresholds(newThresholds) {
         this.thresholds = { ...this.thresholds, ...newThresholds };
-        LogManager.info('Performance thresholds updated');
+        LogManager.info('Performance thresholds updated', { newThresholds });
     }
 
     getEndpointMetrics(endpoint) {

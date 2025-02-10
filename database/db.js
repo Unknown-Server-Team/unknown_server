@@ -20,7 +20,7 @@ module.exports = {
             const [rows] = await promisePool.execute(sql, params);
             return rows;
         } catch (error) {
-            LogManager.error(`Database Error: ${error.message}`);
+            LogManager.error('Database Error', error);
             throw error;
         }
     },
@@ -29,7 +29,7 @@ module.exports = {
             await promisePool.end();
             LogManager.info('Database connection pool closed');
         } catch (error) {
-            LogManager.error(`Error closing database pool: ${error.message}`);
+            LogManager.error('Error closing database pool', error);
             throw error;
         }
     }
