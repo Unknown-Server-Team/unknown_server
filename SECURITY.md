@@ -23,7 +23,7 @@ Unknown Server implements several security features:
 ## Reporting a Vulnerability
 
 1. **Do Not** open public issues for security vulnerabilities
-2. Email unknown_server@gmail.com with:
+2. Email unknown.server.team@gmail.com with:
    - Description of the vulnerability
    - Steps to reproduce
    - Potential impact
