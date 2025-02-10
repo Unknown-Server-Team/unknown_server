@@ -1,0 +1,96 @@
+<div class="documentation-container">
+    <div class="documentation-header">
+        <h1><%= title %></h1>
+    </div>
+    <div class="documentation-content">
+        <%- content %>
+    </div>
+</div>
+
+<style>
+.documentation-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.documentation-header {
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--text-muted);
+}
+
+.documentation-header h1 {
+    color: var(--primary-color);
+    font-size: 2.5rem;
+}
+
+.documentation-content {
+    line-height: 1.6;
+    color: var(--text-color);
+}
+
+.documentation-content h1,
+.documentation-content h2,
+.documentation-content h3 {
+    color: var(--primary-color);
+    margin: 1.5rem 0 1rem;
+}
+
+.documentation-content code {
+    background: var(--code-background);
+    padding: 0.2em 0.4em;
+    border-radius: 3px;
+    font-family: 'Fira Code', monospace;
+}
+
+.documentation-content pre {
+    background: var(--code-background);
+    padding: 1rem;
+    border-radius: 5px;
+    overflow-x: auto;
+    margin: 1rem 0;
+}
+
+.documentation-content pre code {
+    background: none;
+    padding: 0;
+}
+
+.documentation-content ul,
+.documentation-content ol {
+    padding-left: 2rem;
+    margin: 1rem 0;
+}
+
+.documentation-content li {
+    margin: 0.5rem 0;
+}
+
+.documentation-content table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+}
+
+.documentation-content th,
+.documentation-content td {
+    border: 1px solid var(--text-muted);
+    padding: 0.5rem;
+    text-align: left;
+}
+
+.documentation-content th {
+    background: var(--card-background);
+}
+
+@media (max-width: 768px) {
+    .documentation-container {
+        padding: 1rem;
+    }
+    
+    .documentation-header h1 {
+        font-size: 2rem;
+    }
+}
+</style>

@@ -1,4 +1,4 @@
-const mysql = require('mysql2');
+const mysql = require('mysql');
 const LogManager = require('../managers/LogManager');
 
 const pool = mysql.createPool({
@@ -11,26 +11,32 @@ const pool = mysql.createPool({
     queueLimit: 0
 });
 
-const promisePool = pool.promise();
+// Promisify the pool query method
+const query = (sql, params) => {
+    return new Promise((resolve, reject) => {
+        pool.query(sql, params, (error, results) => {
+            if (error) {
+                LogManager.error('Database Error', error);
+                return reject(error);
+            }
+            resolve(results);
+        });
+    });
+};
 
 module.exports = {
-    pool: promisePool,
-    async query(sql, params) {
-        try {
-            const [rows] = await promisePool.execute(sql, params);
-            return rows;
-        } catch (error) {
-            LogManager.error('Database Error', error);
-            throw error;
-        }
-    },
+    pool,
+    query,
     async close() {
-        try {
-            await promisePool.end();
-            LogManager.info('Database connection pool closed');
-        } catch (error) {
-            LogManager.error('Error closing database pool', error);
-            throw error;
-        }
+        return new Promise((resolve, reject) => {
+            pool.end(err => {
+                if (err) {
+                    LogManager.error('Error closing database pool', err);
+                    return reject(err);
+                }
+                LogManager.info('Database connection pool closed');
+                resolve();
+            });
+        });
     }
 };

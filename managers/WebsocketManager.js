@@ -1,5 +1,8 @@
 const WebSocket = require('ws');
 const LogManager = require('./LogManager');
+const PermissionManager = require('./PermissionManager');
+const AuthMonitor = require('./AuthMonitor');
+const SessionMonitor = require('./SessionMonitor');
 
 class WebsocketManager {
     constructor() {
@@ -17,6 +20,139 @@ class WebsocketManager {
         });
 
         LogManager.success('WebSocket server initialized');
+    }
+
+    // Add auth event handling methods
+    initializeAuthEvents() {
+        // Auth events registration
+        this.registerEvent('auth:roleChange', async (ws, data) => {
+            if (!this.verifyAuthority(ws, ['role:write'])) {
+                return this.sendError(ws, 'Insufficient permissions');
+            }
+            
+            this.broadcast({
+                type: 'auth:roleUpdated',
+                data: {
+                    userId: data.userId,
+                    roles: data.roles
+                }
+            });
+        });
+
+        this.registerEvent('auth:permissionChange', async (ws, data) => {
+            if (!this.verifyAuthority(ws, ['permission:write'])) {
+                return this.sendError(ws, 'Insufficient permissions');
+            }
+            
+            this.broadcast({
+                type: 'auth:permissionUpdated',
+                data: {
+                    roleId: data.roleId,
+                    permissions: data.permissions
+                }
+            });
+        });
+    }
+
+    initializeMonitoringEvents() {
+        // Create monitoring room
+        this.monitoringRoom = 'system:monitoring';
+
+        // Register monitoring events
+        this.registerEvent('monitoring:subscribe', async (ws, data) => {
+            if (!await PermissionManager.hasPermission(ws.user.id, 'system:admin')) {
+                return this.sendError(ws, 'Insufficient permissions for monitoring');
+            }
+            this.joinRoom(ws, this.monitoringRoom);
+            this.sendMonitoringData(ws);
+        });
+
+        this.registerEvent('monitoring:unsubscribe', (ws) => {
+            this.leaveRoom(ws, this.monitoringRoom);
+        });
+
+        // Set up periodic monitoring updates
+        setInterval(() => {
+            this.broadcastMonitoringData();
+        }, 5000); // Every 5 seconds
+    }
+
+    async sendMonitoringData(ws) {
+        const monitoringData = {
+            type: 'monitoring:update',
+            data: {
+                auth: AuthMonitor.getMetrics(),
+                sessions: SessionMonitor.getSessionStats(),
+                connections: this.getConnections(),
+                rooms: this.getRooms()
+            }
+        };
+        ws.send(JSON.stringify(monitoringData));
+    }
+
+    async broadcastMonitoringData() {
+        const monitoringData = {
+            type: 'monitoring:update',
+            data: {
+                auth: AuthMonitor.getMetrics(),
+                sessions: SessionMonitor.getSessionStats(),
+                connections: this.getConnections(),
+                rooms: this.getRooms()
+            }
+        };
+        this.broadcastToRoom(this.monitoringRoom, monitoringData);
+    }
+
+    notifySecurityEvent(eventType, data) {
+        const securityEvent = {
+            type: 'security:alert',
+            eventType,
+            data,
+            timestamp: new Date()
+        };
+        this.broadcastToRoom(this.monitoringRoom, securityEvent);
+    }
+
+    verifyAuthority(ws, requiredPermissions) {
+        return ws.user && ws.permissions && 
+            requiredPermissions.some(perm => ws.permissions.includes(perm));
+    }
+
+    sendError(ws, message) {
+        ws.send(JSON.stringify({
+            type: 'error',
+            message
+        }));
+    }
+
+    attachUserData(ws, user, permissions) {
+        ws.user = user;
+        ws.permissions = permissions;
+        
+        // Join user-specific room
+        this.joinRoom(ws, `user:${user.id}`);
+        
+        // Join role-based rooms
+        if (user.roles) {
+            user.roles.forEach(role => {
+                this.joinRoom(ws, `role:${role.name}`);
+            });
+        }
+    }
+
+    notifyRoleUpdate(userId, roles) {
+        this.broadcastToRoom(`user:${userId}`, {
+            type: 'auth:userRolesUpdated',
+            data: { roles }
+        });
+    }
+
+    notifyPermissionUpdate(roleId, permissions) {
+        // Notify all users with this role
+        this.broadcast({
+            type: 'auth:rolePermissionsUpdated',
+            data: { roleId, permissions }
+        });
     }
 
     handleConnection(ws, req) {
@@ -42,14 +178,40 @@ class WebsocketManager {
         ws.on('message', async (data) => {
             try {
                 const message = JSON.parse(data);
+                
+                // Handle authentication on connection
+                if (message.type === 'auth:authenticate') {
+                    const { token } = message;
+                    const user = await AuthManager.verifyToken(token);
+                    if (user) {
+                        const permissions = await PermissionManager.getUserPermissions(user.id);
+                        this.attachUserData(ws, user, permissions.map(p => p.name));
+                        ws.send(JSON.stringify({
+                            type: 'auth:authenticated',
+                            data: { user, permissions }
+                        }));
+                    }
+                }
+
                 await this.handleMessage(ws, message);
             } catch (error) {
                 LogManager.error('Error handling WebSocket message', error);
-                ws.send(JSON.stringify({ error: 'Invalid message format' }));
+                this.sendError(ws, 'Invalid message format');
             }
         });
 
+        // Track connection in SessionMonitor
+        if (ws.user) {
+            SessionMonitor.trackSession(ws.user.id, ws.id, {
+                ip: req.socket.remoteAddress,
+                userAgent: req.headers['user-agent']
+            });
+        }
+
         ws.on('close', () => {
+            if (ws.user) {
+                SessionMonitor.removeSession(ws.user.id, ws.id);
+            }
             this.handleDisconnection(ws);
         });
 
@@ -198,6 +360,20 @@ class WebsocketManager {
                 closedConnections: this.connections.size
             });
         });
+    }
+
+    // Add method to broadcast system notifications
+    broadcastSystemNotification(title, message, level = 'info') {
+        const notification = {
+            type: 'system:notification',
+            data: {
+                title,
+                message,
+                level,
+                timestamp: new Date()
+            }
+        };
+        this.broadcast(notification);
     }
 }
 

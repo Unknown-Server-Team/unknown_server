@@ -5,16 +5,15 @@ const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
 const expressLayouts = require('express-ejs-layouts');
+const fileUpload = require('express-fileupload');
 
 // Import managers
 const LogManager = require('./managers/LogManager');
 const RatelimitManager = require('./managers/RatelimitManager');
 const PerformanceManager = require('./managers/PerformanceManager');
 const WebsocketManager = require('./managers/WebsocketManager');
-
-// Import routers
-const mainRouter = require('./routers/main');
-const apiRouter = require('./routers/api');
+const AuthMonitor = require('./managers/AuthMonitor');
+const SessionManager = require('./managers/SessionManager');
 
 // Import database
 const db = require('./database/db');
@@ -28,38 +27,48 @@ app.use(helmet({
     contentSecurityPolicy: {
         directives: {
             defaultSrc: ["'self'"],
-            styleSrc: ["'self'", "'unsafe-inline'", "cdnjs.cloudflare.com", "fonts.googleapis.com", "fonts.gstatic.com", "https:"],
-            styleSrcElem: ["'self'", "'unsafe-inline'", "cdnjs.cloudflare.com", "fonts.googleapis.com", "fonts.gstatic.com", "https:"],
-            scriptSrc: ["'self'", "'unsafe-inline'", "cdnjs.cloudflare.com", "https:"],
-            scriptSrcElem: ["'self'", "'unsafe-inline'", "cdnjs.cloudflare.com", "https:"],
+            styleSrc: ["'self'", "'unsafe-inline'", "cdnjs.cloudflare.com", "fonts.googleapis.com"],
+            scriptSrc: ["'self'", "'unsafe-inline'", "cdnjs.cloudflare.com"],
             connectSrc: ["'self'", "ws:", "wss:"],
             imgSrc: ["'self'", "data:", "https:"],
-            fontSrc: ["'self'", "fonts.gstatic.com", "fonts.googleapis.com", "https:", "data:"],
-            frameSrc: ["'none'"],
-            objectSrc: ["'none'"],
-            upgradeInsecureRequests: []
+            fontSrc: ["'self'", "fonts.gstatic.com", "https:", "data:"]
         }
     },
-    crossOriginEmbedderPolicy: false,
-    crossOriginResourcePolicy: { policy: "cross-origin" }
+    crossOriginEmbedderPolicy: false
 }));
-app.use(cors());
+
+app.use(cors({
+    origin: process.env.CORS_ORIGIN,
+    credentials: true
+}));
+
 app.use(compression());
 
-// General middleware
+// Session handling
+app.use(SessionManager.createSessionMiddleware());
+
+// Request parsing
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(fileUpload({
+    limits: { fileSize: 50 * 1024 * 1024 },
+    useTempFiles: true,
+    tempFileDir: '/tmp/',
+    debug: process.env.NODE_ENV === 'development'
+}));
+
+// Static files
 app.use(express.static(path.join(__dirname, 'public')));
 
-// View engine setup
+// View engine
 app.set('view engine', 'ejs');
 app.use(expressLayouts);
 app.set('layout', 'layouts/main');
 
-// Add request logging middleware
+// Add request logging
 app.use(LogManager.requestLogger());
 
-// Performance monitoring middleware
+// Performance monitoring
 app.use((req, res, next) => {
     const start = process.hrtime();
     res.on('finish', () => {
@@ -70,48 +79,54 @@ app.use((req, res, next) => {
     next();
 });
 
+// Initialize routers
+const mainRouter = require('./routers/main');
+const apiRouter = require('./routers/api');
+
 // Routes
 app.use('/', mainRouter);
 app.use('/api', apiRouter);
 
-// 404 handler
+// Error handling
 app.use((req, res) => {
-    // Check if the request is for the API
     if (req.path.startsWith('/api/')) {
-        res.status(404).json({ error: true, status: 404, message: "Not found" });
+        res.status(404).json({ error: 'Not found' });
     } else {
         res.status(404).render('404');
     }
 });
 
-// Error handling
 app.use((err, req, res, next) => {
     LogManager.error('Server Error', err);
     PerformanceManager.trackError(err, req.path);
 
-    // Check if the request is for the API
     if (req.path.startsWith('/api/')) {
-        res.status(500).json({ error: true, status: 500, message: 'Internal Server Error' });
+        res.status(500).json({ 
+            error: 'Internal Server Error',
+            code: err.code,
+            message: process.env.NODE_ENV === 'development' ? err.message : undefined
+        });
     } else {
         res.status(500).render('error', { error: err });
     }
 });
 
-// Initialize server
+// Server initialization
 const startServer = async () => {
     try {
-        // Display ASCII art
         const banner = await LogManager.figlet('UNKNOWN');
         console.log(banner);
 
-        // Startup sequence
-        LogManager.info('Initializing Unknown Server...', { env: process.env.NODE_ENV || 'development' });
+        // Initialize components
+        LogManager.info('Initializing server components...');
         
-        // Database initialization
-        LogManager.info('Initializing database connection...');
+        // Initialize database queries
+        LogManager.info('Initializing database...');
         await initializeQueries();
-        LogManager.success('Database initialized successfully');
-
+        
+        // Start monitoring systems
+        AuthMonitor.startMonitoring();
+        
         // Create HTTP server
         const server = app.listen(PORT, () => {
             LogManager.success(`Server is running on port ${PORT}`);
@@ -121,47 +136,34 @@ const startServer = async () => {
             });
         });
 
-        // Initialize WebSocket with new logging
+        // Initialize WebSocket
         LogManager.info('Initializing WebSocket server...');
         WebsocketManager.initialize(server);
+        WebsocketManager.initializeAuthEvents();
         WebsocketManager.startHeartbeat();
-        LogManager.success('WebSocket server is ready');
 
-        // Log initial performance metrics
-        LogManager.info('Collecting initial performance metrics...');
+        // Start performance monitoring
         PerformanceManager.logMetrics();
-        LogManager.success('Server initialization complete');
-        LogManager.info("Metrics logs will be shown every 5 minutes");
-        
         const metricsInterval = setInterval(() => {
             PerformanceManager.logMetrics();
-        }, 300000);
+        }, 300000); // Every 5 minutes
 
         // Graceful shutdown
         const shutdown = async () => {
             LogManager.info('Received shutdown signal');
-
-            // Clear metrics interval
-            clearInterval(metricsInterval);
-            LogManager.info('Cleared metrics interval');
             
-            // Close WebSocket connections
-            LogManager.info('Closing WebSocket connections...');
+            clearInterval(metricsInterval);
             WebsocketManager.close();
             
-            // Close database connections
-            LogManager.info('Closing database connections...');
             await db.close();
             
-            // Close HTTP server
             server.close(() => {
-                LogManager.success('All connections closed successfully');
+                LogManager.success('Server shut down successfully');
                 process.exit(0);
             });
 
-            // Force exit after 5 seconds
             setTimeout(() => {
-                LogManager.error('Could not close connections in time', new Error('Shutdown timeout'));
+                LogManager.error('Force closing server after timeout');
                 process.exit(1);
             }, 5000);
         };
