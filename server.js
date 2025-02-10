@@ -71,11 +71,27 @@ app.use((req, res, next) => {
 app.use('/', mainRouter);
 app.use('/api', apiRouter);
 
+// 404 handler
+app.use((req, res) => {
+    // Check if the request is for the API
+    if (req.path.startsWith('/api/')) {
+        res.status(404).json({ error: true, status: 404, message: "Not found" });
+    } else {
+        res.status(404).render('404');
+    }
+});
+
 // Error handling
 app.use((err, req, res, next) => {
     LogManager.error('Server Error:', err);
     PerformanceManager.trackError(err, req.path);
-    res.status(500).json({ error: 'Internal Server Error' });
+
+    // Check if the request is for the API
+    if (req.path.startsWith('/api/')) {
+        res.status(500).json({ error: true, status: 500, message: 'Internal Server Error' });
+    } else {
+        res.status(500).render('error', { error: err });
+    }
 });
 
 // Initialize server
@@ -87,7 +103,7 @@ const startServer = async () => {
         // Startup sequence
         LogManager.system('Initializing Unknown Server...');
         LogManager.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
-        
+
         // Database initialization
         LogManager.system('Initializing database connection...');
         await initializeQueries();
@@ -122,15 +138,15 @@ const startServer = async () => {
             // Clear metrics interval
             clearInterval(metricsInterval);
             LogManager.info('Cleared metrics interval');
-            
+
             // Close WebSocket connections
             LogManager.info('Closing WebSocket connections...');
             WebsocketManager.close();
-            
+
             // Close database connections
             LogManager.info('Closing database connections...');
             await db.close();
-            
+
             // Close HTTP server
             server.close(() => {
                 LogManager.success('All connections closed successfully');
