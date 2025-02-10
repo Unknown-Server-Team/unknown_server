@@ -42,6 +42,27 @@
 
 ## Version History Contributors
 
+### Version 2.1.2
+- [Santiago Morales](https://github.com/santiadjmc)
+  - Enhanced logout functionality
+  - Advanced role management
+  - Email verification improvements
+  - Permission management enhancements
+  - Security improvements
+
+### Version 2.1.1
+- [Santiago Morales](https://github.com/santiadjmc)
+  - Validation middleware implementation
+  - User management query functions
+  - Route handler and middleware fixes
+
+### Version 2.1.0
+- [Santiago Morales](https://github.com/santiadjmc)
+  - Comprehensive Swagger API Documentation
+  - Enhanced User Management System
+  - Extended Authorization Controls
+  - Input Validation System improvements
+
 ### Version 2.0.0
 - [Santiago Morales](https://github.com/santiadjmc)
   - Session Management System
