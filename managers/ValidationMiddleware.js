@@ -16,6 +16,37 @@ class ValidationMiddleware {
         };
     }
 
+    static validateRegistration(req, res, next) {
+        const validation = ValidationManager.validateRegistration(req.body);
+        if (!validation.isValid) {
+            return res.status(400).json({
+                error: 'Validation failed',
+                details: validation.errors
+            });
+        }
+        next();
+    }
+
+    static validateLogin(req, res, next) {
+        const errors = {};
+        
+        if (!req.body.email || !ValidationManager.validateEmail(req.body.email)) {
+            errors.email = ['Invalid email address'];
+        }
+        
+        if (!req.body.password || req.body.password.length < 1) {
+            errors.password = ['Password is required'];
+        }
+
+        if (Object.keys(errors).length > 0) {
+            return res.status(400).json({
+                error: 'Validation failed',
+                details: errors
+            });
+        }
+        next();
+    }
+
     static sanitize() {
         return (req, res, next) => {
             if (req.body) {
