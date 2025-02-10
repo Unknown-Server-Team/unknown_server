@@ -5,7 +5,7 @@ const LogManager = require('./LogManager');
 const EmailManager = require('./EmailManager');
 const RoleManager = require('./RoleManager');
 const { userQueries } = require('../database/mainQueries');
-
+const db = require('../database/db');
 class AuthManager {
     constructor() {
         this.secret = process.env.JWT_SECRET || 'your-secret-key';
@@ -22,12 +22,20 @@ class AuthManager {
     }
 
     async generateToken(user) {
+        if (!user || !user.id) {
+            LogManager.error('Invalid user object passed to generateToken', { user });
+            throw new Error('Invalid user object');
+        }
+
         const roles = await RoleManager.getUserRoles(user.id);
+        // Ensure roles is an array and map it, defaulting to empty array if roles is falsy
+        const roleNames = (roles || []).map(r => r.name);
+
         return jwt.sign(
             { 
                 id: user.id, 
                 email: user.email,
-                roles: roles.map(r => r.name)
+                roles: roleNames
             },
             this.secret,
             { expiresIn: this.tokenExpiration }

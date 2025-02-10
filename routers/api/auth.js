@@ -84,12 +84,20 @@ router.post('/register',
                     details: validation.errors
                 });
             }
-
+            const foundUser = await userQueries.getUserByEmail(req.body.email);
+            if (foundUser) {
+                return res.status(409).json({ error: 'Email already exists' });
+            }
             const userId = await AuthManager.createUser(req.body);
             const user = await userQueries.getUserById(userId);
-            
-            // Generate verification token and send email
-            await AuthManager.initiateEmailVerification(user);
+
+            try {
+                // Generate verification token and send email
+                await AuthManager.initiateEmailVerification(user);
+            }
+            catch (error) {
+                LogManager.error('Failed to send verification email', error);
+            }
 
             // Get initial roles and permissions
             const userAuth = await RoleManager.getUserWithRolesAndPermissions(userId);
@@ -164,9 +172,9 @@ router.post('/login', ValidationMiddleware.validateLogin, RatelimitManager.creat
         }
 
         // Generate token
-        const token = AuthManager.generateToken(user);
-        
-        res.json({ 
+        const token = await AuthManager.generateToken(user);
+
+        res.json({
             token,
             user: {
                 id: user.id,
@@ -203,7 +211,7 @@ router.get('/me', AuthManager.getAuthMiddleware(), async (req, res) => {
 
         const roles = await RoleManager.getUserRoles(req.user.id);
         const sanitizedUser = ValidationManager.sanitizeUser(user);
-        
+
         res.json({
             ...sanitizedUser,
             roles
@@ -323,7 +331,7 @@ router.post('/reset-password/:token', RatelimitManager.createAuthLimiter(), asyn
 
         const passwordValidation = ValidationManager.validatePassword(newPassword);
         if (!passwordValidation.isValid) {
-            return res.status(400).json({ 
+            return res.status(400).json({
                 error: 'Invalid password',
                 details: passwordValidation.errors
             });
@@ -357,13 +365,13 @@ router.post('/reset-password/:token', RatelimitManager.createAuthLimiter(), asyn
  *       403:
  *         description: Email already verified
  */
-router.post('/resend-verification', 
-    AuthManager.getAuthMiddleware({ requireVerified: false }), 
+router.post('/resend-verification',
+    AuthManager.getAuthMiddleware({ requireVerified: false }),
     RatelimitManager.createAuthLimiter(),
     async (req, res) => {
         try {
             const user = await userQueries.getUserById(req.user.id);
-            
+
             if (user.email_verified) {
                 return res.status(403).json({ error: 'Email already verified' });
             }
@@ -391,8 +399,8 @@ router.post('/resend-verification',
  *       403:
  *         description: Insufficient permissions
  */
-router.get('/roles', 
-    AuthManager.getAuthMiddleware({ roles: ['admin'] }), 
+router.get('/roles',
+    AuthManager.getAuthMiddleware({ roles: ['admin'] }),
     async (req, res) => {
         try {
             const roles = await RoleManager.getRoles();
@@ -661,8 +669,8 @@ router.delete('/roles/:roleId/permissions/:permissionId',
                     [req.params.permissionId]
                 );
                 if (permission?.name === 'system:admin') {
-                    return res.status(400).json({ 
-                        error: 'Cannot remove system:admin permission from admin role' 
+                    return res.status(400).json({
+                        error: 'Cannot remove system:admin permission from admin role'
                     });
                 }
             }

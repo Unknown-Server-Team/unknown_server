@@ -2,6 +2,32 @@
 
 All notable changes to Unknown Server will be documented in this file.
 
+## [2.1.2] - 2025-02-11
+
+### Added
+- Enhanced logout functionality
+  - Added session invalidation
+  - Implemented token blacklisting
+  - Improved logout error handling
+- Advanced role management
+  - Protection against removing last admin role
+  - Added role permission endpoints
+  - Enhanced role assignment validation
+- Email verification improvements
+  - Added resend verification endpoint
+  - Enhanced verification token handling
+  - Better error messaging for verification
+- Permission management enhancements
+  - Protected critical admin permissions
+  - Added permission assignment endpoints
+  - Improved permission validation
+
+### Security
+- Improved authentication checks
+- Enhanced role-based access control
+- Added protection for critical system permissions
+- Better session security handling
+
 ## [2.1.1] - 2025-02-11
 
 ### Added

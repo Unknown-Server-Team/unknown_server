@@ -21,7 +21,8 @@ class RoleManager {
                 JOIN user_roles ur ON r.id = ur.role_id
                 WHERE ur.user_id = ?
             `, [userId]);
-            return roles;
+            // Return empty array instead of undefined if no roles found
+            return roles || [];
         } catch (error) {
             LogManager.error('Failed to get user roles', error);
             throw error;
