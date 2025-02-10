@@ -5,6 +5,7 @@ const swaggerUi = require('swagger-ui-express');
 const RatelimitManager = require('../../managers/RatelimitManager');
 const PerformanceManager = require('../../managers/PerformanceManager');
 const authRouter = require('./auth');
+const usersRouter = require('./users');
 const path = require('path');
 
 // Swagger configuration
@@ -36,6 +37,11 @@ const swaggerOptions = {
                     type: 'http',
                     scheme: 'bearer',
                     bearerFormat: 'JWT',
+                },
+                sessionAuth: {
+                    type: 'apiKey',
+                    in: 'cookie',
+                    name: 'sessionId',
                 },
             },
             schemas: {
@@ -79,6 +85,38 @@ const swaggerOptions = {
                         }
                     }
                 }
+            },
+            responses: {
+                UnauthorizedError: {
+                    description: 'Access token is missing or invalid',
+                    content: {
+                        'application/json': {
+                            schema: {
+                                $ref: '#/components/schemas/Error'
+                            }
+                        }
+                    }
+                },
+                ForbiddenError: {
+                    description: 'The server understood the request but refuses to authorize it',
+                    content: {
+                        'application/json': {
+                            schema: {
+                                $ref: '#/components/schemas/Error'
+                            }
+                        }
+                    }
+                },
+                ValidationError: {
+                    description: 'The request data did not pass validation',
+                    content: {
+                        'application/json': {
+                            schema: {
+                                $ref: '#/components/schemas/Error'
+                            }
+                        }
+                    }
+                }
             }
         },
         tags: [
@@ -89,6 +127,14 @@ const swaggerOptions = {
             {
                 name: 'System',
                 description: 'System health and monitoring endpoints'
+            },
+            {
+                name: 'Authorization',
+                description: 'Role and permission management'
+            },
+            {
+                name: 'Users',
+                description: 'User profile and management'
             }
         ]
     },
@@ -128,6 +174,9 @@ router.get('/docs.json', (req, res) => {
 
 // Auth routes
 router.use('/auth', authRouter);
+
+// Users routes
+router.use('/users', usersRouter);
 
 /**
  * @swagger

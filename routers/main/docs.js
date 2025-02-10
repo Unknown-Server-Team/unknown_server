@@ -59,4 +59,16 @@ router.get('/security', async (req, res) => {
     }
 });
 
+router.get('/roles-and-permissions', async (req, res) => {
+    try {
+        const markdown = await renderMarkdown(path.join(__dirname, '../../docs/roles-and-permissions.md'));
+        res.render('documentation', { 
+            title: 'Roles and Permissions Guide',
+            content: markdown
+        });
+    } catch (error) {
+        res.status(500).render('error', { error });
+    }
+});
+
 module.exports = router;

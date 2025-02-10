@@ -7,6 +7,27 @@ const ValidationManager = require('../../managers/ValidationManager');
 const { userQueries } = require('../../database/mainQueries');
 const RatelimitManager = require('../../managers/RatelimitManager');
 const LogManager = require('../../managers/LogManager');
+const ValidationMiddleware = require('../../managers/ValidationMiddleware');
+
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     User:
+ *       type: object
+ *       required:
+ *         - email
+ *         - password
+ *       properties:
+ *         email:
+ *           type: string
+ *           format: email
+ *         password:
+ *           type: string
+ *           format: password
+ *         name:
+ *           type: string
+ */
 
 /**
  * @swagger
@@ -28,56 +49,63 @@ const LogManager = require('../../managers/LogManager');
  *             properties:
  *               email:
  *                 type: string
+ *                 format: email
  *               password:
  *                 type: string
+ *                 format: password
  *               name:
  *                 type: string
  *     responses:
- *       200:
- *         description: User registered successfully
+ *       201:
+ *         description: User created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 user:
+ *                   $ref: '#/components/schemas/User'
  *       400:
- *         description: Invalid input
+ *         description: Invalid input data
  *       409:
  *         description: Email already exists
+ *       500:
+ *         description: Server error
  */
-router.post('/register', RatelimitManager.createAuthLimiter(), async (req, res) => {
-    try {
-        const validation = ValidationManager.validateRegistration(req.body);
-        if (!validation.isValid) {
-            return res.status(400).json({ 
-                error: 'Validation failed',
-                details: validation.errors
+router.post('/register',
+    ValidationMiddleware.validateRegistration,
+    RatelimitManager.createAuthLimiter(),
+    async (req, res) => {
+        try {
+            const validation = ValidationManager.validateRegistration(req.body);
+            if (!validation.isValid) {
+                return res.status(400).json({
+                    error: 'Validation failed',
+                    details: validation.errors
+                });
+            }
+
+            const userId = await AuthManager.createUser(req.body);
+            const user = await userQueries.getUserById(userId);
+            
+            // Generate verification token and send email
+            await AuthManager.initiateEmailVerification(user);
+
+            // Get initial roles and permissions
+            const userAuth = await RoleManager.getUserWithRolesAndPermissions(userId);
+
+            res.status(201).json({
+                message: 'User registered successfully. Please check your email to verify your account.',
+                userId,
+                roles: userAuth.roles,
+                permissions: userAuth.permissions
             });
+        } catch (error) {
+            LogManager.error('Registration failed', error);
+            res.status(500).json({ error: 'Registration failed' });
         }
-
-        const { email, password, name } = req.body;
-        const existingUser = await userQueries.getUserByEmail(email);
-        if (existingUser) {
-            return res.status(409).json({ error: 'Email already registered' });
-        }
-
-        const hashedPassword = await AuthManager.hashPassword(password);
-        const result = await userQueries.createUser({
-            email,
-            password: hashedPassword,
-            name
-        });
-
-        // After successful registration, initiate email verification
-        const user = { id: result.insertId, email, name };
-        await AuthManager.initiateEmailVerification(user);
-
-        res.json({ 
-            message: 'User registered successfully. Please check your email to verify your account.',
-            userId: result.insertId
-        });
-
-        LogManager.info('New user registered', { userId: result.insertId, email });
-    } catch (error) {
-        LogManager.error('Registration failed', error);
-        res.status(500).json({ error: 'Registration failed' });
     }
-});
+);
 
 /**
  * @swagger
@@ -98,15 +126,28 @@ router.post('/register', RatelimitManager.createAuthLimiter(), async (req, res) 
  *             properties:
  *               email:
  *                 type: string
+ *                 format: email
  *               password:
  *                 type: string
+ *                 format: password
  *     responses:
  *       200:
  *         description: Login successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 token:
+ *                   type: string
+ *                 user:
+ *                   $ref: '#/components/schemas/User'
  *       401:
  *         description: Invalid credentials
+ *       500:
+ *         description: Server error
  */
-router.post('/login', RatelimitManager.createAuthLimiter(), async (req, res) => {
+router.post('/login', ValidationMiddleware.validateLogin, RatelimitManager.createAuthLimiter(), async (req, res) => {
     try {
         const { email, password } = req.body;
 
@@ -662,38 +703,41 @@ router.get('/my-permissions',
     }
 );
 
-// Update register endpoint to assign default role and permissions
-router.post('/register',
-    RatelimitManager.createAuthLimiter(),
-    async (req, res) => {
-        try {
-            const validation = ValidationManager.validateRegistration(req.body);
-            if (!validation.isValid) {
-                return res.status(400).json({
-                    error: 'Validation failed',
-                    details: validation.errors
-                });
-            }
-
-            const userId = await AuthManager.createUser(req.body);
-            const user = await userQueries.getUserById(userId);
-            
-            // Generate verification token and send email
-            await AuthManager.initiateEmailVerification(user);
-
-            // Get initial roles and permissions
-            const userAuth = await RoleManager.getUserWithRolesAndPermissions(userId);
-
-            res.json({
-                message: 'User registered successfully. Please check your email to verify your account.',
-                userId,
-                roles: userAuth.roles,
-                permissions: userAuth.permissions
-            });
-        } catch (error) {
-            res.status(500).json({ error: 'Registration failed' });
+/**
+ * @swagger
+ * /api/auth/logout:
+ *   post:
+ *     summary: Logout current user
+ *     tags: [Authentication]
+ *     security:
+ *       - bearerAuth: []
+ *       - sessionAuth: []
+ *     responses:
+ *       200:
+ *         description: Logout successful
+ *       401:
+ *         description: Not authenticated
+ *       500:
+ *         description: Server error
+ */
+router.post('/logout', AuthManager.getAuthMiddleware(), async (req, res) => {
+    try {
+        // If there's a session, invalidate it
+        if (req.session) {
+            await SessionManager.invalidateSession(req.session.id);
         }
+
+        // If there's a token, add it to blacklist
+        const token = AuthManager.extractToken(req);
+        if (token) {
+            await AuthMonitor.removeToken(token);
+        }
+
+        res.json({ message: 'Logged out successfully' });
+    } catch (error) {
+        LogManager.error('Logout failed', error);
+        res.status(500).json({ error: 'Failed to logout' });
     }
-);
+});
 
 module.exports = router;

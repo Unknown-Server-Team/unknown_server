@@ -355,11 +355,24 @@ li {
     transition: all 0.3s ease;
     padding: 0.5rem;
     border-radius: 8px;
+    position: relative;
+    z-index: 1;
 }
 
-.hover-effect:hover code {
-    background: var(--primary-color);
-    color: white;
+.instruction-card a.hover-effect {
+    display: block;
+    text-decoration: none;
+    color: var(--text-color);
+    position: relative;
+    z-index: 2;
+}
+
+.instruction-card a.hover-effect:hover {
+    color: var(--primary-color);
+}
+
+.instruction-card li {
+    list-style: none;
 }
 
 /* Particles background */

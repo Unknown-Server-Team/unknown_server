@@ -274,6 +274,37 @@ const userQueries = {
             [password, userId]
         );
         return result;
+    },
+
+    async getUsers(offset = 0, limit = 10) {
+        const [users] = await db.query(
+            'SELECT * FROM users ORDER BY created_at DESC LIMIT ? OFFSET ?',
+            [limit, offset]
+        );
+        return users;
+    },
+
+    async getUserCount() {
+        const [[result]] = await db.query('SELECT COUNT(*) as count FROM users');
+        return result.count;
+    },
+
+    async countUsersByRole(roleName) {
+        const [[result]] = await db.query(`
+            SELECT COUNT(DISTINCT ur.user_id) as count 
+            FROM user_roles ur
+            JOIN roles r ON ur.role_id = r.id
+            WHERE r.name = ?
+        `, [roleName]);
+        return result.count;
+    },
+
+    async deleteUser(userId) {
+        const [result] = await db.query(
+            'DELETE FROM users WHERE id = ?',
+            [userId]
+        );
+        return result.affectedRows > 0;
     }
 };
 

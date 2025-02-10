@@ -74,10 +74,10 @@
             <div class="card-icon">📚</div>
             <h3>Documentation</h3>
             <ul>
-                <li class="hover-effect"><a href="/docs/api">API Reference</a></li>
-                <li class="hover-effect"><a href="/docs/deployment">Deployment Guide</a></li>
-                <li class="hover-effect"><a href="/docs/security">Security Guide</a></li>
-                <li class="hover-effect"><a href="https://github.com/your-repo">GitHub Repository</a></li>
+                <li><a href="/api-docs" class="hover-effect">API Documentation</a></li>
+                <li><a href="/docs/roles-and-permissions" class="hover-effect">Roles & Permissions</a></li>
+                <li><a href="/docs/deployment" class="hover-effect">Deployment Guide</a></li>
+                <li><a href="/docs/security" class="hover-effect">Security Guide</a></li>
             </ul>
         </div>
     </div>
@@ -94,14 +94,26 @@
 
     // Add hover effect to list items
     document.querySelectorAll('.hover-effect').forEach(item => {
-        item.addEventListener('mouseover', function() {
-            this.style.transform = 'translateX(10px)';
-            this.style.color = getComputedStyle(document.documentElement).getPropertyValue('--primary-color');
-        });
-        
-        item.addEventListener('mouseout', function() {
-            this.style.transform = 'translateX(0)';
-            this.style.color = '';
-        });
+        if (item.tagName === 'A') {
+            // For links, only apply color change
+            item.addEventListener('mouseover', function() {
+                this.style.color = getComputedStyle(document.documentElement).getPropertyValue('--primary-color');
+            });
+            
+            item.addEventListener('mouseout', function() {
+                this.style.color = '';
+            });
+        } else {
+            // For non-links, apply full hover effect
+            item.addEventListener('mouseover', function() {
+                this.style.transform = 'translateX(10px)';
+                this.style.color = getComputedStyle(document.documentElement).getPropertyValue('--primary-color');
+            });
+            
+            item.addEventListener('mouseout', function() {
+                this.style.transform = 'translateX(0)';
+                this.style.color = '';
+            });
+        }
     });
 </script>

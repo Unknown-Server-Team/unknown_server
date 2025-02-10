@@ -81,6 +81,67 @@ class ValidationManager {
         const { password, password_reset_token, email_verification_token, ...safeUser } = user;
         return safeUser;
     }
+
+    static validate(schema, data) {
+        const errors = {};
+        
+        Object.entries(schema).forEach(([field, rules]) => {
+            if (rules.required && !data[field]) {
+                errors[field] = [`${field} is required`];
+                return;
+            }
+
+            if (data[field]) {
+                if (rules.type === 'email' && !this.validateEmail(data[field])) {
+                    errors[field] = ['Invalid email format'];
+                }
+                if (rules.type === 'password') {
+                    const passwordValidation = this.validatePassword(data[field]);
+                    if (!passwordValidation.isValid) {
+                        errors[field] = passwordValidation.errors;
+                    }
+                }
+                if (rules.minLength && data[field].length < rules.minLength) {
+                    errors[field] = [`Must be at least ${rules.minLength} characters`];
+                }
+                if (rules.maxLength && data[field].length > rules.maxLength) {
+                    errors[field] = [`Must be no more than ${rules.maxLength} characters`];
+                }
+                if (rules.pattern && !rules.pattern.test(data[field])) {
+                    errors[field] = [rules.message || 'Invalid format'];
+                }
+            }
+        });
+
+        return {
+            isValid: Object.keys(errors).length === 0,
+            errors
+        };
+    }
+
+    static sanitizeInput(data) {
+        if (!data) return data;
+        
+        const sanitized = {};
+        for (const [key, value] of Object.entries(data)) {
+            if (typeof value === 'string') {
+                // Remove any HTML tags and trim
+                sanitized[key] = value.replace(/<[^>]*>/g, '').trim();
+            } else if (Array.isArray(value)) {
+                // Recursively sanitize arrays
+                sanitized[key] = value.map(item => 
+                    typeof item === 'object' ? this.sanitizeInput(item) : item
+                );
+            } else if (typeof value === 'object' && value !== null) {
+                // Recursively sanitize nested objects
+                sanitized[key] = this.sanitizeInput(value);
+            } else {
+                // Keep other types as is
+                sanitized[key] = value;
+            }
+        }
+        return sanitized;
+    }
 }
 
 module.exports = ValidationManager;

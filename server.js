@@ -6,6 +6,8 @@ const helmet = require('helmet');
 const compression = require('compression');
 const expressLayouts = require('express-ejs-layouts');
 const fileUpload = require('express-fileupload');
+const swaggerUi = require('swagger-ui-express');
+const swaggerSpecs = require('./config/swagger');
 
 // Import managers
 const LogManager = require('./managers/LogManager');
@@ -27,8 +29,8 @@ app.use(helmet({
     contentSecurityPolicy: {
         directives: {
             defaultSrc: ["'self'"],
-            styleSrc: ["'self'", "'unsafe-inline'", "cdnjs.cloudflare.com", "fonts.googleapis.com"],
-            scriptSrc: ["'self'", "'unsafe-inline'", "cdnjs.cloudflare.com"],
+            styleSrc: ["'self'", "'unsafe-inline'", "cdnjs.cloudflare.com", "fonts.googleapis.com", "swagger-ui.css"],
+            scriptSrc: ["'self'", "'unsafe-inline'", "cdnjs.cloudflare.com", "swagger-ui-bundle.js", "swagger-ui-standalone-preset.js"],
             connectSrc: ["'self'", "ws:", "wss:"],
             imgSrc: ["'self'", "data:", "https:"],
             fontSrc: ["'self'", "fonts.gstatic.com", "https:", "data:"]
@@ -82,6 +84,14 @@ app.use((req, res, next) => {
 // Initialize routers
 const mainRouter = require('./routers/main');
 const apiRouter = require('./routers/api');
+
+// Swagger Documentation
+app.use('/api-docs', swaggerUi.serve);
+app.get('/api-docs', swaggerUi.setup(swaggerSpecs, {
+    explorer: true,
+    customCss: '.swagger-ui .topbar { display: none }',
+    customSiteTitle: "Unknown Server API Documentation"
+}));
 
 // Routes
 app.use('/', mainRouter);
