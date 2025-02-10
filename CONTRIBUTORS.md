@@ -2,7 +2,7 @@
 
 ## Project Maintainers
 
-- [santiago Morales](https://github.com/santiadjmc) - Project Lead & Core Developer
+- [Santiago Morales](https://github.com/santiadjmc) - Project Lead & Core Developer
 
 ## How to Contribute
 
