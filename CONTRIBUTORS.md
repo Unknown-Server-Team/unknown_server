@@ -33,7 +33,14 @@
 
 ### Core Contributors
 
-- TBD
+- [Santiago Morales](https://github.com/santiadjmc)
+  - Authentication System
+  - Authorization System
+  - Session Management
+  - Security Features
+  - API Documentation
+  - Email System
+  - Monitoring Tools
 
 ### Special Thanks
 
@@ -42,7 +49,15 @@
 
 ## Version History Contributors
 
-### Version 2.1.2
+### Version 2.1.3 (2025-02-12)
+- [Santiago Morales](https://github.com/santiadjmc)
+  - NGINX reverse proxy integration
+  - Enhanced security documentation
+  - DDoS protection implementation
+  - SSL/TLS optimization
+  - Advanced proxy security features
+
+### Version 2.1.2 (2025-02-11)
 - [Santiago Morales](https://github.com/santiadjmc)
   - Enhanced logout functionality
   - Advanced role management
@@ -50,20 +65,20 @@
   - Permission management enhancements
   - Security improvements
 
-### Version 2.1.1
+### Version 2.1.1 (2025-02-11)
 - [Santiago Morales](https://github.com/santiadjmc)
   - Validation middleware implementation
   - User management query functions
   - Route handler and middleware fixes
 
-### Version 2.1.0
+### Version 2.1.0 (2025-02-11)
 - [Santiago Morales](https://github.com/santiadjmc)
   - Comprehensive Swagger API Documentation
   - Enhanced User Management System
   - Extended Authorization Controls
   - Input Validation System improvements
 
-### Version 2.0.0
+### Version 2.0.0 (2025-02-10)
 - [Santiago Morales](https://github.com/santiadjmc)
   - Session Management System
   - Authentication System

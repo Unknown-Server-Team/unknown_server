@@ -24,25 +24,36 @@ const { initializeQueries } = require('./database/mainQueries');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Security middleware
+// Security middleware - Configuración mínima para desarrollo local
 app.use(helmet({
-    contentSecurityPolicy: {
-        directives: {
-            defaultSrc: ["'self'"],
-            styleSrc: ["'self'", "'unsafe-inline'", "cdnjs.cloudflare.com", "fonts.googleapis.com", "swagger-ui.css"],
-            scriptSrc: ["'self'", "'unsafe-inline'", "cdnjs.cloudflare.com", "swagger-ui-bundle.js", "swagger-ui-standalone-preset.js"],
-            connectSrc: ["'self'", "ws:", "wss:"],
-            imgSrc: ["'self'", "data:", "https:"],
-            fontSrc: ["'self'", "fonts.gstatic.com", "https:", "data:"]
-        }
-    },
-    crossOriginEmbedderPolicy: false
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false,
+    crossOriginOpenerPolicy: false,
+    crossOriginResourcePolicy: false,
+    originAgentCluster: false,
+    dnsPrefetchControl: false,
+    expectCt: false,
+    frameguard: false,
+    hidePoweredBy: false,
+    hsts: false,
+    ieNoOpen: false,
+    noSniff: false,
+    permittedCrossDomainPolicies: false,
+    referrerPolicy: false,
+    xssFilter: false
 }));
 
-app.use(cors({
-    origin: process.env.CORS_ORIGIN,
-    credentials: true
-}));
+// Configuración CORS simplificada
+app.use(cors());
+
+// Headers específicos para desarrollo local
+app.use((req, res, next) => {
+    res.setHeader('Cross-Origin-Opener-Policy', 'unsafe-none');
+    res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.setHeader('Origin-Agent-Cluster', '?0');
+    next();
+});
 
 app.use(compression());
 
@@ -138,12 +149,9 @@ const startServer = async () => {
         AuthMonitor.startMonitoring();
         
         // Create HTTP server
-        const server = app.listen(PORT, () => {
+        const server = app.listen(PORT, '0.0.0.0', () => {
             LogManager.success(`Server is running on port ${PORT}`);
-            LogManager.info('Server URLs:', {
-                local: `http://localhost:${PORT}`,
-                network: `http://${require('os').hostname()}:${PORT}`
-            });
+            LogManager.info('Server running behind NGINX reverse proxy');
         });
 
         // Initialize WebSocket

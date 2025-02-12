@@ -2,6 +2,43 @@
 
 All notable changes to Unknown Server will be documented in this file.
 
+## [2.1.3] - 2025-02-12
+
+### Added
+- Comprehensive security documentation
+  - Added detailed SECURITY.md
+  - Enhanced security policy
+  - Added vulnerability reporting process
+  - Documented security features
+- Updated contributor documentation
+  - Enhanced role descriptions
+  - Added version history details
+  - Updated maintainer information
+- NGINX Integration
+  - Added reverse proxy configuration
+  - Enhanced SSL/TLS termination
+  - Improved load balancing capabilities
+  - Added proxy caching layer
+
+### Security
+- Implemented reverse proxy security features
+  - Request filtering and validation
+  - DDoS protection
+  - SSL/TLS optimization
+  - Header security enforcement
+- Enhanced server configuration
+  - Improved CORS policies
+  - Stricter CSP rules
+  - Advanced rate limiting
+  - IP filtering capabilities
+
+### Documentation
+- Added security response timelines
+- Enhanced security best practices
+- Added deployment security guidelines
+- Updated development guidelines
+- Added NGINX configuration documentation
+
 ## [2.1.2] - 2025-02-11
 
 ### Added

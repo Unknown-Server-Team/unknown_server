@@ -86,7 +86,37 @@ Authorization: Bearer <token>
 
 ## Rate Limiting
 
-API endpoints are protected by rate limiting. Exceeding the rate limit will result in a 429 Too Many Requests response.
+API endpoints are protected by multi-layer rate limiting:
+
+### Global Limits (NGINX Layer)
+- 30 requests per minute per IP
+- Burst allowance: 10 requests
+- Maximum 10 concurrent connections per IP
+
+### API-Specific Limits
+- Auth endpoints: 5 requests per minute
+- General API: 30 requests per minute
+- Static resources: No rate limit
+
+### Cache Behavior
+Different endpoints have different caching strategies:
+
+1. Static Resources (/static/*):
+   - Cache duration: 1 year
+   - Cache-Control: public, no-transform
+   - Cached at proxy level
+   - Stale cache served on errors
+
+2. API Endpoints (/api/*):
+   - GET/HEAD methods cached for 10 minutes
+   - No caching for authenticated requests
+   - Cached at proxy level
+   - Cache bypassed for WebSocket connections
+
+3. Health Check (/health):
+   - No caching
+   - Internal access only
+   - Rate limiting disabled
 
 ## WebSocket Events
 
@@ -120,12 +150,29 @@ Common HTTP status codes:
 
 ## Security
 
-The API implements several security measures:
+The API implements several security measures through multiple layers:
+
+### Application Layer
 - Input sanitization
 - CORS protection
 - Content Security Policy (CSP)
 - Secure session handling
 - Advanced validation middleware
+
+### Proxy Layer (NGINX)
+- DDoS protection through rate limiting
+- SSL/TLS termination with modern ciphers
+- Request filtering and validation
+- Advanced header security
+- IP filtering and connection limiting
+- Multi-layer caching strategy
+- WebSocket protection
+- Buffer overflow prevention
+
+For detailed security implementation, see:
+- [Security Policy](../SECURITY.md)
+- [NGINX Deployment Guide](./nginx-deployment.md)
+- [Roles and Permissions](./roles-and-permissions.md)
 
 ## Additional Resources
 

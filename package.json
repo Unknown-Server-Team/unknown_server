@@ -1,6 +1,6 @@
 {
   "name": "unknown-server",
-  "version": "1.0.0",
+  "version": "2.1.2",
   "description": "A modern Express.js server with built-in managers and utilities",
   "main": "server.js",
   "scripts": {
