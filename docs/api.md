@@ -98,6 +98,25 @@ API endpoints are protected by multi-layer rate limiting:
 - General API: 30 requests per minute
 - Static resources: No rate limit
 
+### Token Bucket Algorithm
+- Dynamic token allocation
+- Burst protection with configurable multiplier
+- Automatic IP tracking and blocking
+- Whitelist/blacklist support
+
+### Rate Limits
+- Auth endpoints: 5 requests per minute
+- API endpoints: Dynamic based on user role
+- Monitoring endpoints: Role-based access
+- WebSocket connections: 60 per minute per IP
+
+### Rate Limit Headers
+```
+X-RateLimit-Limit: Maximum requests allowed
+X-RateLimit-Remaining: Requests remaining
+X-RateLimit-Reset: Time until limit resets
+```
+
 ### Cache Behavior
 Different endpoints have different caching strategies:
 
@@ -117,6 +136,46 @@ Different endpoints have different caching strategies:
    - No caching
    - Internal access only
    - Rate limiting disabled
+
+## Performance Monitoring
+
+### GET /api/metrics
+Returns detailed system performance metrics.
+
+**Response:**
+```json
+{
+  "cpu": {
+    "usage": "number",
+    "cores": ["number"],
+    "average": "number"
+  },
+  "memory": {
+    "heapUsed": "string",
+    "heapTotal": "string",
+    "rss": "string",
+    "external": "string"
+  },
+  "requests": {
+    "total": "number",
+    "perMinute": "number",
+    "avgResponseTime": "number"
+  },
+  "trends": {
+    "responseTime": {
+      "current": "number",
+      "hourly": "number",
+      "trend": "string"
+    }
+  }
+}
+```
+
+### GET /api/health
+Basic health check endpoint.
+
+### GET /api/analytics/auth
+Returns authentication-related analytics.
 
 ## WebSocket Events
 

@@ -145,7 +145,7 @@ class PerformanceManager {
         if (requestRate > this.thresholds.requestRateWarning && 
             (!this.metrics.alerts.has('requestRate') || 
              now - this.metrics.alerts.get('requestRate') > this.thresholds.alertCooldown)) {
-            LogManager.warn(`High request rate: ${requestRate} requests/minute`);
+            LogManager.warning(`High request rate: ${requestRate} requests/minute`);
             this.metrics.alerts.set('requestRate', now);
         }
     }

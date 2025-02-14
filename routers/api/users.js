@@ -3,6 +3,26 @@ const router = express.Router();
 const AuthManager = require('../../managers/AuthManager');
 const ValidationMiddleware = require('../../managers/ValidationMiddleware');
 const { userQueries } = require('../../database/mainQueries');
+const { RatelimitManager } = require('../../managers/RatelimitManager');
+
+// Create specific limiters for user operations
+const userListLimiter = RatelimitManager.create({
+    windowMs: 60 * 1000, // 1 minute
+    max: 30, // 30 requests per minute for listing users
+    message: 'Too many user list requests, please try again later'
+});
+
+const userProfileLimiter = RatelimitManager.create({
+    windowMs: 60 * 1000,
+    max: 60, // 60 requests per minute for profile views
+    message: 'Too many profile requests, please try again later'
+});
+
+const userUpdateLimiter = RatelimitManager.create({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 10, // 10 update requests per 15 minutes
+    message: 'Too many profile update requests, please try again later'
+});
 
 /**
  * @swagger
@@ -78,6 +98,7 @@ const { userQueries } = require('../../database/mainQueries');
  */
 router.get('/', 
     AuthManager.getAuthMiddleware({ roles: ['admin'] }),
+    userListLimiter,
     ValidationMiddleware.validateQuery({
         page: { type: 'number', min: 1 },
         limit: { type: 'number', min: 1, max: 100 }
@@ -137,6 +158,7 @@ router.get('/',
  */
 router.get('/:id',
     AuthManager.getAuthMiddleware(),
+    userProfileLimiter,
     ValidationMiddleware.validateId(),
     async (req, res) => {
         try {
@@ -202,6 +224,7 @@ router.get('/:id',
  */
 router.patch('/:id',
     AuthManager.getAuthMiddleware(),
+    userUpdateLimiter,
     ValidationMiddleware.validateId(),
     async (req, res) => {
         try {

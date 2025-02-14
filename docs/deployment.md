@@ -51,7 +51,7 @@ Just make sure your database connection settings are properly configured in the 
 ## Security Configuration
 
 1. Configure NGINX (See [NGINX Deployment Guide](./nginx-deployment.md))
-   - Set up SSL/TLS with modern ciphers
+   - Set up SSL/TTLS with modern ciphers
    - Configure security headers:
      - HSTS
      - CSP
@@ -135,6 +135,51 @@ docker-compose up -d
    - Update security configurations
    - Monitor proxy performance
    - Review rate limiting effectiveness
+
+## Performance Monitoring
+
+1. Configure monitoring thresholds:
+   ```
+   MEMORY_WARNING_THRESHOLD=0.85
+   CPU_WARNING_THRESHOLD=0.8
+   SLOW_RESPONSE_TIME=1000
+   REQUEST_RATE_WARNING=1000
+   ERROR_RATE_WARNING=0.1
+   ```
+
+2. Set up monitoring endpoints:
+   - `/api/metrics` for detailed performance data
+   - `/api/health` for basic health checks
+   - `/api/analytics` for system analytics
+
+3. Monitor critical metrics:
+   - CPU usage per core
+   - Memory allocation patterns
+   - Request rate analysis
+   - Response time tracking
+   - Error rate monitoring
+
+## Rate Limiting Configuration
+
+1. Token Bucket Settings:
+   ```
+   RATE_LIMIT_WINDOW=900000
+   RATE_LIMIT_MAX_TOKENS=100
+   RATE_LIMIT_REFILL_RATE=0.1
+   BURST_MULTIPLIER=2
+   ```
+
+2. DDoS Protection:
+   - Configure request thresholds
+   - Set burst detection rules
+   - Enable IP tracking
+   - Configure automated responses
+
+3. IP Management:
+   - Set up whitelist/blacklist rules
+   - Configure automated IP blocking
+   - Set block duration rules
+   - Enable notifications
 
 ## Scaling
 

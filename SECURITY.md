@@ -13,6 +13,8 @@
 Unknown Server implements comprehensive security features:
 
 ### Authentication & Authorization
+- Advanced Role Hierarchy System
+- Permission inheritance control
 - Role-Based Access Control (RBAC)
 - Permission-based access control
 - Session management with monitoring
@@ -21,11 +23,24 @@ Unknown Server implements comprehensive security features:
 - Password reset functionality
 - Protection for critical admin roles
 
+### Rate Limiting & DDoS Protection
+- Token bucket algorithm implementation
+- Smart burst protection system
+- IP whitelist/blacklist management
+- Automated threat response
+- Adaptive rate limiting rules
+- Request rate analysis
+- Traffic pattern monitoring
+- Real-time threat detection
+
 ### Monitoring & Protection
+- Real-time performance monitoring
+- CPU and memory analytics
+- Response time tracking
+- Automated system alerts
 - Real-time authentication monitoring
 - Brute force attack detection
 - Suspicious activity tracking
-- Rate limiting with analytics
 - Session monitoring and analytics
 - Role change monitoring
 

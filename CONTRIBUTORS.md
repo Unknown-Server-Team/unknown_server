@@ -49,6 +49,14 @@
 
 ## Version History Contributors
 
+### Version 2.1.4 (2025-02-13)
+- [Santiago Morales](https://github.com/santiadjmc)
+  - Advanced Performance Monitoring system
+  - Enhanced Rate Limiting with token bucket
+  - Extended Role Management improvements
+  - DDoS protection enhancements
+  - Documentation updates
+
 ### Version 2.1.3 (2025-02-12)
 - [Santiago Morales](https://github.com/santiadjmc)
   - NGINX reverse proxy integration

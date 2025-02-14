@@ -2,6 +2,60 @@
 
 All notable changes to Unknown Server will be documented in this file.
 
+## [2.1.4] - 2025-02-13
+
+### Added
+- Advanced Performance Monitoring
+  - Real-time CPU and memory tracking
+  - Detailed request rate analysis
+  - Enhanced response time monitoring
+  - Automated system alerts
+- Enhanced Rate Limiting
+  - Token bucket algorithm implementation
+  - Burst protection mechanisms
+  - DDoS detection improvements
+  - IP blacklist/whitelist management
+- Extended Role Management
+  - Role hierarchy system
+  - Permission inheritance
+  - Advanced role validation
+  - Role analytics tracking
+
+### Enhanced
+- Authentication Manager
+  - Improved token handling
+  - Better session management
+  - Enhanced security validations
+  - Extended role integration
+- Rate Limiting System
+  - Multi-layer protection
+  - Adaptive rate limits
+  - Enhanced burst handling
+  - Better analytics tracking
+- Performance Monitoring
+  - Expanded metrics collection
+  - Improved alert system
+  - Enhanced trend analysis
+  - Resource usage optimization
+
+### Security
+- Enhanced DDoS Protection
+  - Multi-layer detection
+  - Improved burst handling
+  - Better IP tracking
+  - Automated threat response
+- Advanced Rate Limiting
+  - Smart token bucket system
+  - Enhanced protection rules
+  - Better traffic analysis
+  - Improved block handling
+
+### Documentation
+- Updated security guidelines
+- Enhanced deployment docs
+- Improved API documentation
+- Updated performance tuning guide
+
 ## [2.1.3] - 2025-02-12
 
 ### Added

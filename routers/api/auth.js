@@ -5,9 +5,61 @@ const RoleManager = require('../../managers/RoleManager');
 const PermissionManager = require('../../managers/PermissionManager');
 const ValidationManager = require('../../managers/ValidationManager');
 const { userQueries } = require('../../database/mainQueries');
-const RatelimitManager = require('../../managers/RatelimitManager');
 const LogManager = require('../../managers/LogManager');
 const ValidationMiddleware = require('../../managers/ValidationMiddleware');
+const AuthAnalytics = require('../../managers/AuthAnalytics');
+const { RatelimitManager } = require('../../managers/RatelimitManager');
+const SessionManager = require('../../managers/SessionManager');
+const AuthMonitor = require('../../managers/AuthMonitor');
+
+// Define enhanced rate limiters with new features
+const loginLimiter = RatelimitManager.create({
+    windowMs: 15 * 60 * 1000,
+    max: 5,
+    message: 'Too many login attempts, please try again later',
+    burstMultiplier: 1.5, // Allow small bursts
+    onLimitReached: (req) => {
+        const ip = req.ip;
+        AuthMonitor.trackLoginAttempt(false, ip);
+        WebsocketManager.notifySecurityEvent('login_rate_limit', { ip });
+        LogManager.warning('Login rate limit exceeded', { ip });
+    }
+});
+
+const registrationLimiter = RatelimitManager.create({
+    windowMs: 60 * 60 * 1000,
+    max: 3,
+    message: 'Too many accounts created from this IP',
+    burstMultiplier: 1, // No burst allowed for registration
+    onLimitReached: (req) => {
+        const ip = req.ip;
+        WebsocketManager.notifySecurityEvent('registration_rate_limit', { ip });
+        LogManager.warning('Registration rate limit exceeded', { ip });
+    }
+});
+
+const passwordResetLimiter = RatelimitManager.create({
+    windowMs: 60 * 60 * 1000,
+    max: 3,
+    message: 'Too many password reset requests',
+    burstMultiplier: 1, // No burst allowed for password reset
+    onLimitReached: (req) => {
+        const ip = req.ip;
+        WebsocketManager.notifySecurityEvent('password_reset_rate_limit', { ip });
+        LogManager.warning('Password reset rate limit exceeded', { ip });
+    }
+});
+
+const emailVerificationLimiter = RatelimitManager.create({
+    windowMs: 30 * 60 * 1000,
+    max: 5,
+    message: 'Too many email verification requests',
+    burstMultiplier: 1.2,
+    onLimitReached: (req) => {
+        const ip = req.ip;
+        LogManager.warning('Email verification rate limit exceeded', { ip });
+    }
+});
 
 /**
  * @swagger
@@ -74,7 +126,7 @@ const ValidationMiddleware = require('../../managers/ValidationMiddleware');
  */
 router.post('/register',
     ValidationMiddleware.validateRegistration,
-    RatelimitManager.createAuthLimiter(),
+    registrationLimiter,
     async (req, res) => {
         try {
             const validation = ValidationManager.validateRegistration(req.body);
@@ -88,8 +140,24 @@ router.post('/register',
             if (foundUser) {
                 return res.status(409).json({ error: 'Email already exists' });
             }
+            
+            // Create the user (this also assigns the default role)
             const userId = await AuthManager.createUser(req.body);
             const user = await userQueries.getUserById(userId);
+
+            // Get the default role that was assigned
+            const defaultRole = await RoleManager.getDefaultRole();
+            if (defaultRole) {
+                // Log the role assignment in audit log
+                await AuthAnalytics.logAuditEvent({
+                    action_type: 'role_assign',
+                    admin_id: userId,
+                    target_id: userId,
+                    role_id: defaultRole.id,
+                    metadata: { source: 'registration' },
+                    ip_address: req.ip
+                });
+            }
 
             try {
                 // Generate verification token and send email
@@ -155,7 +223,7 @@ router.post('/register',
  *       500:
  *         description: Server error
  */
-router.post('/login', ValidationMiddleware.validateLogin, RatelimitManager.createAuthLimiter(), async (req, res) => {
+router.post('/login', ValidationMiddleware.validateLogin, loginLimiter, async (req, res) => {
     try {
         const { email, password } = req.body;
 
@@ -278,7 +346,7 @@ router.get('/verify-email/:token', async (req, res) => {
  *       404:
  *         description: User not found
  */
-router.post('/forgot-password', RatelimitManager.createAuthLimiter(), async (req, res) => {
+router.post('/forgot-password', passwordResetLimiter, async (req, res) => {
     try {
         const { email } = req.body;
         if (!ValidationManager.validateEmail(email)) {
@@ -324,7 +392,7 @@ router.post('/forgot-password', RatelimitManager.createAuthLimiter(), async (req
  *       400:
  *         description: Invalid or expired token
  */
-router.post('/reset-password/:token', RatelimitManager.createAuthLimiter(), async (req, res) => {
+router.post('/reset-password/:token', passwordResetLimiter, async (req, res) => {
     try {
         const { token } = req.params;
         const { newPassword } = req.body;
@@ -367,7 +435,7 @@ router.post('/reset-password/:token', RatelimitManager.createAuthLimiter(), asyn
  */
 router.post('/resend-verification',
     AuthManager.getAuthMiddleware({ requireVerified: false }),
-    RatelimitManager.createAuthLimiter(),
+    emailVerificationLimiter,
     async (req, res) => {
         try {
             const user = await userQueries.getUserById(req.user.id);
@@ -662,7 +730,7 @@ router.delete('/roles/:roleId/permissions/:permissionId',
     async (req, res) => {
         try {
             // Prevent removing critical permissions from admin role
-            const [[role]] = await db.query('SELECT name FROM roles WHERE id = ?', [req.params.roleId]);
+            const [role] = await db.query('SELECT name FROM roles WHERE id = ?', [req.params.roleId]);
             if (role?.name === 'admin') {
                 const [[permission]] = await db.query(
                     'SELECT name FROM permissions WHERE id = ?',

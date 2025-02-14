@@ -238,6 +238,16 @@ class RoleManager {
             }
         };
     }
+
+    async getDefaultRole() {
+        try {
+            const [role] = await db.query('SELECT * FROM roles WHERE name = ?', ['user']);
+            return role || null;
+        } catch (error) {
+            LogManager.error('Failed to get default role', error);
+            throw error;
+        }
+    }
 }
 
 module.exports = new RoleManager();

@@ -139,19 +139,28 @@ class AuthManager {
     }
 
     async createUser(userData, initialRole = 'user') {
-        const hashedPassword = await this.hashPassword(userData.password);
-        const result = await userQueries.createUser({
-            ...userData,
-            password: hashedPassword
-        });
+        try {
+            const hashedPassword = await this.hashPassword(userData.password);
+            const result = await userQueries.createUser({
+                ...userData,
+                password: hashedPassword
+            });
 
-        // Assign default role
-        const [roles] = await db.query('SELECT id FROM roles WHERE name = ?', [initialRole]);
-        if (roles.length > 0) {
-            await RoleManager.assignRole(result.insertId, roles[0].id);
+            // Get default role and assign it
+            const [role] = await db.query('SELECT id FROM roles WHERE name = ?', [initialRole]);
+            if (!role) {
+                LogManager.error('Default role not found', { roleName: initialRole });
+                throw new Error('Default role not found');
+            }
+
+            await RoleManager.assignRole(result.insertId, role.id);
+            LogManager.info('User created with default role', { userId: result.insertId, roleId: role.id });
+
+            return result.insertId;
+        } catch (error) {
+            LogManager.error('Failed to create user', error);
+            throw error;
         }
-
-        return result.insertId;
     }
 
     requireRoles(roles) {
