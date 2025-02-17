@@ -117,7 +117,7 @@ app.use('/api', apiRouter);
 // Error handling
 app.use((req, res) => {
     if (req.path.startsWith('/api/')) {
-        res.status(404).json({ error: 'Not found' });
+        res.status(404).json({ error: true, message: 'Not Found', status: 404 });
     } else {
         res.status(404).render('404');
     }
