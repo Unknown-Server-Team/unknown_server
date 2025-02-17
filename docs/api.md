@@ -228,6 +228,48 @@ The API implements several security measures through multiple layers:
 - WebSocket protection
 - Buffer overflow prevention
 
+## Service Mesh Architecture
+
+### Service Discovery
+All services in the mesh are automatically discovered and monitored. Services must implement:
+- Health check endpoint
+- Version information
+- Metrics collection
+
+### Request Flow
+1. Request arrives at gateway
+2. Service mesh middleware intercepts
+3. Load balancer selects endpoint
+4. Request forwarded to service
+5. Response cached if applicable
+6. Metrics collected and updated
+
+### Headers
+The service mesh adds the following headers:
+- `x-request-id`: Unique request identifier
+- `x-service-version`: Version of the target service
+- `x-proxy-timestamp`: Timestamp of proxy forwarding
+
+## Gateway Features
+
+### Circuit Breaker
+- Timeout: 5000ms (default)
+- Error Threshold: 50%
+- Reset Timeout: 30000ms
+- Volume Threshold: 10 requests
+
+### Caching
+- GET requests cached by default
+- Cache TTL: 300s (configurable)
+- Cache bypass for authenticated requests
+- Automatic cache invalidation on errors
+
+### Load Balancing
+- Round-robin (default)
+- Least connections
+- Random selection
+- Custom strategy support
+
 For detailed security implementation, see:
 - [Security Policy](../SECURITY.md)
 - [NGINX Deployment Guide](./nginx-deployment.md)

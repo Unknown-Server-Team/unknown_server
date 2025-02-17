@@ -4,6 +4,8 @@ const swaggerJsdoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
 const { RatelimitManager } = require('../../managers/RatelimitManager');
 const PerformanceManager = require('../../managers/PerformanceManager');
+const GatewayManager = require('../../managers/GatewayManager');
+const ServiceMeshManager = require('../../managers/ServiceMeshManager');
 const authRouter = require('./auth');
 const usersRouter = require('./users');
 const path = require('path');
@@ -197,29 +199,37 @@ router.use('/users', usersRouter);
  *                 status:
  *                   type: string
  *                   example: healthy
- *                 uptime:
- *                   type: string
- *                   example: 2d 5h 30m 15s
- *                 memory:
+ *                 services:
+ *                   type: object
+ *                   description: Service health information
+ *                 gateway:
+ *                   type: object
+ *                   description: API Gateway status
+ *                 performance:
  *                   type: object
  *                   properties:
- *                     heapUsed:
+ *                     uptime:
  *                       type: string
- *                     heapTotal:
+ *                     memory:
+ *                       type: object
+ *                     cpu:
  *                       type: string
- *                     rss:
- *                       type: string
- *                 cpu:
- *                   type: string
- *                   example: 45.2%
  */
-router.get('/health', (req, res) => {
+router.get('/health', async (req, res) => {
     const metrics = PerformanceManager.getMetrics();
+    const gatewayHealth = GatewayManager.getServiceHealth();
+    const serviceHealth = ServiceMeshManager.getServiceMetrics();
+
     res.json({
         status: 'healthy',
-        uptime: metrics.uptime,
-        memory: metrics.memoryUsage,
-        cpu: metrics.currentCpuUsage
+        timestamp: new Date().toISOString(),
+        services: serviceHealth,
+        gateway: gatewayHealth,
+        performance: {
+            uptime: metrics.uptime,
+            memory: metrics.memoryUsage,
+            cpu: metrics.currentCpuUsage
+        }
     });
 });
 

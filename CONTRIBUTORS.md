@@ -49,6 +49,14 @@
 
 ## Version History Contributors
 
+### Version 2.2.0 (2025-02-16)
+- [Santiago Morales](https://github.com/santiadjmc)
+  - Advanced Service Mesh Architecture
+  - Enhanced Gateway Management
+  - WebSocket System Improvements
+  - Performance Monitoring Enhancements
+  - Documentation Updates
+
 ### Version 2.1.4 (2025-02-13)
 - [Santiago Morales](https://github.com/santiadjmc)
   - Advanced Performance Monitoring system

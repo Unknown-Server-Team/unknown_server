@@ -22,6 +22,8 @@ const PerformanceManager = require('./managers/PerformanceManager');
 const WebsocketManager = require('./managers/WebsocketManager');
 const AuthMonitor = require('./managers/AuthMonitor');
 const SessionManager = require('./managers/SessionManager');
+const GatewayManager = require('./managers/GatewayManager');
+const ServiceMeshManager = require('./managers/ServiceMeshManager');
 
 // Import database
 const db = require('./database/db');
@@ -63,6 +65,10 @@ app.use((req, res, next) => {
 
 app.use(compression());
 
+// API Gateway and Service Mesh middleware
+app.use(GatewayManager.createGatewayMiddleware());
+app.use(ServiceMeshManager.createMeshMiddleware());
+
 // Session handling
 app.use(SessionManager.createSessionMiddleware());
 
@@ -73,7 +79,7 @@ app.use(fileUpload({
     limits: { fileSize: 50 * 1024 * 1024 },
     useTempFiles: true,
     tempFileDir: '/tmp/',
-    debug: process.env.NODE_ENV === 'development'
+    debug: false
 }));
 
 // Static files
@@ -109,6 +115,54 @@ app.get('/api-docs', swaggerUi.setup(swaggerSpecs, {
     customCss: '.swagger-ui .topbar { display: none }',
     customSiteTitle: "Unknown Server API Documentation"
 }));
+
+// Register core service endpoints
+GatewayManager.registerService('auth', {
+    endpoints: [
+        { path: '/api/auth', handler: apiRouter },
+    ],
+    healthCheck: async () => {
+        try {
+            await db.query('SELECT 1');
+            return true;
+        } catch (error) {
+            return false;
+        }
+    },
+    circuitBreaker: {
+        timeout: 5000,
+        errorThresholdPercentage: 50,
+        resetTimeout: 30000
+    }
+});
+
+GatewayManager.registerService('users', {
+    endpoints: [
+        { path: '/api/users', handler: apiRouter },
+    ],
+    cacheTTL: 300,
+    maxRetries: 3
+});
+
+// Configure service mesh routes
+ServiceMeshManager.registerService({
+    name: 'auth-service',
+    url: process.env.AUTH_SERVICE_URL || 'http://localhost:3000',
+    version: '1.0.0'
+});
+
+ServiceMeshManager.setupServiceProxy('auth-service', {
+    target: '/api/auth',
+    routes: ['/api/auth'],
+    loadBalancingStrategy: 'round-robin',
+    middleware: [
+        async (req) => {
+            // Add tracking headers
+            req.headers['x-request-id'] = require('crypto').randomBytes(16).toString('hex');
+            req.headers['x-service-version'] = '1.0.0';
+        }
+    ]
+});
 
 // Routes
 app.use('/', mainRouter);
@@ -170,6 +224,10 @@ const startServer = async () => {
         PerformanceManager.logMetrics();
         const metricsInterval = setInterval(() => {
             PerformanceManager.logMetrics();
+            
+            // Log Gateway and Service Mesh metrics
+            LogManager.info('API Gateway Health', GatewayManager.getServiceHealth());
+            LogManager.info('Service Mesh Metrics', ServiceMeshManager.getServiceMetrics());
         }, 300000); // Every 5 minutes
 
         // Graceful shutdown

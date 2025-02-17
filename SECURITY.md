@@ -4,8 +4,9 @@
 
 | Version | Supported          |
 | ------- | ------------------ |
+| 2.2.x   | :white_check_mark: |
 | 2.1.x   | :white_check_mark: |
-| 2.0.x   | :white_check_mark: |
+| 2.0.x   | :x:                |
 | 1.x.x   | :x:                |
 
 ## Security Features
@@ -90,6 +91,26 @@ Unknown Server implements comprehensive security features:
 - Connection and request limits
 - Buffer size restrictions
 - WebSocket protection
+
+### Service Mesh Security Features
+- Dynamic service authentication
+- Health monitoring and alerting
+- Multi-layer request validation
+- Traffic pattern analysis
+- Service metrics monitoring
+- Load balancer security
+- Request tracking headers
+- Version control and validation
+
+### Gateway Protection
+- Circuit breaker implementation
+- Service health monitoring
+- Request rate control
+- Cache security measures
+- Error threshold protection
+- Automatic service recovery
+- Request timeout management
+- Load distribution security
 
 ## Best Practices
 

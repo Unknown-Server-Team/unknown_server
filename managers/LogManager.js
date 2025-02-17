@@ -156,6 +156,7 @@ class LogManager {
 
     static requestLogger() {
         return (req, res, next) => {
+            if (req.path.startsWith("/health")) return next();
             const start = process.hrtime();
             const requestId = Math.random().toString(36).substring(7);
 

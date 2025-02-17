@@ -226,3 +226,57 @@ For additional support:
 2. Review issues on GitHub
 3. Contact maintainers
 4. See NGINX configuration guide
+
+## Service Mesh Configuration
+
+### Service Registration
+```env
+# Service Mesh Configuration
+MESH_HEALTH_CHECK_INTERVAL=10000
+MESH_METRIC_COLLECTION_INTERVAL=5000
+MESH_MAX_CONCURRENT_REQUESTS=100
+MESH_RETRY_ATTEMPTS=3
+```
+
+### Load Balancing Strategies
+- round-robin (default)
+- least-connections
+- random
+
+Configure in the service registration:
+```js
+ServiceMeshManager.setupServiceProxy('service-name', {
+  loadBalancingStrategy: 'round-robin'
+});
+```
+
+### Health Checks
+- Default interval: 10 seconds
+- Customizable health check endpoints
+- Automatic service recovery
+- Status monitoring and alerts
+
+### Metrics Collection
+- Request count tracking
+- Error rate monitoring
+- Average response time
+- Service status tracking
+
+## Gateway Configuration
+
+### Circuit Breaker Settings
+```env
+# Circuit Breaker Configuration
+CIRCUIT_BREAKER_TIMEOUT=5000
+CIRCUIT_BREAKER_ERROR_THRESHOLD=50
+CIRCUIT_BREAKER_RESET_TIMEOUT=30000
+CIRCUIT_BREAKER_VOLUME_THRESHOLD=10
+```
+
+### Service Configuration
+- Health check endpoints
+- Retry policies
+- Cache TTL settings
+- Timeout configuration
+- Error thresholds
+- Recovery settings
