@@ -18,7 +18,6 @@ const swaggerSpecs = require('./config/swagger');
 
 // Import managers
 const LogManager = require('./managers/LogManager');
-const RatelimitManager = require('./managers/RatelimitManager');
 const PerformanceManager = require('./managers/PerformanceManager');
 const WebsocketManager = require('./managers/WebsocketManager');
 const AuthMonitor = require('./managers/AuthMonitor');
