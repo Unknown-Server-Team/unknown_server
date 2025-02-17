@@ -5,7 +5,6 @@
  * Important: This server is designed to run behind an NGINX reverse proxy.
  * Important: This server is running by default in development mode. Adjust security settings for production before deployment.
  */
-
 require('dotenv').config();
 const express = require('express');
 const path = require('path');
@@ -54,7 +53,7 @@ app.use(helmet({
 // Simplified CORS settings for development
 app.use(cors());
 
-// Local developemtn specific headers
+// Local development specific headers
 app.use((req, res, next) => {
     res.setHeader('Cross-Origin-Opener-Policy', 'unsafe-none');
     res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
