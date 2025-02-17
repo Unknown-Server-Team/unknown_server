@@ -1,3 +1,11 @@
+/**
+ * If you are reading this, you are probably interested in how this server works.
+ * This is the main entry point for the server, where all the components are initialized.
+ * The server is built using Express.js, a popular web framework for Node.js.
+ * Important: This server is designed to run behind an NGINX reverse proxy.
+ * Important: This server is running by default in development mode. Adjust security settings for production before deployment.
+ */
+
 require('dotenv').config();
 const express = require('express');
 const path = require('path');
@@ -24,7 +32,7 @@ const { initializeQueries } = require('./database/mainQueries');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Security middleware - Configuración mínima para desarrollo local
+// Security middleware - Minimal settings for local development
 app.use(helmet({
     contentSecurityPolicy: false,
     crossOriginEmbedderPolicy: false,
@@ -43,10 +51,10 @@ app.use(helmet({
     xssFilter: false
 }));
 
-// Configuración CORS simplificada
+// Simplified CORS settings for development
 app.use(cors());
 
-// Headers específicos para desarrollo local
+// Local developemtn specific headers
 app.use((req, res, next) => {
     res.setHeader('Cross-Origin-Opener-Policy', 'unsafe-none');
     res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
