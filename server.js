@@ -32,6 +32,9 @@ const { initializeQueries } = require('./database/mainQueries');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Trust NGINX proxy
+app.set('trust proxy', true);
+
 // Security middleware - Minimal settings for local development
 app.use(helmet({
     contentSecurityPolicy: false,

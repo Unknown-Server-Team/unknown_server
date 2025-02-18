@@ -22,7 +22,7 @@ class RatelimitManager {
         const limiterId = Math.random().toString(36).substr(2, 9);
         const store = new Map();
         const tokenBucket = new Map();
-        
+
         this.limiters.set(limiterId, { store, config });
         this.tokenBuckets.set(limiterId, tokenBucket);
 
@@ -52,7 +52,7 @@ class RatelimitManager {
             // Token bucket algorithm
             const bucket = tokenBucket.get(key) || this.initTokenBucket(key, config);
             const tokens = this.getAvailableTokens(bucket, now, config);
-            
+
             if (tokens < 1) {
                 this.handleLimitReached(req, res);
                 const retryAfter = Math.ceil((config.windowMs - (now - bucket.lastRefill)) / 1000);
@@ -174,14 +174,14 @@ class RatelimitManager {
     static isBurstAttack(ip, now) {
         const stats = this.burstProtection.get(ip) || { count: 0, firstRequest: now };
         const timeDiff = now - stats.firstRequest;
-        
+
         if (timeDiff > 1000) {
             stats.count = 1;
             stats.firstRequest = now;
         } else {
             stats.count++;
         }
-        
+
         this.burstProtection.set(ip, stats);
         return stats.count > 100; // More than 100 requests per second
     }
@@ -198,10 +198,10 @@ class RatelimitManager {
         const timePassed = now - bucket.lastRefill;
         const refillRate = config.max / config.windowMs;
         const tokensToAdd = Math.floor(timePassed * refillRate);
-        
+
         bucket.tokens = Math.min(bucket.capacity, bucket.tokens + tokensToAdd);
         bucket.lastRefill = now;
-        
+
         return bucket.tokens;
     }
 
@@ -218,17 +218,17 @@ class RatelimitManager {
 
     static handleLimitReached(req, res) {
         const ip = req.ip;
-        LogManager.warning('Rate limit exceeded', { 
+        LogManager.warning('Rate limit exceeded', {
             ip,
             path: req.path,
             method: req.method
         });
-        
+
         const offenderKey = `${ip}:offenses`;
         const offenses = this.customStores.get('offenders') || new Map();
         const currentOffenses = (offenses.get(offenderKey) || 0) + 1;
         offenses.set(offenderKey, currentOffenses);
-        
+
         // More aggressive blacklisting for potential attacks
         if (currentOffenses >= 5 || this.isDDoSAttack(ip, Date.now())) {
             this.blacklistIP(ip);
@@ -243,7 +243,9 @@ class RatelimitManager {
         if (customKeyGenerator) {
             return customKeyGenerator(req);
         }
-        return req.ip;
+        // Get real IP from headers set by NGINX
+        return req.headers['x-real-ip'] ||
+            (req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0].trim() : req.ip);
     }
 
     static getRemainingRequests(ip, limiterId) {
@@ -334,12 +336,12 @@ class RatelimitManager {
 
     static cleanup() {
         const now = Date.now();
-        
+
         // Cleanup limiters
         for (const [limiterId, limiter] of this.limiters) {
             const { store, config } = limiter;
             const windowStart = now - config.windowMs;
-            
+
             for (const [key, data] of store) {
                 const validTimestamps = data.timestamps.filter(time => time > windowStart);
                 if (validTimestamps.length === 0) {
