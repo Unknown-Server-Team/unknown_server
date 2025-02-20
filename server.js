@@ -119,54 +119,6 @@ app.get('/api-docs', swaggerUi.setup(swaggerSpecs, {
     customSiteTitle: "Unknown Server API Documentation"
 }));
 
-// Register core service endpoints
-GatewayManager.registerService('auth', {
-    endpoints: [
-        { path: '/api/auth', handler: apiRouter },
-    ],
-    healthCheck: async () => {
-        try {
-            await db.query('SELECT 1');
-            return true;
-        } catch (error) {
-            return false;
-        }
-    },
-    circuitBreaker: {
-        timeout: 5000,
-        errorThresholdPercentage: 50,
-        resetTimeout: 30000
-    }
-});
-
-GatewayManager.registerService('users', {
-    endpoints: [
-        { path: '/api/users', handler: apiRouter },
-    ],
-    cacheTTL: 300,
-    maxRetries: 3
-});
-
-// Configure service mesh routes
-ServiceMeshManager.registerService({
-    name: 'auth-service',
-    url: process.env.AUTH_SERVICE_URL || 'http://localhost:3000',
-    version: '1.0.0'
-});
-
-ServiceMeshManager.setupServiceProxy('auth-service', {
-    target: '/api/auth',
-    routes: ['/api/auth'],
-    loadBalancingStrategy: 'round-robin',
-    middleware: [
-        async (req) => {
-            // Add tracking headers
-            req.headers['x-request-id'] = require('crypto').randomBytes(16).toString('hex');
-            req.headers['x-service-version'] = '1.0.0';
-        }
-    ]
-});
-
 // Routes
 app.use('/', mainRouter);
 app.use('/api', apiRouter);
@@ -185,7 +137,7 @@ app.use((err, req, res, next) => {
     PerformanceManager.trackError(err, req.path);
 
     if (req.path.startsWith('/api/')) {
-        res.status(500).json({ 
+        res.status(500).json({
             error: 'Internal Server Error',
             code: err.code,
             message: process.env.NODE_ENV === 'development' ? err.message : undefined
@@ -203,14 +155,61 @@ const startServer = async () => {
 
         // Initialize components
         LogManager.info('Initializing server components...');
-        
+        // Register core service endpoints
+        GatewayManager.registerService('auth', {
+            endpoints: [
+                { path: '/api/auth', handler: apiRouter },
+            ],
+            healthCheck: async () => {
+                try {
+                    await db.query('SELECT 1');
+                    return true;
+                } catch (error) {
+                    return false;
+                }
+            },
+            circuitBreaker: {
+                timeout: 5000,
+                errorThresholdPercentage: 50,
+                resetTimeout: 30000
+            }
+        });
+
+        GatewayManager.registerService('users', {
+            endpoints: [
+                { path: '/api/users', handler: apiRouter },
+            ],
+            cacheTTL: 300,
+            maxRetries: 3
+        });
+
+        // Configure service mesh routes
+        ServiceMeshManager.registerService({
+            name: 'auth-service',
+            url: process.env.AUTH_SERVICE_URL || 'http://localhost:3000',
+            version: '1.0.0'
+        });
+
+        ServiceMeshManager.setupServiceProxy('auth-service', {
+            target: '/api/auth',
+            routes: ['/api/auth'],
+            loadBalancingStrategy: 'round-robin',
+            middleware: [
+                async (req) => {
+                    // Add tracking headers
+                    req.headers['x-request-id'] = require('crypto').randomBytes(16).toString('hex');
+                    req.headers['x-service-version'] = '1.0.0';
+                }
+            ]
+        });
+
         // Initialize database queries
         LogManager.info('Initializing database...');
         await initializeQueries();
-        
+
         // Start monitoring systems
         AuthMonitor.startMonitoring();
-        
+
         // Create HTTP server
         const server = app.listen(PORT, '0.0.0.0', () => {
             LogManager.success(`Server is running on port ${PORT}`);
@@ -227,7 +226,7 @@ const startServer = async () => {
         PerformanceManager.logMetrics();
         const metricsInterval = setInterval(() => {
             PerformanceManager.logMetrics();
-            
+
             // Log Gateway and Service Mesh metrics
             LogManager.info('API Gateway Health', GatewayManager.getServiceHealth());
             LogManager.info('Service Mesh Metrics', ServiceMeshManager.getServiceMetrics());
@@ -236,12 +235,12 @@ const startServer = async () => {
         // Graceful shutdown
         const shutdown = async () => {
             LogManager.info('Received shutdown signal');
-            
+
             clearInterval(metricsInterval);
             WebsocketManager.close();
-            
+
             await db.close();
-            
+
             server.close(() => {
                 LogManager.success('Server shut down successfully');
                 process.exit(0);
