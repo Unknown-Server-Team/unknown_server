@@ -1,6 +1,6 @@
 {
   "name": "unknown-server",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "A modern Express.js server with built-in managers and utilities",
   "main": "server.js",
   "bin": {
@@ -24,6 +24,7 @@
     "bcryptjs": "^2.4.3",
     "chalk": "^4.1.2",
     "cli-table3": "^0.6.3",
+    "commander": "^11.0.0",
     "compression": "^1.7.4",
     "cors": "^2.8.5",
     "dotenv": "^16.0.3",
@@ -35,6 +36,7 @@
     "figlet": "^1.7.0",
     "figures": "^3.2.0",
     "helmet": "^6.1.5",
+    "inquirer": "^8.2.6",
     "ioredis": "^5.5.0",
     "jsonwebtoken": "^9.0.2",
     "marked": "^15.0.7",
@@ -43,6 +45,7 @@
     "node-cache": "^5.1.2",
     "node-fetch": "^2.6.7",
     "nodemailer": "^6.10.0",
+    "open": "^8.4.2",
     "opossum": "^8.4.0",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
@@ -53,10 +56,7 @@
     "validator": "^13.12.0",
     "winston": "^3.11.0",
     "winston-daily-rotate-file": "^4.7.1",
-    "ws": "^8.13.0",
-    "commander": "^11.0.0",
-    "inquirer": "^8.2.6",
-    "open": "^8.4.2"
+    "ws": "^8.13.0"
   },
   "devDependencies": {
     "cross-env": "^7.0.3",
