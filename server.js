@@ -39,21 +39,22 @@ app.set('trust proxy', true);
 
 // Security middleware - Minimal settings for local development
 app.use(helmet({
-    contentSecurityPolicy: false,
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "cdnjs.cloudflare.com"],
+            styleSrc: ["'self'", "'unsafe-inline'", "fonts.googleapis.com", "cdnjs.cloudflare.com"],
+            fontSrc: ["'self'", "fonts.gstatic.com"],
+            imgSrc: ["'self'", "data:", "blob:"],
+            connectSrc: ["'self'"],
+            frameSrc: ["'self'"],
+            objectSrc: ["'none'"],
+            upgradeInsecureRequests: []
+        }
+    },
     crossOriginEmbedderPolicy: false,
     crossOriginOpenerPolicy: false,
-    crossOriginResourcePolicy: false,
-    originAgentCluster: false,
-    dnsPrefetchControl: false,
-    expectCt: false,
-    frameguard: false,
-    hidePoweredBy: false,
-    hsts: false,
-    ieNoOpen: false,
-    noSniff: false,
-    permittedCrossDomainPolicies: false,
-    referrerPolicy: false,
-    xssFilter: false
+    crossOriginResourcePolicy: false
 }));
 
 // Simplified CORS settings for development
