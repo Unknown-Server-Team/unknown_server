@@ -49,6 +49,14 @@
 
 ## Version History Contributors
 
+### Version 2.3.0 (2025-02-24)
+- [Santiago Morales](https://github.com/santiadjmc)
+  - API Versioning Support implementation
+  - Enhanced API Documentation system
+  - Documentation Tools development
+  - CLI Tool for Server Management
+  - Documentation System improvements
+
 ### Version 2.2.0 (2025-02-16)
 - [Santiago Morales](https://github.com/santiadjmc)
   - Advanced Service Mesh Architecture
