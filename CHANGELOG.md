@@ -37,6 +37,7 @@ All notable changes to Unknown Server will be documented in this file.
   - Documentation tools
   - Interactive prompts
   - Role management
+  - IMPORTANT: This feature is not still fully implemented. Needs tests and improvements.
 
 ### Enhanced
 - Documentation System
