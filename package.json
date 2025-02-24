@@ -1,11 +1,15 @@
 {
   "name": "unknown-server",
-  "version": "2.1.4",
+  "version": "2.2.0",
   "description": "A modern Express.js server with built-in managers and utilities",
   "main": "server.js",
+  "bin": {
+    "unknown": "./cli/cli.js"
+  },
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "cli": "node ./cli/cli.js"
   },
   "keywords": [
     "express",
@@ -49,7 +53,10 @@
     "validator": "^13.12.0",
     "winston": "^3.11.0",
     "winston-daily-rotate-file": "^4.7.1",
-    "ws": "^8.13.0"
+    "ws": "^8.13.0",
+    "commander": "^11.0.0",
+    "inquirer": "^8.2.6",
+    "open": "^8.4.2"
   },
   "devDependencies": {
     "cross-env": "^7.0.3",

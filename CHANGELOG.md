@@ -2,6 +2,53 @@
 
 All notable changes to Unknown Server will be documented in this file.
 
+## [2.3.0] - 2025-02-24
+
+### Added
+- API Versioning Support
+  - Version header support (Accept-Version)
+  - Multiple API versions running simultaneously
+  - Version deprecation system
+  - Version-specific route handling
+  - Automatic version routing
+- Enhanced API Documentation
+  - Version-specific documentation
+  - Improved Swagger integration
+  - Better schema organization
+  - Enhanced endpoint descriptions
+  - Automatic version-specific docs generation
+  - Markdown documentation validation
+  - Code example validation
+  - Link checking and validation
+  - Integration with CI/CD pipeline
+- Documentation Tools
+  - Automated doc generation
+  - Version-specific templating
+  - CLI documentation tools
+  - Multi-format export support
+  - Real-time validation
+  - Interactive API explorer
+  - SDK documentation generation
+  - Migration guide generation
+- CLI Tool for Server Management
+  - User management commands
+  - Authentication commands
+  - Service monitoring
+  - Documentation tools
+  - Interactive prompts
+  - Role management
+
+### Enhanced
+- Documentation System
+  - Interactive API explorer
+  - CLI documentation tools
+  - Export in multiple formats
+  - Version-specific docs
+  - Automatic validation
+  - Template-based generation
+  - Better organization
+  - Improved readability
+
 ## [2.2.0] - 2025-02-16
 
 ### Added

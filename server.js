@@ -24,6 +24,8 @@ const AuthMonitor = require('./managers/AuthMonitor');
 const SessionManager = require('./managers/SessionManager');
 const GatewayManager = require('./managers/GatewayManager');
 const ServiceMeshManager = require('./managers/ServiceMeshManager');
+const DocumentationValidator = require('./managers/DocumentationValidator');
+const DocGenerator = require('./managers/utils/DocGenerator');
 
 // Import database
 const db = require('./database/db');
@@ -155,6 +157,22 @@ const startServer = async () => {
 
         // Initialize components
         LogManager.info('Initializing server components...');
+
+        // Initialize documentation system
+        LogManager.info('Initializing documentation system...');
+        await DocGenerator.initialize();
+
+        // Validate API documentation
+        LogManager.info('Validating API documentation...');
+        const docValidation = await DocGenerator.validateAllDocs();
+        if (!docValidation.isValid) {
+            LogManager.warning('Documentation validation issues:', docValidation.errors);
+        }
+
+        // Generate versioned documentation
+        LogManager.info('Generating versioned API documentation...');
+        await DocGenerator.generateVersionDocs();
+
         // Register core service endpoints
         GatewayManager.registerService('auth', {
             endpoints: [

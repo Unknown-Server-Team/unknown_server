@@ -1,4 +1,5 @@
 const ValidationManager = require('./ValidationManager');
+const VersionManager = require('./VersionManager');
 const LogManager = require('./LogManager');
 
 class ValidationMiddleware {
@@ -139,6 +140,45 @@ class ValidationMiddleware {
                 });
             }
 
+            next();
+        };
+    }
+
+    static validateApiVersion() {
+        return (req, res, next) => {
+            const version = req.headers['accept-version'];
+            const supportedVersions = VersionManager.getSupportedVersions();
+
+            // If no version specified, use latest non-deprecated version
+            if (!version) {
+                const latestVersion = supportedVersions
+                    .filter(v => !VersionManager.isDeprecated(v))
+                    .sort()
+                    .pop();
+                req.apiVersion = latestVersion;
+                return next();
+            }
+
+            // Check if version exists
+            if (!supportedVersions.includes(version)) {
+                return res.status(400).json({
+                    error: 'Unsupported API version',
+                    message: `Version ${version} is not supported`,
+                    supportedVersions,
+                    latest: supportedVersions[supportedVersions.length - 1]
+                });
+            }
+
+            // Warning for deprecated versions
+            if (VersionManager.isDeprecated(version)) {
+                res.set('Warning', '299 - "This API version is deprecated"');
+                LogManager.warning(`Deprecated API version ${version} accessed`, {
+                    path: req.path,
+                    ip: req.ip
+                });
+            }
+
+            req.apiVersion = version;
             next();
         };
     }

@@ -1,57 +1,80 @@
 const swaggerJsdoc = require('swagger-jsdoc');
+const DocumentationValidator = require('../managers/DocumentationValidator');
+const VersionManager = require('../managers/VersionManager');
+const LogManager = require('../managers/LogManager');
+const path = require('path');
 
-const options = {
-    definition: {
-        openapi: '3.0.0',
-        info: {
-            title: 'Unknown Server API Documentation',
-            version: '2.0.0',
-            description: 'API documentation for Unknown Server',
-            license: {
-                name: 'MIT',
-                url: 'https://opensource.org/licenses/MIT',
-            },
-            contact: {
-                name: 'API Support',
-                url: 'https://github.com/santiadjmc/unknown',
-            },
-        },
-        servers: [
-            {
-                url: process.env.API_URL || 'http://localhost:3000',
-                description: 'Development Server',
-            },
-        ],
-        components: {
-            securitySchemes: {
-                bearerAuth: {
-                    type: 'http',
-                    scheme: 'bearer',
-                    bearerFormat: 'JWT',
-                },
-                sessionAuth: {
-                    type: 'apiKey',
-                    in: 'cookie',
-                    name: 'sessionId',
-                },
-            },
-        },
-        security: [
-            { bearerAuth: [] },
-            { sessionAuth: [] },
-        ],
+// Generate base OpenAPI specs for each version
+const versionedSpecs = DocumentationValidator.generateVersionedSpecs();
+
+// Combine all versioned specs into one
+const combinedSpec = {
+    openapi: '3.0.0',
+    info: {
+        title: 'Unknown Server API Documentation',
+        version: process.env.VERSION || '2.2.0',
+        description: 'Complete API documentation for all versions',
+        license: {
+            name: 'MIT',
+            url: 'https://opensource.org/licenses/MIT'
+        }
     },
-    apis: [
-        './routers/api/*.js',
-        './routers/main/*.js',
-        './managers/*.js',
+    servers: [
+        {
+            url: process.env.API_URL || 'http://localhost:3000',
+            description: 'Development Server'
+        }
     ],
+    tags: [
+        {
+            name: 'System',
+            description: 'System health and monitoring endpoints'
+        },
+        {
+            name: 'Authentication',
+            description: 'Authentication and user management'
+        },
+        {
+            name: 'Authorization',
+            description: 'Role and permission management'
+        }
+    ],
+    components: {
+        securitySchemes: {
+            bearerAuth: {
+                type: 'http',
+                scheme: 'bearer',
+                bearerFormat: 'JWT'
+            },
+            sessionAuth: {
+                type: 'apiKey',
+                in: 'cookie',
+                name: 'sessionId'
+            }
+        }
+    },
+    security: [
+        { bearerAuth: [] },
+        { sessionAuth: [] }
+    ],
+    paths: {}
 };
 
-const specs = swaggerJsdoc(options);
+// Merge all versioned paths
+Object.values(versionedSpecs).forEach(spec => {
+    Object.entries(spec.paths || {}).forEach(([path, methods]) => {
+        combinedSpec.paths[path] = methods;
+    });
+});
+
+// Validate the combined documentation
+const validation = DocumentationValidator.validateVersionedDocs(combinedSpec);
+if (!validation.isValid) {
+    LogManager.warning('API Documentation validation failed', { errors: validation.errors });
+}
 
 // Add custom CSS for dark theme
-specs.customCss = `
+combinedSpec.customCss = `
     .swagger-ui {
         background-color: #1a1a1a;
         color: #ffffff;
@@ -106,4 +129,4 @@ specs.customCss = `
     }
 `;
 
-module.exports = specs;
+module.exports = combinedSpec;
