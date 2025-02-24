@@ -16,12 +16,12 @@ class API {
                 this.baseUrl = config.apiUrl || 'http://localhost:3000/api';
                 this.token = config.token;
             } else {
-                this.baseUrl = 'http://localhost:3000/api';
+                this.baseUrl = 'http://localhost:3000/api/v1';
                 this.token = null;
             }
         } catch (error) {
             console.error('Failed to load config:', error.message);
-            this.baseUrl = 'http://localhost:3000/api';
+            this.baseUrl = `http://localhost:3000/api/v1`;
             this.token = null;
         }
     }
@@ -55,6 +55,7 @@ class API {
         }
 
         try {
+            console.log(`Making request to ${url} with options:`, options);
             const response = await fetch(url, {
                 ...options,
                 headers: {
