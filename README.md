@@ -164,32 +164,32 @@ Unknown Server is a robust Express.js-based server solution that provides enterp
 ### Installation
 
 1️⃣ Clone the repository
-\`\`\`bash
+```bash
 git clone https://github.com/santiadjmc/unknown.git
 cd unknown
-\`\`\`
+```
 
 2️⃣ Set up environment
-\`\`\`bash
+```bash
 cp .env.example .env
 # Edit .env with your configuration
-\`\`\`
+```
 
 3️⃣ Install dependencies
-\`\`\`bash
+```bash
 npm install
-\`\`\`
+```
 
 4️⃣ Start development server
-\`\`\`bash
+```bash
 npm run dev
-\`\`\`
+```
 
-5️⃣ Visit \`http://localhost:3000\` 🎉
+5️⃣ Visit `http://localhost:3000` 🎉
 
 ## 📂 Project Structure
 
-\`\`\`
+```
 ├── cli/              # CLI management tools
 ├── config/           # Configuration files
 ├── database/         # Database configuration and queries
@@ -211,7 +211,7 @@ npm run dev
 │   │   └── v1/    # Version 1 API
 │   └── main/      # Web routes
 └── views/          # EJS templates
-\`\`\`
+```
 
 ## 📚 Documentation
 
@@ -250,11 +250,11 @@ Community guidelines
 
 | Command | Description |
 |---------|-------------|
-| \`npm start\` | Start production server |
-| \`npm run dev\` | Start development server with hot reloading |
-| \`npm test\` | Run tests (when implemented) |
-| \`npm run cli\` | Access CLI management tools |
-| \`npm run docs\` | Generate documentation |
+| `npm start` | Start production server |
+| `npm run dev` | Start development server with hot reloading |
+| `npm test` | Run tests (when implemented) |
+| `npm run cli` | Access CLI management tools |
+| `npm run docs` | Generate documentation |
 
 ## 🤝 Getting Involved
 
