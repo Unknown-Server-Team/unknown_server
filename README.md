@@ -169,7 +169,7 @@ Unknown Server is a robust Express.js-based server solution that provides enterp
 
 1️⃣ Clone the repository
 ```bash
-git clone https://github.com/santiadjmc/unknown.git
+git clone https://github.com/Unknown-Server-Team/unknown_server.git
 cd unknown
 ```
 
