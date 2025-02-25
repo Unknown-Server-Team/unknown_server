@@ -238,7 +238,7 @@ MESH_MAX_CONCURRENT_REQUESTS=100
 MESH_RETRY_ATTEMPTS=3
 ```
 
-### Load Balancing Strategies
+## Load Balancing Strategies
 - round-robin (default)
 - least-connections
 - random
@@ -273,7 +273,7 @@ CIRCUIT_BREAKER_RESET_TIMEOUT=30000
 CIRCUIT_BREAKER_VOLUME_THRESHOLD=10
 ```
 
-### Service Configuration
+## Service Configuration
 - Health check endpoints
 - Retry policies
 - Cache TTL settings
