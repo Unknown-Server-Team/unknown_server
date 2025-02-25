@@ -189,7 +189,7 @@ npm install
 npm run dev
 ```
 
-5️⃣ Visit `http://localhost:3000` 🎉
+5️⃣ Visit `http://localhost` 🎉
 
 ## 📂 Project Structure
 
