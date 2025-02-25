@@ -134,8 +134,8 @@ Unknown Server is a robust Express.js-based server solution that provides enterp
   - Room management
   - Heartbeat monitoring
 - 💾 Cache Management
-  - Multi-level caching
-  - Proxy caching
+  - In-memory caching (node-cache)
+  - Smart cache invalidation
   - Memory optimization
   - Auto invalidation
 - ✅ Validation System
@@ -144,9 +144,13 @@ Unknown Server is a robust Express.js-based server solution that provides enterp
   - Custom rules
   - Input sanitization
 - 🎯 Database Features
+  - MySQL support
   - Connection pooling
   - Query optimization
   - Transaction management
+  - Prepared statements
+  - Foreign key constraints
+  - Index optimization
 - 🔥 Developer Experience
   - Hot reloading
   - Pretty errors
@@ -158,8 +162,8 @@ Unknown Server is a robust Express.js-based server solution that provides enterp
 
 - Node.js >= 16.0.0
 - npm >= 8.0.0
-- MongoDB >= 5.0 (optional)
-- Redis >= 6.0 (optional)
+- MySQL >= 5.7
+- NGINX >= 1.18.0 (see NGINX [configuration for development](./config/nginx.conf))
 
 ### Installation
 
@@ -172,7 +176,7 @@ cd unknown
 2️⃣ Set up environment
 ```bash
 cp .env.example .env
-# Edit .env with your configuration
+# Edit .env with your MySQL database configuration
 ```
 
 3️⃣ Install dependencies
