@@ -1,108 +1,99 @@
 # Security Policy
 
-## Supported Versions
+## 🔐 Reporting Security Vulnerabilities
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 2.2.x   | :white_check_mark: |
-| 2.1.x   | :white_check_mark: |
-| 2.0.x   | :x:                |
-| 1.x.x   | :x:                |
+If you discover a security vulnerability in Unknown Server, please follow these steps:
 
-## Security Features
+1. **Do NOT disclose the vulnerability publicly**
+2. Email security@unknownserver.com with:
+   - A description of the vulnerability
+   - Steps to reproduce
+   - Potential impact
+   - (Optional) Suggested fix
+3. You will receive a response within 48 hours
+4. Allow us reasonable time to fix the issue before disclosure
 
-Unknown Server implements comprehensive security features:
+## ⚡ Security Features
 
-### Authentication & Authorization
-- Advanced Role Hierarchy System
-- Permission inheritance control
-- Role-Based Access Control (RBAC)
-- Permission-based access control
-- Session management with monitoring
-- Token blacklisting
+### 🛡️ Authentication & Authorization
+- Role-Based Access Control (RBAC) with hierarchy system
+- Permission inheritance and granular access control
+- JWT-based authentication with blacklisting
 - Email verification system
-- Password reset functionality
+- Secure password reset flow
+- Session management with real-time monitoring
 - Protection for critical admin roles
+- Token validation and refresh mechanism
 
-### Rate Limiting & DDoS Protection
+### 🚫 Rate Limiting & DDoS Protection
 - Token bucket algorithm implementation
-- Smart burst protection system
+- Smart burst protection system (100 req/s threshold)
 - IP whitelist/blacklist management
-- Automated threat response
-- Adaptive rate limiting rules
-- Request rate analysis
-- Traffic pattern monitoring
-- Real-time threat detection
+- Request rate analysis and pattern detection
+- Endpoint-specific limits:
+  - Login: 5 attempts/15 min
+  - Registration: 3 attempts/hour
+  - Password Reset: 3 attempts/hour
+  - Email Verification: 5 attempts/30 min
+  - API: 100 requests/15 min with burst allowance
 
-### Monitoring & Protection
-- Real-time performance monitoring
-- CPU and memory analytics
-- Response time tracking
-- Automated system alerts
+### 👁️ Security Monitoring
 - Real-time authentication monitoring
 - Brute force attack detection
 - Suspicious activity tracking
 - Session monitoring and analytics
-- Role change monitoring
+- Role change auditing
+- Performance metrics monitoring
+- CPU and memory analytics
+- Response time tracking
+- Automated system alerts
 
-### Input & Data Security
-- Request validation middleware
-- Input sanitization
-- Schema validation
-- File upload protection
-- Secure password policies
-- Email validation
+### 🔒 Data Security
+- Input validation middleware
+- Comprehensive request sanitization
+- Schema-based validation
+- Secure file upload handling
+- MySQL injection prevention through parameterized queries
+- XSS protection
+- CSRF protection
+- Secure password hashing (bcrypt)
 
-### System Security
+### 🌐 System Security
+- Helmet.js integration with:
+  - Content Security Policy (CSP)
+  - HSTS enforcement
+  - XSS Filter
+  - Nosniff
+  - Frame protection
 - CORS configuration
-- Content Security Policy (CSP)
 - Secure WebSocket connections
-- Cache management
-- Logging rotation
-- Error handling security
-- NGINX reverse proxy protection
-  - DDoS mitigation through rate limiting (30 r/m with burst)
-  - SSL/TLS termination with TLS 1.2/1.3
-  - Request filtering and validation
-  - Modern cipher configuration
-  - Comprehensive security headers
-  - IP filtering (10 concurrent connections)
-  - Proxy caching with bypass rules
-  - Load balancing with keepalive
-  - Rate limiting at multiple levels
-  - Buffer overflow protection (16KB body, 1KB header)
+- Structured error handling
+- Rotated logging system
+- Environment-based security configs
 
-### Proxy Security Features
-- Multi-layer request validation
-- Bad bot protection through rate limiting
-- Advanced DDoS mitigation with burst control
-- SSL/TLS with modern cipher suite
-- Comprehensive security headers:
-  - HSTS with long duration
-  - X-Frame-Options: DENY
-  - X-Content-Type-Options: nosniff
-  - X-XSS-Protection with block mode
-  - Strict CSP policy
-  - Strict Referrer Policy
-  - Restrictive Permissions Policy
-- IP connection limiting (10 per IP)
-- Smart caching with authentication bypass
-- Efficient load distribution
-- Connection and request limits
-- Buffer size restrictions
-- WebSocket protection
+### 🔄 Reverse Proxy (NGINX)
+- DDoS mitigation (30 req/min with burst)
+- SSL/TLS termination (TLS 1.2/1.3)
+- Modern cipher configuration
+- Request filtering and validation
+- IP filtering (10 concurrent connections max)
+- Buffer overflow protection:
+  - Request body: 16KB max
+  - Header size: 1KB max
+- Proxy caching with auth bypass rules
+- Load balancing with keepalive
 
-### Service Mesh Security Features
+### 🌍 Service Mesh Security
 - Dynamic service authentication
 - Health monitoring and alerting
-- Multi-layer request validation
+- Circuit breaker protection
 - Traffic pattern analysis
+- Request tracking headers
+- Version control validation
 - Service metrics monitoring
 - Load balancer security
-- Request tracking headers
-- Version control and validation
 
-### Gateway Protection
+### 🔍 Gateway Protection
 - Circuit breaker implementation
 - Service health monitoring
 - Request rate control
@@ -112,13 +103,13 @@ Unknown Server implements comprehensive security features:
 - Request timeout management
 - Load distribution security
 
-## Best Practices
+## 🛠️ Security Best Practices
 
 ### Configuration
 - Use strong session secrets
 - Enable HTTPS in production
 - Configure proper CORS settings
-- Set up appropriate rate limits
+- Set appropriate rate limits
 - Use secure WebSocket connections
 - Implement proper error logging
 - Set up monitoring and analytics
@@ -140,61 +131,19 @@ Unknown Server implements comprehensive security features:
 - Keep backups secure
 - Implement rate limiting
 - Configure error handling
-- NGINX Configuration
-  - Configure SSL/TLS properly
-  - Set up request filtering
-  - Enable security headers
-  - Configure rate limits
-  - Set up load balancing
-  - Enable proxy caching
-  - Configure DDoS protection
 
-## Reporting a Vulnerability
+## 📝 Version Support
 
-1. **Do Not** open public issues for security vulnerabilities
-2. Email unknown.server.team@gmail.com with:
-   - Description of the vulnerability
-   - Steps to reproduce
-   - Potential impact
-   - Suggested fix (if any)
+| Version | Security Support |
+|---------|-----------------|
+| 2.3.x   | ✅ Current      |
+| 2.2.x   | ✅ Supported    |
+| 2.1.x   | ⚠️ Until 2025-06|
+| ≤ 2.0.x | ❌ Unsupported  |
 
-## Response Timeline
+## 📚 Additional Resources
 
-- Confirmation within 24 hours
-- Initial assessment within 72 hours
-- Regular updates on progress
-- Fix implementation timeline based on severity:
-  - Critical: 7 days
-  - High: 14 days
-  - Medium: 30 days
-  - Low: 60 days
-
-## Security Measures
-
-### Authentication
-- Password complexity requirements
-- Email verification
-- Session management
-- Token-based authentication
-- Rate limiting on auth endpoints
-
-### Authorization
-- Role-based access control
-- Permission-based access control
-- Protection of admin privileges
-- Session validation
-- Token validation
-
-### Data Protection
-- Input sanitization
-- Output encoding
-- SQL injection prevention
-- XSS prevention
-- CSRF protection
-
-### Monitoring
-- Auth analytics
-- Session monitoring
-- Suspicious activity detection
-- Role change tracking
-- Login attempt monitoring
+- [Deployment Security Guide](./docs/deployment.md)
+- [API Security Documentation](./docs/api.md)
+- [NGINX Security Configuration](./docs/nginx-deployment.md)
+- [Role & Permission Guide](./docs/roles-and-permissions.md)
