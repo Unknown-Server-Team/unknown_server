@@ -72,16 +72,24 @@ class RoleManager {
 
     async hasAnyRole(userId, roleNames) {
         try {
+            // Handle the case when roleNames is empty or not an array
+            if (!roleNames || !Array.isArray(roleNames) || roleNames.length === 0) {
+                return false;
+            }
+            
             const [roles] = await db.query(`
                 SELECT COUNT(*) as count
                 FROM user_roles ur
                 JOIN roles r ON r.id = ur.role_id
                 WHERE ur.user_id = ? AND r.name IN (?)
             `, [userId, roleNames]);
-            return roles[0].count > 0;
+            
+            // Check if the result exists and has the expected structure
+            return roles && roles[0] && roles[0].count > 0;
         } catch (error) {
             LogManager.error('Failed to check roles', error);
-            throw error;
+            // Return false instead of throwing to make the function more robust
+            return false;
         }
     }
 

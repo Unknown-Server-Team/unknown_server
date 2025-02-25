@@ -11,6 +11,7 @@ const AuthAnalytics = require('../../managers/AuthAnalytics');
 const { RatelimitManager } = require('../../managers/RatelimitManager');
 const SessionManager = require('../../managers/SessionManager');
 const AuthMonitor = require('../../managers/AuthMonitor');
+const { query } = require('../../database/db');
 
 // Define enhanced rate limiters with new features
 const loginLimiter = RatelimitManager.create({
@@ -172,7 +173,11 @@ router.post('/register',
 
             res.status(201).json({
                 message: 'User registered successfully. Please check your email to verify your account.',
-                userId,
+                user: {
+                    id: user.id,
+                    email: user.email,
+                    name: user.name
+                },
                 roles: userAuth.roles,
                 permissions: userAuth.permissions
             });

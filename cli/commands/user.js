@@ -48,9 +48,9 @@ const create = new Command('create')
                 }
             ]);
 
-            const user = await API.post('/users', answers);
+            const user = await API.post('/auth/register', answers);
             console.log(chalk.green('User created successfully!'));
-            console.log(chalk.cyan('User ID:'), user.id);
+            console.log(chalk.cyan('User ID:'), user.user.id);
         } catch (error) {
             console.error(chalk.red('Failed to create user:', error.message));
         }

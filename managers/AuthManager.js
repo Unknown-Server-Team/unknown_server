@@ -28,8 +28,10 @@ class AuthManager {
         }
 
         const roles = await RoleManager.getUserRoles(user.id);
-        // Ensure roles is an array and map it, defaulting to empty array if roles is falsy
-        const roleNames = (roles || []).map(r => r.name);
+        // Ensure roles is always an array before mapping
+        const roleArray = Array.isArray(roles) ? roles : [];
+        // Map the array to get role names
+        const roleNames = roleArray.map(r => r.name);
 
         return jwt.sign(
             { 
