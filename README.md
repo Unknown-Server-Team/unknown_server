@@ -184,9 +184,10 @@ cp .env.example .env
 npm install
 ```
 
-4️⃣ Start development server
+4️⃣ Start development server with hot reloading (recommended)
 ```bash
 npm run dev
+# Don't forget to run NGINX with proper configuration
 ```
 
 5️⃣ Visit `http://localhost` 🎉
