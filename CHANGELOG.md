@@ -2,6 +2,56 @@
 
 All notable changes to Unknown Server will be documented in this file.
 
+## [2.4.0] - 2025-03-01
+
+### Added
+- Enhanced Service Mesh Architecture
+  - Service discovery and registration
+  - Automatic service recovery mechanisms
+  - P95 response time metrics
+  - Improved health check system
+  - Weighted load balancing strategy
+  - Service tagging and filtering
+  - Auto-recovery for unhealthy services
+
+- Advanced Gateway Management
+  - Advanced endpoint health monitoring
+  - Improved circuit breaker implementation
+  - Weighted load balancing support
+  - Adaptive caching strategies
+  - Enhanced error handling and timeout management
+  - Automatic retry mechanisms with backoff
+  - Performance metrics for all services
+
+- Enhanced Role Hierarchy System
+  - Role inheritance and permission propagation
+  - Circular reference detection
+  - Parent-child role relationships
+  - Hierarchical permission resolution
+  - Cache optimization for role lookups
+  - Analytics integration for role changes
+  - Improved middleware for role-based access
+
+### Enhanced
+- Service Management
+  - Better error handling and recovery
+  - More comprehensive metrics collection
+  - Improved load balancing strategies
+  - Enhanced service health monitoring
+  - Better integration between Gateway and Service Mesh
+
+- Security
+  - More resilient role-based access control
+  - Enhanced permission inheritance through role hierarchy
+  - Better caching for faster permission checks
+  - Improved tracking of role and permission usage
+
+- Performance
+  - Optimized caching for service routing
+  - Reduced latency in permission checks
+  - More efficient role hierarchy traversal
+  - Better memory usage in service tracking
+
 ## [2.3.0] - 2025-02-24
 
 ### Added

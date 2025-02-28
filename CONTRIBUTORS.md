@@ -49,6 +49,15 @@
 
 ## Version History Contributors
 
+### Version 2.4.0 (2025-03-01)
+- [Santiago Morales](https://github.com/santiadjmc)
+  - Enhanced Service Mesh Architecture
+  - Advanced Gateway Management
+  - Enhanced Role Hierarchy System
+  - Improved service health monitoring
+  - Performance optimization and caching strategies
+  - Advanced security and permissions system
+
 ### Version 2.3.0 (2025-02-24)
 - [Santiago Morales](https://github.com/santiadjmc)
   - API Versioning Support implementation
