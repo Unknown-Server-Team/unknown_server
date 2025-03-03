@@ -15,6 +15,7 @@ const expressLayouts = require('express-ejs-layouts');
 const fileUpload = require('express-fileupload');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpecs = require('./config/swagger');
+const cluster = require('cluster');
 
 // Import managers
 const LogManager = require('./managers/LogManager');
@@ -26,10 +27,14 @@ const GatewayManager = require('./managers/GatewayManager');
 const ServiceMeshManager = require('./managers/ServiceMeshManager');
 const DocumentationValidator = require('./managers/DocumentationValidator');
 const DocGenerator = require('./managers/utils/DocGenerator');
+const WorkerThreadManager = require('./managers/WorkerThreadManager');
 
 // Import database
 const db = require('./database/db');
 const { initializeQueries } = require('./database/mainQueries');
+
+// Detect if we're running in a cluster worker
+const isClusterWorker = cluster.isWorker;
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -153,26 +158,42 @@ app.use((err, req, res, next) => {
 // Server initialization
 const startServer = async () => {
     try {
-        const banner = await LogManager.figlet('UNKNOWN');
-        console.log(banner);
+        // Only show banner in the primary process or if not in cluster mode
+        if (!isClusterWorker) {
+            const banner = await LogManager.figlet('UNKNOWN');
+            console.log(banner);
+        }
 
         // Initialize components
         LogManager.info('Initializing server components...');
 
-        // Initialize documentation system
-        LogManager.info('Initializing documentation system...');
-        await DocGenerator.initialize();
+        // Initialize WorkerThreadManager with a worker count based on 
+        // whether we're in cluster mode or not
+        LogManager.info('Initializing worker thread pool...');
+        const maxThreadsPerProcess = isClusterWorker ? 
+            Math.max(1, Math.floor(require('os').cpus().length / (process.env.SERVER_WORKERS || require('os').cpus().length))) : 
+            Math.max(2, Math.floor(require('os').cpus().length / 2));
+            
+        WorkerThreadManager.initialize({
+            maxWorkers: process.env.MAX_WORKER_THREADS || maxThreadsPerProcess
+        });
 
-        // Validate API documentation
-        LogManager.info('Validating API documentation...');
-        const docValidation = await DocGenerator.validateAllDocs();
-        if (!docValidation.isValid) {
-            LogManager.warning('Documentation validation issues:', docValidation.errors);
+        // Initialize documentation system - only need to do this in primary process
+        if (!isClusterWorker) {
+            LogManager.info('Initializing documentation system...');
+            await DocGenerator.initialize();
+
+            // Validate API documentation
+            LogManager.info('Validating API documentation...');
+            const docValidation = await DocGenerator.validateAllDocs();
+            if (!docValidation.isValid) {
+                LogManager.warning('Documentation validation issues:', docValidation.errors);
+            }
+
+            // Generate versioned documentation
+            LogManager.info('Generating versioned API documentation...');
+            await DocGenerator.generateVersionDocs();
         }
-
-        // Generate versioned documentation
-        LogManager.info('Generating versioned API documentation...');
-        await DocGenerator.generateVersionDocs();
 
         // Register core service endpoints
         GatewayManager.registerService('auth', {
@@ -218,6 +239,10 @@ const startServer = async () => {
                     // Add tracking headers
                     req.headers['x-request-id'] = require('crypto').randomBytes(16).toString('hex');
                     req.headers['x-service-version'] = '1.0.0';
+                    // Add worker identification to help with debugging
+                    if (isClusterWorker) {
+                        req.headers['x-worker-id'] = process.pid.toString();
+                    }
                 }
             ]
         });
@@ -226,51 +251,88 @@ const startServer = async () => {
         LogManager.info('Initializing database...');
         await initializeQueries();
 
-        // Start monitoring systems
-        AuthMonitor.startMonitoring();
+        // Start monitoring systems - avoid duplicate monitors in clustered environment
+        if (!isClusterWorker || process.env.NODE_APP_INSTANCE === '0') {
+            AuthMonitor.startMonitoring();
+        }
 
         // Create HTTP server
         const server = app.listen(PORT, '0.0.0.0', () => {
             LogManager.success(`Server is running on port ${PORT}`);
             LogManager.info('Server running behind NGINX reverse proxy');
+            
+            // Log worker and processing information
+            LogManager.info(`Worker threads available: ${WorkerThreadManager.maxWorkers}`);
+            if (process.env.pm_id) {
+                LogManager.info(`Running under PM2 process manager (ID: ${process.env.pm_id})`);
+            }
+            if (isClusterWorker) {
+                LogManager.info(`Cluster worker: ${process.pid}`);
+            }
+            if (process.env.NODE_APP_INSTANCE) {
+                LogManager.info(`Cluster instance: ${process.env.NODE_APP_INSTANCE}`);
+            }
         });
 
-        // Initialize WebSocket
+        // Initialize WebSocket with sticky sessions for clustered environment
         LogManager.info('Initializing WebSocket server...');
-        WebsocketManager.initialize(server);
+        WebsocketManager.initialize(server, { 
+            isClusterWorker, 
+            workerId: process.pid 
+        });
         WebsocketManager.initializeAuthEvents();
         WebsocketManager.startHeartbeat();
 
-        // Start performance monitoring
-        PerformanceManager.logMetrics();
-        const metricsInterval = setInterval(() => {
+        // Start performance monitoring - only in primary process or in first worker
+        // to avoid duplicate metrics reporting
+        if (!isClusterWorker || process.env.NODE_APP_INSTANCE === '0') {
             PerformanceManager.logMetrics();
+            const metricsInterval = setInterval(() => {
+                PerformanceManager.logMetrics();
 
-            // Log Gateway and Service Mesh metrics
-            LogManager.info('API Gateway Health', GatewayManager.getServiceHealth());
-            LogManager.info('Service Mesh Metrics', ServiceMeshManager.getServiceMetrics());
-        }, 300000); // Every 5 minutes
+                // Log Gateway and Service Mesh metrics
+                LogManager.info('API Gateway Health', GatewayManager.getServiceHealth());
+                LogManager.info('Service Mesh Metrics', ServiceMeshManager.getServiceMetrics());
+            }, 300000); // Every 5 minutes
+        }
 
         // Graceful shutdown
         const shutdown = async () => {
-            LogManager.info('Received shutdown signal');
+            LogManager.info(`Process ${process.pid} received shutdown signal`);
 
-            clearInterval(metricsInterval);
+            // Clear interval only if it was created in this process
+            if (!isClusterWorker || process.env.NODE_APP_INSTANCE === '0') {
+                clearInterval(metricsInterval);
+            }
+            
             WebsocketManager.close();
+            
+            // Shut down worker threads
+            await WorkerThreadManager.shutdownAll();
 
+            // Close database connections
             await db.close();
 
+            // Close the HTTP server
             server.close(() => {
-                LogManager.success('Server shut down successfully');
-                process.exit(0);
+                LogManager.success(`Server ${process.pid} shut down successfully`);
+                // In clustered mode, don't call process.exit() directly,
+                // let the cluster manager handle it
+                if (!isClusterWorker) {
+                    process.exit(0);
+                }
             });
 
+            // Set a timeout for force shutdown if graceful shutdown fails
             setTimeout(() => {
-                LogManager.error('Force closing server after timeout');
-                process.exit(1);
+                LogManager.error(`Force closing server ${process.pid} after timeout`);
+                if (!isClusterWorker) {
+                    process.exit(1);
+                }
             }, 5000);
         };
 
+        // Register shutdown handlers
         process.on('SIGTERM', shutdown);
         process.on('SIGINT', shutdown);
 

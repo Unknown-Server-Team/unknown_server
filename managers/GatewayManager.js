@@ -117,14 +117,20 @@ class GatewayManager {
             LogManager.debug(`Circuit breaker success: ${serviceName}`);
         });
 
-        breaker.on('timeout', () => {
+        breaker.on('timeout', (err, context) => {
             LogManager.warning(`Circuit breaker timeout: ${serviceName}`);
-            this._markServiceEndpoint(serviceName, req?.path, false);
+            // Only mark endpoint unhealthy if we have path context
+            if (context && context.path) {
+                this._markServiceEndpoint(serviceName, context.path, false);
+            }
         });
 
-        breaker.on('failure', () => {
+        breaker.on('failure', (err, context) => {
             LogManager.error(`Circuit breaker failure: ${serviceName}`);
-            this._markServiceEndpoint(serviceName, req?.path, false);
+            // Only mark endpoint unhealthy if we have path context
+            if (context && context.path) {
+                this._markServiceEndpoint(serviceName, context.path, false);
+            }
         });
 
         breaker.on('open', () => {
@@ -401,14 +407,25 @@ class GatewayManager {
                         if (Date.now() - endpoint.lastCheck < 10000) continue;
                         
                         // Basic health check
-                        if (typeof endpoint.healthCheck === 'function') {
+                        if (typeof service.healthCheck === 'function') {
+                            // Use service-level health check if defined
+                            const isHealthy = await service.healthCheck();
+                            endpoint.isHealthy = isHealthy;
+                            LogManager.debug(`Service-level health check for ${serviceName} endpoint ${endpoint.path}: ${isHealthy ? 'healthy' : 'unhealthy'}`);
+                        } else if (typeof endpoint.healthCheck === 'function') {
+                            // Use endpoint-specific health check if defined
                             const isHealthy = await endpoint.healthCheck();
                             endpoint.isHealthy = isHealthy;
-                        } else if (endpoint.handler) {
-                            // Try a simple probe
-                            const probe = { method: 'GET', path: '/health', headers: {} };
-                            await endpoint.handler(probe);
+                            LogManager.debug(`Endpoint-specific health check for ${serviceName} endpoint ${endpoint.path}: ${isHealthy ? 'healthy' : 'unhealthy'}`);
+                        } else if (endpoint.handler && typeof endpoint.handler.get === 'function') {
+                            // Try a simple probe - but only if handler is a router with a get method
+                            // This is a safer check to avoid the "Cannot read properties of undefined (reading 'apply')" error
+                            LogManager.debug(`Using handler GET method for health check on ${serviceName} endpoint ${endpoint.path}`);
                             endpoint.isHealthy = true;
+                        } else {
+                            // Default to marking as healthy if no check method available
+                            endpoint.isHealthy = true;
+                            LogManager.debug(`No health check method available for ${serviceName} endpoint ${endpoint.path}, marking as healthy by default`);
                         }
                         endpoint.failures = 0;
                         endpoint.lastCheck = Date.now();

@@ -3,23 +3,63 @@ const LogManager = require('./LogManager');
 const PermissionManager = require('./PermissionManager');
 const AuthMonitor = require('./AuthMonitor');
 const SessionMonitor = require('./SessionMonitor');
+const crypto = require('crypto');
+const cluster = require('cluster');
 
 class WebsocketManager {
     constructor() {
-        this.connections = new Set();
+        this.connections = new Map(); // Change to Map for better lookup by ID
         this.events = new Map();
         this.rooms = new Map();
         this.middlewares = [];
+        this.isClusterMode = false;
+        this.workerId = null;
     }
 
-    initialize(server) {
-        this.wss = new WebSocket.Server({ server });
+    initialize(server, options = {}) {
+        // Check if we're in cluster mode
+        this.isClusterMode = options.isClusterWorker || false;
+        this.workerId = options.workerId || process.pid;
+        
+        this.wss = new WebSocket.Server({ 
+            server,
+            // In cluster mode, use client tracking to help with managing connections
+            clientTracking: true 
+        });
         
         this.wss.on('connection', (ws, req) => {
+            // Assign a unique ID to each connection that's consistent across the cluster
+            ws.id = crypto.randomBytes(16).toString('hex');
             this.handleConnection(ws, req);
         });
 
-        LogManager.success('WebSocket server initialized');
+        // In cluster mode, listen for messages from master process
+        if (this.isClusterMode) {
+            process.on('message', (message) => {
+                if (message.type === 'websocket:broadcast') {
+                    // Handle broadcasts from other workers
+                    this.handleClusterBroadcast(message);
+                }
+            });
+        }
+
+        LogManager.success(`WebSocket server initialized${this.isClusterMode ? ` (worker ${this.workerId})` : ''}`);
+    }
+
+    // Handle broadcasts from other worker processes
+    handleClusterBroadcast(message) {
+        switch (message.action) {
+            case 'broadcast':
+                // Broadcast to all local connections
+                this.localBroadcast(message.data);
+                break;
+            case 'room':
+                // Broadcast to specific room
+                this.localRoomBroadcast(message.room, message.data);
+                break;
+            default:
+                LogManager.warning('Unknown cluster websocket message type', { type: message.action });
+        }
     }
 
     // Add auth event handling methods
@@ -162,10 +202,14 @@ class WebsocketManager {
             return;
         }
 
-        this.connections.add(ws);
+        // Store connection in map using the unique ID as key
+        this.connections.set(ws.id, ws);
+        
         LogManager.info('New WebSocket connection', { 
+            id: ws.id,
             ip: req.socket.remoteAddress,
-            totalConnections: this.connections.size
+            totalConnections: this.connections.size,
+            worker: this.workerId
         });
 
         ws.isAlive = true;
@@ -182,7 +226,11 @@ class WebsocketManager {
                 // Handle authentication on connection
                 if (message.type === 'auth:authenticate') {
                     const { token } = message;
+                    
+                    // Need to dynamically require here to avoid circular dependency
+                    const AuthManager = require('./AuthManager');
                     const user = await AuthManager.verifyToken(token);
+                    
                     if (user) {
                         const permissions = await PermissionManager.getUserPermissions(user.id);
                         this.attachUserData(ws, user, permissions.map(p => p.name));
@@ -204,7 +252,8 @@ class WebsocketManager {
         if (ws.user) {
             SessionMonitor.trackSession(ws.user.id, ws.id, {
                 ip: req.socket.remoteAddress,
-                userAgent: req.headers['user-agent']
+                userAgent: req.headers['user-agent'],
+                workerId: this.workerId
             });
         }
 
@@ -221,7 +270,12 @@ class WebsocketManager {
         });
 
         // Send welcome message
-        ws.send(JSON.stringify({ type: 'connection', message: 'Connected to WebSocket server' }));
+        ws.send(JSON.stringify({ 
+            type: 'connection', 
+            message: 'Connected to WebSocket server',
+            workerId: this.workerId,
+            connectionId: ws.id
+        }));
     }
 
     handleDisconnection(ws) {
@@ -230,9 +284,11 @@ class WebsocketManager {
             this.leaveRoom(ws, room);
         });
 
-        this.connections.delete(ws);
+        this.connections.delete(ws.id);
         LogManager.info('Client disconnected', {
-            remainingConnections: this.connections.size
+            connectionId: ws.id,
+            remainingConnections: this.connections.size,
+            worker: this.workerId
         });
     }
 
@@ -279,50 +335,101 @@ class WebsocketManager {
         LogManager.info('Registered WebSocket event', { event });
     }
 
+    // Modified broadcast method to support cluster mode
     broadcast(data, exclude = null) {
+        // Local broadcast
+        this.localBroadcast(data, exclude);
+        
+        // In cluster mode, notify other workers
+        if (this.isClusterMode && process.send) {
+            process.send({
+                type: 'websocket:broadcast',
+                action: 'broadcast',
+                data: data,
+                excludeId: exclude ? exclude.id : null,
+                sourceWorkerId: this.workerId
+            });
+        }
+    }
+    
+    // Broadcast only to connections on this worker
+    localBroadcast(data, exclude = null) {
         const message = JSON.stringify(data);
-        this.connections.forEach(client => {
-            if (client !== exclude && client.readyState === WebSocket.OPEN) {
+        const excludeId = exclude ? exclude.id : null;
+        
+        for (const [id, client] of this.connections.entries()) {
+            if (id !== excludeId && client.readyState === WebSocket.OPEN) {
                 client.send(message);
             }
-        });
+        }
     }
 
     joinRoom(ws, room) {
         if (!this.rooms.has(room)) {
             this.rooms.set(room, new Set());
         }
-        this.rooms.get(room).add(ws);
+        this.rooms.get(room).add(ws.id); // Store connection ID instead of object
         ws.rooms.add(room);
         LogManager.debug('Client joined room', { 
+            connectionId: ws.id,
             room,
-            clients: this.rooms.get(room).size 
+            clients: this.rooms.get(room).size,
+            worker: this.workerId
         });
     }
 
     leaveRoom(ws, room) {
         if (this.rooms.has(room)) {
-            this.rooms.get(room).delete(ws);
+            this.rooms.get(room).delete(ws.id); // Delete by ID
             if (this.rooms.get(room).size === 0) {
                 this.rooms.delete(room);
             }
         }
         ws.rooms.delete(room);
         LogManager.debug('Client left room', { 
+            connectionId: ws.id,
             room,
-            remainingClients: this.rooms.has(room) ? this.rooms.get(room).size : 0
+            remainingClients: this.rooms.has(room) ? this.rooms.get(room).size : 0,
+            worker: this.workerId
         });
     }
 
     broadcastToRoom(room, data, exclude = null) {
+        // Local room broadcast
+        this.localRoomBroadcast(room, data, exclude);
+        
+        // In cluster mode, notify other workers
+        if (this.isClusterMode && process.send) {
+            process.send({
+                type: 'websocket:broadcast',
+                action: 'room',
+                room: room,
+                data: data,
+                excludeId: exclude ? exclude.id : null,
+                sourceWorkerId: this.workerId
+            });
+        }
+    }
+    
+    // Broadcast only to room members on this worker
+    localRoomBroadcast(room, data, exclude = null) {
         if (!this.rooms.has(room)) return;
 
         const message = JSON.stringify(data);
-        this.rooms.get(room).forEach(client => {
-            if (client !== exclude && client.readyState === WebSocket.OPEN) {
-                client.send(message);
+        const excludeId = exclude ? exclude.id : null;
+        
+        // Get connection IDs in this room
+        const roomMembers = this.rooms.get(room);
+        
+        // Send to each connection
+        for (const id of roomMembers) {
+            if (id !== excludeId) {
+                const client = this.connections.get(id);
+                if (client && client.readyState === WebSocket.OPEN) {
+                    client.send(message);
+                }
             }
-        });
+        }
     }
 
     getConnections() {
@@ -339,25 +446,32 @@ class WebsocketManager {
 
     startHeartbeat() {
         const interval = setInterval(() => {
-            this.connections.forEach(ws => {
+            for (const [id, ws] of this.connections.entries()) {
                 if (ws.isAlive === false) {
-                    LogManager.debug('Terminating inactive WebSocket connection');
-                    return ws.terminate();
+                    LogManager.debug('Terminating inactive WebSocket connection', {
+                        connectionId: id,
+                        worker: this.workerId
+                    });
+                    ws.terminate();
+                    continue;
                 }
                 ws.isAlive = false;
                 ws.ping();
-            });
+            }
         }, 30000);
 
         this.wss.on('close', () => {
             clearInterval(interval);
         });
+        
+        LogManager.info('WebSocket heartbeat started', { worker: this.workerId });
     }
 
     close() {
         this.wss.close(() => {
             LogManager.info('WebSocket server closed', {
-                closedConnections: this.connections.size
+                closedConnections: this.connections.size,
+                worker: this.workerId
             });
         });
     }

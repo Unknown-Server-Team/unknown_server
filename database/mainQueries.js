@@ -35,6 +35,20 @@ async function initializeQueries() {
             )
         `);
 
+        // Create roles_hierarchy table for role inheritance
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS roles_hierarchy (
+                parent_role_id INT NOT NULL,
+                child_role_id INT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (parent_role_id, child_role_id),
+                FOREIGN KEY (parent_role_id) REFERENCES roles(id) ON DELETE CASCADE,
+                FOREIGN KEY (child_role_id) REFERENCES roles(id) ON DELETE CASCADE,
+                INDEX idx_parent_role (parent_role_id),
+                INDEX idx_child_role (child_role_id)
+            )
+        `);
+
         // Create user_roles junction table
         await db.query(`
             CREATE TABLE IF NOT EXISTS user_roles (
@@ -184,6 +198,21 @@ async function initializeQueries() {
                     );
                 }
             }
+
+            // Set up initial role hierarchy (admin > moderator > user)
+            await db.query('DELETE FROM roles_hierarchy');
+            
+            // Admin is parent of moderator
+            await db.query(
+                'INSERT IGNORE INTO roles_hierarchy (parent_role_id, child_role_id) VALUES (?, ?)',
+                [adminRole.id, moderatorRole.id]
+            );
+            
+            // Moderator is parent of user
+            await db.query(
+                'INSERT IGNORE INTO roles_hierarchy (parent_role_id, child_role_id) VALUES (?, ?)',
+                [moderatorRole.id, userRole.id]
+            );
         }
 
         LogManager.success('Database tables and initial data initialized');
@@ -192,6 +221,107 @@ async function initializeQueries() {
         throw error;
     }
 }
+
+// Add role hierarchy queries to use with RoleManager
+const roleHierarchyQueries = {
+    async getChildRoles(roleId) {
+        const roles = await db.query(
+            `SELECT r.* FROM roles r
+            JOIN roles_hierarchy rh ON r.id = rh.child_role_id
+            WHERE rh.parent_role_id = ?`,
+            [roleId]
+        );
+        return roles;
+    },
+
+    async getParentRoles(roleId) {
+        const roles = await db.query(
+            `SELECT r.* FROM roles r
+            JOIN roles_hierarchy rh ON r.id = rh.parent_role_id
+            WHERE rh.child_role_id = ?`,
+            [roleId]
+        );
+        return roles;
+    },
+
+    async addChildRole(parentRoleId, childRoleId) {
+        // Check for circular references before adding
+        const isCircular = await this.wouldCreateCircularReference(parentRoleId, childRoleId);
+        if (isCircular) {
+            throw new Error('Adding this relationship would create a circular reference in the role hierarchy');
+        }
+
+        const result = await db.query(
+            'INSERT IGNORE INTO roles_hierarchy (parent_role_id, child_role_id) VALUES (?, ?)',
+            [parentRoleId, childRoleId]
+        );
+        return result;
+    },
+
+    async removeChildRole(parentRoleId, childRoleId) {
+        const result = await db.query(
+            'DELETE FROM roles_hierarchy WHERE parent_role_id = ? AND child_role_id = ?',
+            [parentRoleId, childRoleId]
+        );
+        return result;
+    },
+
+    async wouldCreateCircularReference(parentRoleId, childRoleId) {
+        if (parentRoleId === childRoleId) {
+            return true; // Self-reference is circular
+        }
+
+        // Check if child is already an ancestor of the parent (which would create a loop)
+        const ancestors = await this.getAllAncestors(parentRoleId);
+        return ancestors.some(role => role.id === Number(childRoleId));
+    },
+
+    async getAllAncestors(roleId) {
+        // Get all roles that are ancestors (direct or indirect parents) of the given role
+        const ancestors = [];
+        const queue = [roleId];
+        const visited = new Set();
+
+        while (queue.length > 0) {
+            const currentId = queue.shift();
+            
+            if (visited.has(currentId)) continue;
+            visited.add(currentId);
+
+            const parents = await this.getParentRoles(currentId);
+            
+            for (const parent of parents) {
+                ancestors.push(parent);
+                queue.push(parent.id);
+            }
+        }
+
+        return ancestors;
+    },
+
+    async getAllDescendants(roleId) {
+        // Get all roles that are descendants (direct or indirect children) of the given role
+        const descendants = [];
+        const queue = [roleId];
+        const visited = new Set();
+
+        while (queue.length > 0) {
+            const currentId = queue.shift();
+            
+            if (visited.has(currentId)) continue;
+            visited.add(currentId);
+
+            const children = await this.getChildRoles(currentId);
+            
+            for (const child of children) {
+                descendants.push(child);
+                queue.push(child.id);
+            }
+        }
+
+        return descendants;
+    }
+};
 
 const userQueries = {
     async createUser(userData) {
@@ -308,4 +438,4 @@ const userQueries = {
     }
 };
 
-module.exports = { initializeQueries, userQueries };
+module.exports = { initializeQueries, userQueries, roleHierarchyQueries };

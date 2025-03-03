@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-2.3.0-blue.svg)](https://github.com/santiadjmc/unknown/releases)
+[![Version](https://img.shields.io/badge/version-2.5.0-blue.svg)](https://github.com/santiadjmc/unknown/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D16.0.0-brightgreen.svg)](https://nodejs.org/)
 [![Express.js](https://img.shields.io/badge/express.js-%5E4.18.0-lightgrey.svg)](https://expressjs.com/)
@@ -41,10 +41,10 @@ Unknown Server is a robust Express.js-based server solution that provides enterp
 
 ### 🚀 Performance
 - Service mesh architecture
-- Load balancing
+- Multi-core utilization
+- Worker thread offloading
 - Smart caching
 - Response optimization
-- Real-time metrics
 
 </td>
 </tr>
@@ -63,10 +63,10 @@ Unknown Server is a robust Express.js-based server solution that provides enterp
 
 ### 🛠️ Developer Tools
 - CLI management suite
+- Process management
 - Hot reloading
 - Pretty error handling
 - Detailed logging
-- Testing utilities
 
 </td>
 </tr>
@@ -74,8 +74,14 @@ Unknown Server is a robust Express.js-based server solution that provides enterp
 
 ## Features
 
+- 🚀 Advanced Scalability
+  - Node.js clustering for multi-core utilization
+  - Worker thread offloading for CPU-intensive tasks
+  - PM2 process management integration
+  - Zero-downtime restarts
+  - Automatic worker recovery
 - 🔐 Advanced Authentication & Authorization
-  - Advanced token management system
+  - Thread-based encryption system
   - Role hierarchy and inheritance
   - Real-time auth monitoring
   - Smart session invalidation
@@ -196,10 +202,12 @@ npm run dev
 
 ```
 ├── cli/              # CLI management tools
+├── cluster.js        # Clustering support for multi-core systems
 ├── config/           # Configuration files
 ├── database/         # Database configuration and queries
 ├── docs/            # Documentation files
 │   └── versions/    # Version-specific docs
+├── ecosystem.config.js # PM2 process manager configuration
 ├── logs/            # Application and error logs
 ├── managers/         # Core functionality managers
 │   ├── AuthManager.js
@@ -209,7 +217,8 @@ npm run dev
 │   ├── PermissionManager.js
 │   ├── ServiceMeshManager.js
 │   ├── VersionManager.js
-│   └── ... more managers
+│   ├── WorkerThreadManager.js
+│   └── workers/     # Worker thread implementations
 ├── public/          # Static assets
 ├── routers/         # Route handlers
 │   ├── api/        # API endpoints
@@ -257,6 +266,12 @@ Community guidelines
 |---------|-------------|
 | `npm start` | Start production server |
 | `npm run dev` | Start development server with hot reloading |
+| `npm run cluster` | Start server with clustering support for multi-core systems |
+| `npm run start:pm2` | Start server with PM2 process manager |
+| `npm run start:pm2:dev` | Start server with PM2 in development environment |
+| `npm run start:pm2:prod` | Start server with PM2 in production environment |
+| `npm run stop:pm2` | Stop PM2-managed server processes |
+| `npm run monitor` | Monitor PM2-managed server processes |
 | `npm test` | Run tests (when implemented) |
 | `npm run cli` | Access CLI management tools |
 | `npm run docs` | Generate documentation |

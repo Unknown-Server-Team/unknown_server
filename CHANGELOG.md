@@ -2,6 +2,46 @@
 
 All notable changes to Unknown Server will be documented in this file.
 
+## [2.5.0] - 2025-03-15
+
+### Added
+- Advanced Scalability Architecture
+  - Node.js clustering support for multi-core utilization
+  - Worker Thread implementation for CPU-intensive tasks
+  - PM2 process manager integration for improved reliability
+  - Non-blocking password encryption using worker threads
+  - Data processing offloading to separate threads
+  
+- Enhanced Authentication System
+  - Replaced bcrypt with thread-based encryption system
+  - Improved password hashing and comparison performance
+  - Non-blocking user data processing
+  - Better handling of auth operations under heavy load
+
+- Server Management Tools
+  - Added cluster.js entry point for production deployments
+  - PM2 ecosystem configuration for process management
+  - Enhanced graceful shutdown across all worker processes
+  - Better worker process monitoring and recovery
+
+### Enhanced
+- Performance
+  - Significantly reduced main thread blocking
+  - Better utilization of multi-core systems
+  - Improved request handling capacity under heavy load
+  - Reduced latency for encryption operations
+  
+- Reliability
+  - Automatic worker process recovery
+  - Process monitoring and health checks
+  - Memory leak protection with resource limits
+  - Zero-downtime restarts for maintenance
+
+- Development Workflow
+  - Added new npm scripts for cluster and PM2 management
+  - Better logging across worker processes and threads
+  - Improved error handling in distributed environment
+
 ## [2.4.0] - 2025-03-01
 
 ### Added

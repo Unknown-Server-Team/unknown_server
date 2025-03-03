@@ -1,24 +1,90 @@
 const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
+// Remove bcrypt dependency
 const crypto = require('crypto');
 const LogManager = require('./LogManager');
 const EmailManager = require('./EmailManager');
 const RoleManager = require('./RoleManager');
 const { userQueries } = require('../database/mainQueries');
 const db = require('../database/db');
+const WorkerThreadManager = require('./WorkerThreadManager');
+
 class AuthManager {
     constructor() {
         this.secret = process.env.JWT_SECRET || 'your-secret-key';
         this.tokenExpiration = process.env.JWT_EXPIRATION || '24h';
+        // Add encryption settings to use with worker threads
+        this.encryptionSettings = {
+            saltLength: 16,
+            keyAlgorithm: 'sha256',
+            iterations: 10000,
+            keyLength: 32
+        };
     }
 
+    /**
+     * Hash password using worker threads instead of bcrypt
+     * @param {string} password - The password to hash
+     * @returns {Promise<string>} - Hashed password with salt
+     */
     async hashPassword(password) {
-        const salt = await bcrypt.genSalt(10);
-        return bcrypt.hash(password, salt);
+        try {
+            // Generate a random salt
+            const salt = crypto.randomBytes(this.encryptionSettings.saltLength).toString('hex');
+            
+            // Use worker thread to perform CPU-intensive encryption
+            const result = await WorkerThreadManager.executeTask('encryption', 
+                {
+                    text: password,
+                    key: salt
+                },
+                {
+                    operation: 'encrypt'
+                }
+            );
+            
+            // Format the hash with the salt for storage
+            // Format: salt:iv:encrypted
+            return `${salt}:${result.iv}:${result.result}`;
+        } catch (error) {
+            LogManager.error('Password hashing failed', error);
+            throw new Error('Password hashing failed');
+        }
     }
 
-    async comparePassword(password, hash) {
-        return bcrypt.compare(password, hash);
+    /**
+     * Compare plain text password with hashed password using worker threads
+     * @param {string} password - The plain text password
+     * @param {string} hashedPassword - The hashed password from database
+     * @returns {Promise<boolean>} - True if password matches
+     */
+    async comparePassword(password, hashedPassword) {
+        try {
+            // Split the stored hash into components
+            const [salt, iv, hash] = hashedPassword.split(':');
+            
+            if (!salt || !iv || !hash) {
+                LogManager.error('Invalid password hash format');
+                return false;
+            }
+            
+            // Use worker thread to perform CPU-intensive decryption
+            const result = await WorkerThreadManager.executeTask('encryption', 
+                {
+                    text: hash,
+                    key: salt,
+                    iv: iv
+                },
+                {
+                    operation: 'decrypt'
+                }
+            );
+            
+            // Compare the decrypted password with the provided password
+            return result.result === password;
+        } catch (error) {
+            LogManager.error('Password comparison failed', error);
+            return false;
+        }
     }
 
     async generateToken(user) {

@@ -14,16 +14,16 @@ class RoleManager {
     async _initializeRoleHierarchy() {
         try {
             const [hierarchyData] = await db.query(`
-                SELECT role_id, parent_role_id 
-                FROM role_hierarchy
+                SELECT parent_role_id, child_role_id 
+                FROM roles_hierarchy
             `);
             
             // Build hierarchy map
             hierarchyData.forEach(entry => {
-                if (!this.roleHierarchy.has(entry.role_id)) {
-                    this.roleHierarchy.set(entry.role_id, []);
+                if (!this.roleHierarchy.has(entry.child_role_id)) {
+                    this.roleHierarchy.set(entry.child_role_id, []);
                 }
-                this.roleHierarchy.get(entry.role_id).push(entry.parent_role_id);
+                this.roleHierarchy.get(entry.child_role_id).push(entry.parent_role_id);
             });
             
             LogManager.info('Role hierarchy initialized', { hierarchySize: hierarchyData.length });
@@ -248,8 +248,8 @@ class RoleManager {
             // Add role hierarchy if parent role specified
             if (parentRoleId) {
                 await db.query(
-                    'INSERT INTO role_hierarchy (role_id, parent_role_id) VALUES (?, ?)',
-                    [roleId, parentRoleId]
+                    'INSERT INTO roles_hierarchy (parent_role_id, child_role_id) VALUES (?, ?)',
+                    [parentRoleId, roleId]
                 );
                 
                 // Update local hierarchy map
@@ -290,13 +290,13 @@ class RoleManager {
             // Update role hierarchy if parentRoleId is specified
             if (data.parentRoleId !== undefined) {
                 // First remove existing parent relationships for this role
-                await db.query('DELETE FROM role_hierarchy WHERE role_id = ?', [roleId]);
+                await db.query('DELETE FROM roles_hierarchy WHERE child_role_id = ?', [roleId]);
                 
                 // Add new parent relationship if not null
                 if (data.parentRoleId !== null) {
                     await db.query(
-                        'INSERT INTO role_hierarchy (role_id, parent_role_id) VALUES (?, ?)',
-                        [roleId, data.parentRoleId]
+                        'INSERT INTO roles_hierarchy (parent_role_id, child_role_id) VALUES (?, ?)',
+                        [data.parentRoleId, roleId]
                     );
                     
                     // Update local hierarchy map
@@ -348,7 +348,7 @@ class RoleManager {
             await db.query('DELETE FROM roles WHERE id = ?', [roleId]);
             
             // Delete from role hierarchy
-            await db.query('DELETE FROM role_hierarchy WHERE role_id = ? OR parent_role_id = ?', [roleId, roleId]);
+            await db.query('DELETE FROM roles_hierarchy WHERE child_role_id = ? OR parent_role_id = ?', [roleId, roleId]);
             
             // Update local hierarchy map
             this.roleHierarchy.delete(roleId);
@@ -560,7 +560,7 @@ class RoleManager {
                     r.id, r.name, r.description,
                     p.id as parent_id, p.name as parent_name
                 FROM roles r
-                LEFT JOIN role_hierarchy rh ON r.id = rh.role_id
+                LEFT JOIN roles_hierarchy rh ON r.id = rh.child_role_id
                 LEFT JOIN roles p ON rh.parent_role_id = p.id
                 ORDER BY r.name
             `);
@@ -600,13 +600,13 @@ class RoleManager {
             }
             
             // Remove existing parent relationship
-            await db.query('DELETE FROM role_hierarchy WHERE role_id = ?', [roleId]);
+            await db.query('DELETE FROM roles_hierarchy WHERE child_role_id = ?', [roleId]);
             
             // Add new parent if not null
             if (parentRoleId) {
                 await db.query(
-                    'INSERT INTO role_hierarchy (role_id, parent_role_id) VALUES (?, ?)',
-                    [roleId, parentRoleId]
+                    'INSERT INTO roles_hierarchy (parent_role_id, child_role_id) VALUES (?, ?)',
+                    [parentRoleId, roleId]
                 );
                 
                 // Update local hierarchy

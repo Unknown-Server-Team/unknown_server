@@ -49,6 +49,15 @@
 
 ## Version History Contributors
 
+### Version 2.5.0 (2025-03-15)
+- [Santiago Morales](https://github.com/santiadjmc)
+  - Advanced Scalability Architecture
+  - Node.js clustering implementation
+  - Worker Thread Manager development 
+  - Thread-based encryption system
+  - PM2 process management integration
+  - Non-blocking authentication system
+
 ### Version 2.4.0 (2025-03-01)
 - [Santiago Morales](https://github.com/santiadjmc)
   - Enhanced Service Mesh Architecture
