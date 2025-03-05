@@ -2,7 +2,7 @@
 
 All notable changes to Unknown Server will be documented in this file.
 
-## [2.5.0] - 2025-03-15
+## [2.5.0] - 2025-03-03
 
 ### Added
 - Advanced Scalability Architecture
