@@ -17,7 +17,11 @@ module.exports = {
     script: "./server.js",
     instances: "max",        // Use maximum number of CPU cores
     exec_mode: "cluster",    // Run in cluster mode for load balancing
-    watch: false,            // Watch for file changes
+    watch: true,            // Watch for file changes
+    ignore_watch: ["node_modules", "logs"], // Ignore certain directories
+    watch_options: {
+      followSymlinks: false
+    },
     max_memory_restart: "1G", // Restart if memory exceeds 1GB
     
     // Environment variables for production
