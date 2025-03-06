@@ -61,14 +61,67 @@ if (cluster.isPrimary || cluster.isMaster) {
                     otherWorker.send(message);
                 }
             }
+        } else if (message.type === 'cache:operation') {
+            // Forward cache operations to all other workers
+            for (const otherWorker of workers) {
+                if (otherWorker.id !== worker.id) {
+                    otherWorker.send(message);
+                }
+            }
         }
     });
     
-    // Add some basic stats logging
+    // Periodically collect and log memory stats from workers
     setInterval(() => {
         const numWorkers = Object.keys(cluster.workers).length;
         LogManager.debug(`Active workers: ${numWorkers}`);
-    }, 30000);
+        
+        // Request memory stats from all workers
+        for (const worker of workers) {
+            worker.send({ type: 'stats:request', statsType: 'memory' });
+        }
+    }, 300000); // Every 5 minutes
+    
+    // Track worker memory stats
+    const workersMemoryStats = {};
+    cluster.on('message', (worker, message) => {
+        if (message.type === 'stats:response' && message.statsType === 'memory') {
+            workersMemoryStats[worker.id] = message.stats;
+            
+            // Check for potential memory leaks across workers
+            analyzeClusterMemoryUsage(workersMemoryStats);
+        }
+    });
+    
+    // Analyze memory usage across the cluster
+    function analyzeClusterMemoryUsage(stats) {
+        // Only analyze if we have stats for all workers
+        const workerIds = Object.keys(stats);
+        if (workerIds.length < Object.keys(cluster.workers).length) return;
+        
+        // Calculate total and average memory usage
+        let totalMemory = 0;
+        let maxMemoryWorker = { id: null, memory: 0 };
+        
+        workerIds.forEach(id => {
+            const workerMemory = stats[id].heapUsed;
+            totalMemory += workerMemory;
+            
+            if (workerMemory > maxMemoryWorker.memory) {
+                maxMemoryWorker = { id, memory: workerMemory };
+            }
+        });
+        
+        const avgMemory = totalMemory / workerIds.length;
+        
+        // Log memory usage summary
+        LogManager.info(`Cluster memory usage - Total: ${totalMemory.toFixed(2)}MB, Average: ${avgMemory.toFixed(2)}MB per worker`);
+        
+        // Check for outliers (workers using significantly more memory)
+        if (maxMemoryWorker.memory > avgMemory * 1.5) {
+            LogManager.warning(`Worker ${maxMemoryWorker.id} is using ${maxMemoryWorker.memory.toFixed(2)}MB memory, which is ${((maxMemoryWorker.memory / avgMemory) * 100).toFixed(0)}% of the average`);
+        }
+    }
     
     // Handle graceful shutdown
     process.on('SIGTERM', () => {
@@ -116,6 +169,23 @@ if (cluster.isPrimary || cluster.isMaster) {
             LogManager.info(`Worker ${process.pid} received shutdown signal`);
             // The shutdown process itself is handled by server.js
             // We just need to pass along the signal
+        } else if (msg && msg.type === 'stats:request') {
+            // Handle stats requests from master
+            if (msg.statsType === 'memory') {
+                const memoryStats = process.memoryUsage();
+                
+                process.send({
+                    type: 'stats:response',
+                    statsType: 'memory',
+                    stats: {
+                        heapUsed: memoryStats.heapUsed / 1024 / 1024,  // Convert to MB
+                        heapTotal: memoryStats.heapTotal / 1024 / 1024, // Convert to MB
+                        rss: memoryStats.rss / 1024 / 1024,            // Convert to MB
+                        pid: process.pid,
+                        workerId: cluster.worker.id
+                    }
+                });
+            }
         }
     });
     
