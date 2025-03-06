@@ -46,6 +46,7 @@
     "ioredis": "^5.5.0",
     "jsonwebtoken": "^9.0.2",
     "marked": "^15.0.7",
+    "mathjs": "^14.3.0",
     "moment": "^2.29.4",
     "mysql": "^2.18.1",
     "node-cache": "^5.1.2",
