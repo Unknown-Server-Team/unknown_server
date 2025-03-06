@@ -7,6 +7,8 @@
 
 const { workerData, parentPort } = require('worker_threads');
 const crypto = require('crypto');
+// Import mathjs for secure formula evaluation
+const math = require('mathjs');
 
 // Extract task information from worker data
 const { taskId, data, options } = workerData || {};
@@ -345,19 +347,33 @@ async function transformData(data, options = {}) {
                 
             case 'compute':
                 if (transform.formula && transform.target) {
-                    // This is a simplified formula evaluator
-                    // In a real implementation, you would use a proper formula parser
                     try {
-                        // Using Function constructor is not safe for production
-                        // This is for demonstration only
-                        const formula = transform.formula.replace(/\$\{([^}]+)\}/g, (match, field) => {
-                            return result[field] !== undefined ? result[field] : 0;
+                        // Create a mathjs scope with the current data fields as variables
+                        const scope = {};
+                        
+                        // Add all properties from result as variables in the math scope
+                        Object.entries(result).forEach(([key, value]) => {
+                            // Only add numeric values or values that can be converted to numbers
+                            if (typeof value === 'number' || !isNaN(Number(value))) {
+                                scope[key] = typeof value === 'number' ? value : Number(value);
+                            } else {
+                                // For non-numeric values, set to 0 to prevent errors
+                                scope[key] = 0;
+                            }
                         });
                         
-                        // eslint-disable-next-line no-new-func
-                        result[transform.target] = new Function(`return ${formula}`)();
+                        // Replace variable placeholders with their property names for mathjs
+                        const parsedFormula = transform.formula.replace(/\$\{([^}]+)\}/g, (match, field) => {
+                            return field;
+                        });
+                        
+                        // Evaluate the formula safely using mathjs
+                        result[transform.target] = math.evaluate(parsedFormula, scope);
+                        
+                        // Log the successful computation
+                        workerLog('info', `Computed field '${transform.target}' using formula: ${transform.formula}`);
                     } catch (error) {
-                        console.error(`Error evaluating formula: ${transform.formula}`, error);
+                        workerLog('error', `Error evaluating formula: ${transform.formula}`, { error: error.message });
                     }
                 }
                 break;
