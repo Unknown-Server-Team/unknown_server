@@ -1,18 +1,43 @@
 <canvas id="particles" class="particles-bg"></canvas>
 
 <div class="not-found-container animate__animated animate__fadeIn">
-    <div class="glitch-wrapper">
-        <h1 class="glitch" data-text="404">404</h1>
+    <div class="error-code">
+        <span class="digit">4</span>
+        <div class="server-icon">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="2" y="3" width="20" height="18" rx="2" stroke="currentColor" stroke-width="2"/>
+                <line x1="2" y1="9" x2="22" y2="9" stroke="currentColor" stroke-width="2"/>
+                <line x1="2" y1="15" x2="22" y2="15" stroke="currentColor" stroke-width="2"/>
+                <circle cx="6" cy="6" r="1" fill="currentColor"/>
+                <circle cx="6" cy="12" r="1" fill="currentColor"/>
+                <circle cx="6" cy="18" r="1" fill="currentColor"/>
+            </svg>
+        </div>
+        <span class="digit">4</span>
     </div>
-    <p class="not-found-message">Looks like you've ventured too far into space</p>
-    <div class="space-scene">
-        <div class="stars"></div>
-        <div class="astronaut">
-            👨‍🚀
-            <div class="astronaut-trail"></div>
+    
+    <h2 class="error-message">Page Not Found</h2>
+    <p class="error-description">The resource you're looking for might have been moved or doesn't exist.</p>
+    
+    <div class="action-buttons">
+        <a href="/" class="primary-button">Return to Homepage</a>
+        <a href="/api-docs" class="secondary-button">View Documentation</a>
+    </div>
+    
+    <div class="tech-details">
+        <div class="tech-detail-item">
+            <span class="detail-icon">🔍</span>
+            <span class="detail-text">Check the URL for typos</span>
+        </div>
+        <div class="tech-detail-item">
+            <span class="detail-icon">📚</span>
+            <span class="detail-text">Review our API documentation</span>
+        </div>
+        <div class="tech-detail-item">
+            <span class="detail-icon">⚙️</span>
+            <span class="detail-text">Ensure proper authentication</span>
         </div>
     </div>
-    <a href="/" class="home-button animate__animated animate__pulse animate__infinite">Return to Base</a>
 </div>
 
 <style>
@@ -26,138 +51,141 @@
     padding: 2rem;
     position: relative;
     overflow: hidden;
+    color: var(--text-color, #e9e9e9);
 }
 
-.glitch-wrapper {
-    position: relative;
-    margin-bottom: 2rem;
+.error-code {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1.5rem;
 }
 
-.glitch {
+.digit {
     font-size: 8rem;
     font-weight: 800;
-    position: relative;
-    text-shadow: 0.05em 0 0 rgba(255, 0, 0, 0.75),
-                -0.025em -0.05em 0 rgba(0, 255, 0, 0.75),
-                0.025em 0.05em 0 rgba(0, 0, 255, 0.75);
-    animation: glitch 500ms infinite;
-    background: linear-gradient(45deg, var(--gradient-start), var(--gradient-end));
+    background: linear-gradient(45deg, var(--gradient-start, #9b4bff), var(--gradient-end, #e84bff));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    text-shadow: 0 0 10px rgba(155, 75, 255, 0.3);
+}
+
+.server-icon {
+    width: 6rem;
+    height: 6rem;
+    color: var(--primary-color, #9b4bff);
+    margin: 0 1rem;
+    animation: server-pulse 3s ease-in-out infinite;
+}
+
+.error-message {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    background: linear-gradient(45deg, var(--gradient-start, #9b4bff), var(--gradient-end, #e84bff));
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
 }
 
-.glitch::before,
-.glitch::after {
-    content: attr(data-text);
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: var(--background-color);
+.error-description {
+    font-size: 1.2rem;
+    max-width: 600px;
+    margin-bottom: 3rem;
+    color: var(--text-muted, #a0a0a0);
 }
 
-.glitch::before {
-    left: 2px;
-    text-shadow: -2px 0 var(--primary-color);
-    animation: glitch-1 200ms infinite;
-    clip-path: inset(0 33% 0 0);
-}
-
-.glitch::after {
-    left: -2px;
-    text-shadow: -2px 0 var(--secondary-color);
-    animation: glitch-2 300ms infinite;
-    clip-path: inset(0 0 0 33%);
-}
-
-@keyframes glitch {
-    0% { text-shadow: 0.05em 0 0 rgba(255, 0, 0, 0.75),
-                    -0.05em -0.025em 0 rgba(0, 255, 0, 0.75),
-                    -0.025em 0.05em 0 rgba(0, 0, 255, 0.75); }
-    15% { text-shadow: -0.05em -0.025em 0 rgba(255, 0, 0, 0.75),
-                    0.025em 0.025em 0 rgba(0, 255, 0, 0.75),
-                    -0.05em -0.05em 0 rgba(0, 0, 255, 0.75); }
-    50% { text-shadow: 0.025em 0.05em 0 rgba(255, 0, 0, 0.75),
-                    0.05em 0 0 rgba(0, 255, 0, 0.75),
-                    0 -0.05em 0 rgba(0, 0, 255, 0.75); }
-}
-
-.not-found-message {
-    font-size: 1.8rem;
-    color: var(--text-muted);
+.action-buttons {
+    display: flex;
+    gap: 1rem;
     margin-bottom: 3rem;
 }
 
-.space-scene {
-    position: relative;
-    width: 200px;
-    height: 200px;
-    margin: 2rem 0;
-}
-
-.astronaut {
-    font-size: 4rem;
-    position: absolute;
-    animation: float 6s ease-in-out infinite;
-}
-
-.astronaut-trail {
-    position: absolute;
-    width: 100%;
-    height: 20px;
-    background: linear-gradient(90deg, 
-        rgba(155, 75, 255, 0.2) 0%,
-        transparent 100%);
-    transform: rotate(-45deg);
-    animation: trail 2s linear infinite;
-}
-
-@keyframes trail {
-    0% { opacity: 0.8; transform: rotate(-45deg) translateX(0); }
-    100% { opacity: 0; transform: rotate(-45deg) translateX(-20px); }
-}
-
-.stars {
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    background: 
-        radial-gradient(circle at 20% 20%, rgba(155, 75, 255, 0.2) 0%, transparent 50%),
-        radial-gradient(circle at 80% 80%, rgba(232, 75, 255, 0.2) 0%, transparent 50%);
-    animation: twinkle 4s ease-in-out infinite;
-}
-
-@keyframes twinkle {
-    0%, 100% { opacity: 0.5; transform: scale(1); }
-    50% { opacity: 1; transform: scale(1.1); }
-}
-
-@keyframes float {
-    0%, 100% { transform: translateY(0) rotate(0deg); }
-    50% { transform: translateY(-20px) rotate(10deg); }
-}
-
-@keyframes pulse {
-    0%, 100% { transform: scale(1); opacity: 0.5; }
-    50% { transform: scale(1.2); opacity: 0.8; }
-}
-
-.home-button {
-    margin-top: 2rem;
-    padding: 1rem 2rem;
-    background: linear-gradient(45deg, var(--gradient-start), var(--gradient-end));
-    color: white;
-    text-decoration: none;
-    border-radius: 30px;
+.primary-button, .secondary-button {
+    padding: 0.8rem 1.8rem;
+    border-radius: 8px;
     font-weight: 600;
+    text-decoration: none;
     transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+}
+
+.primary-button {
+    background: linear-gradient(45deg, var(--gradient-start, #9b4bff), var(--gradient-end, #e84bff));
+    color: white;
     box-shadow: 0 4px 15px rgba(155, 75, 255, 0.3);
 }
 
-.home-button:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(155, 75, 255, 0.4);
+.secondary-button {
+    background: transparent;
+    border: 2px solid var(--primary-color, #9b4bff);
+    color: var(--primary-color, #9b4bff);
+}
+
+.primary-button:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(155, 75, 255, 0.4);
+}
+
+.secondary-button:hover {
+    background: rgba(155, 75, 255, 0.1);
+}
+
+.tech-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+    max-width: 400px;
+}
+
+.tech-detail-item {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    padding: 0.7rem 1.5rem;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+.tech-detail-item:hover {
+    background: rgba(155, 75, 255, 0.1);
+    transform: translateX(5px);
+}
+
+.detail-icon {
+    font-size: 1.2rem;
+}
+
+.detail-text {
+    font-size: 0.9rem;
+}
+
+@keyframes server-pulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.1); opacity: 0.8; }
+}
+
+@media (max-width: 768px) {
+    .action-buttons {
+        flex-direction: column;
+        width: 100%;
+        max-width: 300px;
+    }
+    
+    .digit {
+        font-size: 5rem;
+    }
+    
+    .server-icon {
+        width: 4rem;
+        height: 4rem;
+    }
+    
+    .error-message {
+        font-size: 2rem;
+    }
 }
 </style>
