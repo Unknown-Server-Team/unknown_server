@@ -2,8 +2,8 @@
 
 ## CLI Issues
 - CLI may not display properly initially due to punycode warning
-- Some actions may result in infinite loading messages
-- Random undefined texts appearing in CLI output
+- Some actions may result in infinite loading messages when failing
+- Random undefined texts appearing in CLI selections
 
 ## Authentication System
 - Registration system not functioning properly due to interaction errors between related managers
