@@ -49,7 +49,15 @@
 
 ## Version History Contributors
 
-### Version 2.5.0 (2025-03-15)
+### Version 2.5.1 (2025-03-07)
+- [Santiago Morales](https://github.com/santiadjmc)
+  - CLI system improvements and bug fixes
+  - Authentication system stability enhancements
+  - Windows-specific PM2 fixes
+  - Known issues documentation
+  - Enhanced error handling implementation
+
+### Version 2.5.0 (2025-03-03)
 - [Santiago Morales](https://github.com/santiadjmc)
   - Advanced Scalability Architecture
   - Node.js clustering implementation

@@ -62,6 +62,29 @@ const emailVerificationLimiter = RatelimitManager.create({
     }
 });
 
+// CLI API Key validation middleware
+const validateCliApiKey = (req, res, next) => {
+    try {
+        // Get CLI API key from environment variable
+        const cliApiKey = process.env.CLI_API_KEY;
+        if (!cliApiKey) {
+            LogManager.warning('CLI API key not configured in environment');
+            return next();
+        }
+
+        // Check for CLI API key in header
+        const requestApiKey = req.headers['x-cli-api-key'];
+        
+        // Set a flag to indicate if this is an authenticated CLI request
+        req.isCliRequest = requestApiKey === cliApiKey;
+        
+        next();
+    } catch (error) {
+        LogManager.error('Error validating CLI API key', error);
+        next();
+    }
+};
+
 /**
  * @swagger
  * components:
@@ -80,6 +103,11 @@ const emailVerificationLimiter = RatelimitManager.create({
  *           format: password
  *         name:
  *           type: string
+ *         roles:
+ *           type: array
+ *           items:
+ *             type: string
+ *           description: Only available when using CLI API key
  */
 
 /**
@@ -89,6 +117,13 @@ const emailVerificationLimiter = RatelimitManager.create({
  *     tags:
  *       - Authentication
  *     summary: Register a new user
+ *     parameters:
+ *       - in: header
+ *         name: x-cli-api-key
+ *         schema:
+ *           type: string
+ *         required: false
+ *         description: CLI API key to authorize role assignment during registration
  *     requestBody:
  *       required: true
  *       content:
@@ -108,6 +143,11 @@ const emailVerificationLimiter = RatelimitManager.create({
  *                 format: password
  *               name:
  *                 type: string
+ *               roles:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 description: Only allowed when using CLI API key
  *     responses:
  *       201:
  *         description: User created successfully
@@ -128,6 +168,7 @@ const emailVerificationLimiter = RatelimitManager.create({
 router.post('/register',
     ValidationMiddleware.validateRegistration,
     registrationLimiter,
+    validateCliApiKey,  // Add CLI API key validation
     async (req, res) => {
         try {
             const validation = ValidationManager.validateRegistration(req.body);
@@ -137,27 +178,89 @@ router.post('/register',
                     details: validation.errors
                 });
             }
+            
             const foundUser = await userQueries.getUserByEmail(req.body.email);
             if (foundUser) {
                 return res.status(409).json({ error: 'Email already exists' });
             }
             
+            // Extract roles from request if CLI API key is valid
+            const customRoles = req.isCliRequest && req.body.roles ? req.body.roles : null;
+            
+            // Log attempt to assign custom roles without CLI API key
+            if (!req.isCliRequest && req.body.roles) {
+                LogManager.warning('Attempt to assign custom roles without valid CLI API key', {
+                    ip: req.ip,
+                    roles: req.body.roles
+                });
+            }
+            
+            // Create user data object (remove roles to ensure AuthManager doesn't process them directly)
+            const userData = { ...req.body };
+            if (userData.roles) delete userData.roles;
+            
             // Create the user (this also assigns the default role)
-            const userId = await AuthManager.createUser(req.body);
+            const userId = await AuthManager.createUser(userData);
             const user = await userQueries.getUserById(userId);
 
-            // Get the default role that was assigned
-            const defaultRole = await RoleManager.getDefaultRole();
-            if (defaultRole) {
-                // Log the role assignment in audit log
-                await AuthAnalytics.logAuditEvent({
-                    action_type: 'role_assign',
-                    admin_id: userId,
-                    target_id: userId,
-                    role_id: defaultRole.id,
-                    metadata: { source: 'registration' },
-                    ip_address: req.ip
-                });
+            // Assign custom roles if provided from CLI with valid API key
+            if (customRoles && customRoles.length > 0) {
+                try {
+                    // Get all available roles
+                    const availableRoles = await RoleManager.getRoles();
+                    const availableRoleNames = availableRoles.map(role => role.name);
+                    
+                    // Filter to valid roles only
+                    const validRoles = customRoles.filter(role => availableRoleNames.includes(role));
+                    
+                    // Log warning for invalid roles
+                    const invalidRoles = customRoles.filter(role => !availableRoleNames.includes(role));
+                    if (invalidRoles.length > 0) {
+                        LogManager.warning('Attempted to assign invalid roles', { 
+                            invalidRoles,
+                            userId
+                        });
+                    }
+                    
+                    // Assign each valid role
+                    for (const roleName of validRoles) {
+                        const role = availableRoles.find(r => r.name === roleName);
+                        if (role) {
+                            await RoleManager.assignRole(userId, role.id);
+                            
+                            // Log the role assignment in audit log
+                            await AuthAnalytics.logAuditEvent({
+                                action_type: 'role_assign',
+                                admin_id: null, // System assigned from CLI
+                                target_id: userId,
+                                role_id: role.id,
+                                metadata: { source: 'cli_registration' },
+                                ip_address: req.ip
+                            });
+                        }
+                    }
+                    
+                    LogManager.info('Assigned custom roles to user from CLI', {
+                        userId,
+                        roles: validRoles
+                    });
+                } catch (roleError) {
+                    LogManager.error('Failed to assign custom roles to user', roleError);
+                }
+            } else {
+                // Get the default role that was assigned
+                const defaultRole = await RoleManager.getDefaultRole();
+                if (defaultRole) {
+                    // Log the role assignment in audit log
+                    await AuthAnalytics.logAuditEvent({
+                        action_type: 'role_assign',
+                        admin_id: userId,
+                        target_id: userId,
+                        role_id: defaultRole.id,
+                        metadata: { source: 'registration' },
+                        ip_address: req.ip
+                    });
+                }
             }
 
             try {
@@ -168,18 +271,25 @@ router.post('/register',
                 LogManager.error('Failed to send verification email', error);
             }
 
-            // Get initial roles and permissions
-            const userAuth = await RoleManager.getUserWithRolesAndPermissions(userId);
+            // Get user roles without using getUserWithRolesAndPermissions which is causing the error
+            const roles = await RoleManager.getUserRoles(userId);
+            // Get user permissions separately
+            let permissions = [];
+            try {
+                permissions = await PermissionManager.getUserPermissions(userId);
+            } catch (permError) {
+                LogManager.error('Failed to get user permissions', permError);
+            }
 
             res.status(201).json({
                 message: 'User registered successfully. Please check your email to verify your account.',
                 user: {
                     id: user.id,
                     email: user.email,
-                    name: user.name
+                    name: user.name,
+                    roles: roles || []
                 },
-                roles: userAuth.roles,
-                permissions: userAuth.permissions
+                permissions: permissions || []
             });
         } catch (error) {
             LogManager.error('Registration failed', error);

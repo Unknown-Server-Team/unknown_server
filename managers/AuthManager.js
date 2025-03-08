@@ -208,23 +208,49 @@ class AuthManager {
 
     async createUser(userData, initialRole = 'user') {
         try {
+            // Hash password first
             const hashedPassword = await this.hashPassword(userData.password);
+            
+            // Create user with hashed password
             const result = await userQueries.createUser({
-                ...userData,
-                password: hashedPassword
+                email: userData.email,
+                password: hashedPassword,
+                name: userData.name
             });
 
-            // Get default role and assign it
-            const [role] = await db.query('SELECT id FROM roles WHERE name = ?', [initialRole]);
-            if (!role) {
-                LogManager.error('Default role not found', { roleName: initialRole });
-                throw new Error('Default role not found');
+            if (!result || !result.insertId) {
+                throw new Error('Failed to create user record');
             }
 
-            await RoleManager.assignRole(result.insertId, role.id);
-            LogManager.info('User created with default role', { userId: result.insertId, roleId: role.id });
+            const userId = result.insertId;
 
-            return result.insertId;
+            try {
+                // Get default role and assign it
+                const defaultRole = await RoleManager.getDefaultRole();
+                if (!defaultRole) {
+                    LogManager.error('Default role not found', { roleName: initialRole });
+                    throw new Error('Default role not found');
+                }
+
+                await RoleManager.assignRole(userId, defaultRole.id);
+                LogManager.info('User created with default role', { userId, roleId: defaultRole.id });
+
+                // If additional roles were specified and this is a CLI request (has API key)
+                if (userData.roles && Array.isArray(userData.roles)) {
+                    for (const roleName of userData.roles) {
+                        const [role] = await db.query('SELECT id FROM roles WHERE name = ?', [roleName]);
+                        if (role) {
+                            await RoleManager.assignRole(userId, role.id);
+                        }
+                    }
+                }
+            } catch (roleError) {
+                // If role assignment fails, delete the user and throw
+                await userQueries.deleteUser(userId);
+                throw roleError;
+            }
+
+            return userId;
         } catch (error) {
             LogManager.error('Failed to create user', error);
             throw error;

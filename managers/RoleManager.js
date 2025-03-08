@@ -17,6 +17,7 @@ class RoleManager {
                 SELECT parent_role_id, child_role_id 
                 FROM roles_hierarchy
             `);
+            if (!hierarchyData) return LogManager.debug('No role hierarchy data found');
             
             // Build hierarchy map
             hierarchyData.forEach(entry => {
@@ -171,7 +172,7 @@ class RoleManager {
 
     async _hasRoleViaHierarchy(userId, roleName) {
         // Get target role ID
-        const [[targetRole]] = await db.query('SELECT id FROM roles WHERE name = ?', [roleName]);
+        const [targetRole] = await db.query('SELECT id FROM roles WHERE name = ?', [roleName]);
         if (!targetRole) return false;
         
         // Get user's direct roles
@@ -383,7 +384,7 @@ class RoleManager {
         if (cached) return cached;
         
         try {
-            const [[role]] = await db.query('SELECT * FROM roles WHERE id = ?', [roleId]);
+            const [role] = await db.query('SELECT * FROM roles WHERE id = ?', [roleId]);
             if (!role) return null;
 
             const permissions = await PermissionManager.getRolePermissions(roleId);
@@ -448,32 +449,40 @@ class RoleManager {
                 WHERE ur.user_id = ?
             `, [userId]);
             
+            // Ensure directPermissions is an array
+            const directPermsArray = Array.isArray(directPermissions) ? directPermissions : [];
+            
             // Get user roles
             const userRoles = await this.getUserRoles(userId);
             
             // Now get permissions inherited through the role hierarchy
             const inheritedPermissions = [];
-            for (const role of userRoles) {
-                const roleId = role.id;
-                const parentRoleIds = await this._getAllParentRoleIds(roleId, new Set());
-                
-                if (parentRoleIds.size > 0) {
-                    const [parentPermissions] = await db.query(`
-                        SELECT DISTINCT p.* 
-                        FROM permissions p
-                        JOIN role_permissions rp ON p.id = rp.permission_id
-                        WHERE rp.role_id IN (?)
-                    `, [Array.from(parentRoleIds)]);
+            // Ensure userRoles is an array before iterating
+            if (Array.isArray(userRoles) && userRoles.length > 0) {
+                for (const role of userRoles) {
+                    const roleId = role.id;
+                    const parentRoleIds = await this._getAllParentRoleIds(roleId, new Set());
                     
-                    inheritedPermissions.push(...parentPermissions);
+                    if (parentRoleIds.size > 0) {
+                        const [parentPermissions] = await db.query(`
+                            SELECT DISTINCT p.* 
+                            FROM permissions p
+                            JOIN role_permissions rp ON p.id = rp.permission_id
+                            WHERE rp.role_id IN (?)
+                        `, [Array.from(parentRoleIds)]);
+                        
+                        if (Array.isArray(parentPermissions)) {
+                            inheritedPermissions.push(...parentPermissions);
+                        }
+                    }
                 }
             }
             
             // Combine direct and inherited permissions, removing duplicates
             const allPermissions = [
-                ...directPermissions,
+                ...directPermsArray,
                 ...inheritedPermissions.filter(inhP => 
-                    !directPermissions.some(dirP => dirP.id === inhP.id)
+                    !directPermsArray.some(dirP => dirP.id === inhP.id)
                 )
             ];
             
@@ -539,13 +548,37 @@ class RoleManager {
             const cached = await CacheManager.get(cacheKey);
             if (cached) return cached;
             
-            const [[role]] = await db.query('SELECT * FROM roles WHERE name = ?', ['user']);
+            // Try to get the default 'user' role
+            const [role] = await db.query('SELECT * FROM roles WHERE name = ?', ['user']);
             
-            if (role) {
-                await CacheManager.set(cacheKey, role, this.CACHE_TTL);
+            // If not found, get any role with minimal permissions
+            if (!role) {
+                const [basicRole] = await db.query(`
+                    SELECT r.* FROM roles r
+                    LEFT JOIN role_permissions rp ON r.id = rp.role_id
+                    GROUP BY r.id
+                    ORDER BY COUNT(rp.permission_id) ASC
+                    LIMIT 1
+                `);
+                
+                if (basicRole) {
+                    await CacheManager.set(cacheKey, basicRole, this.CACHE_TTL);
+                    return basicRole;
+                }
+                
+                // If no roles exist at all, create the default user role
+                const result = await db.query(
+                    'INSERT INTO roles (name, description) VALUES (?, ?)',
+                    ['user', 'Default user role with basic permissions']
+                );
+                
+                const [newRole] = await db.query('SELECT * FROM roles WHERE id = ?', [result.insertId]);
+                await CacheManager.set(cacheKey, newRole, this.CACHE_TTL);
+                return newRole;
             }
             
-            return role || null;
+            await CacheManager.set(cacheKey, role, this.CACHE_TTL);
+            return role;
         } catch (error) {
             LogManager.error('Failed to get default role', error);
             throw error;
@@ -665,19 +698,20 @@ class RoleManager {
     }
     
     // Track role changes for analytics
-    async _trackRoleChange(userId, roleId, action) {
+    async _trackRoleChange(userId, roleId, action, adminId = null) {
         try {
             // If AuthAnalytics is available, log the event
             const AuthAnalytics = require('./AuthAnalytics');
             if (AuthAnalytics && AuthAnalytics.trackRoleUsage) {
                 await AuthAnalytics.trackRoleUsage(roleId, userId);
                 
-                // Log audit event
+                // Log audit event with null admin_id being valid
                 await AuthAnalytics.logAuditEvent({
                     action_type: action === 'assign' ? 'role_assigned' : 'role_removed',
                     target_id: userId,
                     role_id: roleId,
-                    metadata: { timestamp: Date.now() }
+                    metadata: { timestamp: Date.now(), automated: adminId === null },
+                    admin_id: adminId || 0 // Use 0 as a default for system actions
                 });
             }
         } catch (error) {

@@ -47,7 +47,8 @@ class API {
         const headers = {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
-            'Accept-Version': 'v1'
+            'Accept-Version': 'v1',
+            'x-cli-api-key': process.env.CLI_API_KEY
         };
 
         if (this.token) {
@@ -55,7 +56,6 @@ class API {
         }
 
         try {
-            console.log(`Making request to ${url} with options:`, options);
             const response = await fetch(url, {
                 ...options,
                 headers: {
@@ -67,12 +67,22 @@ class API {
             const data = await response.json();
 
             if (!response.ok) {
-                throw new Error(data.error || 'Request failed');
+                // Enhanced error handling with validation errors
+                if (response.status === 400 && data.details) {
+                    const errorMessage = Object.entries(data.details)
+                        .map(([field, errors]) => `${field}: ${errors.join(', ')}`)
+                        .join('\n');
+                    throw new Error(errorMessage);
+                }
+                throw new Error(data.error || data.message || 'Request failed');
             }
 
             return data;
         } catch (error) {
-            throw new Error(`API request failed: ${error.message}`);
+            if (error.message.includes('fetch')) {
+                throw new Error(`Connection failed: ${error.message}`);
+            }
+            throw error;
         }
     }
 

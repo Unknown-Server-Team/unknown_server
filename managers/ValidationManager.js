@@ -69,6 +69,18 @@ class ValidationManager {
             errors.name = nameValidation.errors;
         }
 
+        // Validate roles if provided (CLI only)
+        if (data.roles !== undefined) {
+            if (!Array.isArray(data.roles)) {
+                errors.roles = ['Roles must be an array'];
+            } else {
+                const invalidRoles = data.roles.filter(role => typeof role !== 'string' || !role.trim());
+                if (invalidRoles.length > 0) {
+                    errors.roles = ['All roles must be non-empty strings'];
+                }
+            }
+        }
+
         return {
             isValid: Object.keys(errors).length === 0,
             errors

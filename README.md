@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-2.5.0-blue.svg)](https://github.com/santiadjmc/unknown/releases)
+[![Version](https://img.shields.io/badge/version-2.5.1-blue.svg)](https://github.com/santiadjmc/unknown/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D16.0.0-brightgreen.svg)](https://nodejs.org/)
 [![Express.js](https://img.shields.io/badge/express.js-%5E4.18.0-lightgrey.svg)](https://expressjs.com/)
@@ -250,13 +250,21 @@ Production deployment guide
 Security guidelines
 </td>
 <td>
+<a href="./KNOWN_ISSUES.md">⚠️ Known Issues</a><br/>
+Current limitations and bugs
+</td>
+<td>
 <a href="./CONTRIBUTORS.md">👥 Contributing</a><br/>
 How to contribute
 </td>
+</tr>
+<tr>
 <td>
 <a href="./CONTRIBUTORS_CODE_OF_CONDUCT.md">📜 Code of Conduct</a><br/>
 Community guidelines
 </td>
+<td></td>
+<td></td>
 </tr>
 </table>
 

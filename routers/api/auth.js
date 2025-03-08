@@ -118,6 +118,14 @@ const emailVerificationLimiter = RatelimitManager.create({
  *               properties:
  *                 user:
  *                   $ref: '#/components/schemas/User'
+ *                 roles:
+ *                   type: array
+ *                   items:
+ *                     type: string
+ *                 permissions:
+ *                   type: array
+ *                   items:
+ *                     type: string
  *       400:
  *         description: Invalid input data
  *       409:
@@ -137,6 +145,7 @@ router.post('/register',
                     details: validation.errors
                 });
             }
+
             const foundUser = await userQueries.getUserByEmail(req.body.email);
             if (foundUser) {
                 return res.status(409).json({ error: 'Email already exists' });
@@ -146,40 +155,29 @@ router.post('/register',
             const userId = await AuthManager.createUser(req.body);
             const user = await userQueries.getUserById(userId);
 
-            // Get the default role that was assigned
-            const defaultRole = await RoleManager.getDefaultRole();
-            if (defaultRole) {
-                // Log the role assignment in audit log
-                await AuthAnalytics.logAuditEvent({
-                    action_type: 'role_assign',
-                    admin_id: userId,
-                    target_id: userId,
-                    role_id: defaultRole.id,
-                    metadata: { source: 'registration' },
-                    ip_address: req.ip
-                });
+            if (!user) {
+                throw new Error('Failed to create user');
             }
+
+            // Get the authentication details including roles and permissions
+            const userAuth = await RoleManager.getUserWithRolesAndPermissions(userId);
 
             try {
                 // Generate verification token and send email
                 await AuthManager.initiateEmailVerification(user);
-            }
-            catch (error) {
+            } catch (error) {
                 LogManager.error('Failed to send verification email', error);
             }
-
-            // Get initial roles and permissions
-            const userAuth = await RoleManager.getUserWithRolesAndPermissions(userId);
 
             res.status(201).json({
                 message: 'User registered successfully. Please check your email to verify your account.',
                 user: {
                     id: user.id,
                     email: user.email,
-                    name: user.name
+                    name: user.name,
+                    email_verified: user.email_verified
                 },
-                roles: userAuth.roles,
-                permissions: userAuth.permissions
+                roles: userAuth.roles.map(r => r.name)
             });
         } catch (error) {
             LogManager.error('Registration failed', error);

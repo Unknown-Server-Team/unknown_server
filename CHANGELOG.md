@@ -2,6 +2,27 @@
 
 All notable changes to Unknown Server will be documented in this file.
 
+## [2.5.1] - 2025-03-07
+
+### Fixed
+- CLI Display Issues
+  - Resolved infinite loading message in certain CLI operations
+  - Addressed random undefined text outputs
+
+- Authentication System
+  - Improved stability in registration process
+  - Enhanced interaction between authentication managers
+  - Better error handling in auth operations
+
+- Windows-Specific Fixes
+  - Addressed random blank CMD screens appearing with PM2 (Windows only)
+  - Improved process management in Windows environments
+
+### Documentation
+- Added KNOWN_ISSUES.md to track and document known problems
+- Enhanced documentation clarity for Windows-specific deployment
+- Updated troubleshooting guides for common issues
+
 ## [2.5.0] - 2025-03-03
 
 ### Added
