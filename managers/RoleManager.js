@@ -13,11 +13,11 @@ class RoleManager {
     // Initialize role hierarchy from database
     async _initializeRoleHierarchy() {
         try {
-            const [hierarchyData] = await db.query(`
+            const hierarchyData = await db.query(`
                 SELECT parent_role_id, child_role_id 
                 FROM roles_hierarchy
             `);
-            if (!hierarchyData) return LogManager.debug('No role hierarchy data found');
+            if (!hierarchyData[0]) return LogManager.debug('No role hierarchy data found');
             
             // Build hierarchy map
             hierarchyData.forEach(entry => {
