@@ -5,8 +5,8 @@ const path = require('path');
 const fs = require('fs');
 const Table = require('cli-table3');
 const figures = require('figures');
-const moment = require('moment');
 const figlet = require('figlet');
+const dayjs = require('dayjs');
 
 const LOG_DIR = path.join(__dirname, '..', 'logs');
 
@@ -48,7 +48,7 @@ class LogManager {
 
             const symbol = levelSymbols[level] || levelSymbols.default
 
-            let output = `${chalk.gray(moment(timestamp).format('YYYY-MM-DD HH:mm:ss'))} `;
+            let output = `${chalk.gray(dayjs(timestamp).format('YYYY-MM-DD HH:mm:ss'))} `;
             output += color(`${symbol} [${level.toUpperCase()}] ${message}`);
 
             if (Object.keys(meta.metadata).length > 0) {

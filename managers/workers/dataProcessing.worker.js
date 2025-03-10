@@ -338,7 +338,7 @@ async function transformData(data, options = {}) {
                     } else if (transform.format === 'lowercase') {
                         result[transform.field] = result[transform.field].toString().toLowerCase();
                     } else if (transform.format === 'date' && transform.dateFormat) {
-                        // Simple date formatting - would use moment.js in a real implementation
+                        // Simple date formatting - would use day.js in a real implementation
                         const date = new Date(result[transform.field]);
                         result[transform.field] = date.toISOString();
                     }
