@@ -108,37 +108,30 @@ class LogManager {
         });
     }
 
-    static getInstance() {
-        if (!LogManager.instance) {
-            LogManager.instance = new LogManager();
-        }
-        return LogManager.instance;
+    info(message, meta = {}) {
+        this.logger.info(message, meta)
     }
 
-    static info(message, meta = {}) {
-        LogManager.getInstance().logger.info(message, meta);
-    }
-
-    static error(message, error = null) {
+    error(message, error = null) {
         const meta = error ? { error: { message: error.message, stack: error.stack } } : {};
-        LogManager.getInstance().logger.error(message, meta);
+        this.logger.error(message, meta)
     }
 
-    static warning(message, meta = {}) {
-        LogManager.getInstance().logger.warn(message, meta);
+    warning(message, meta = {}) {
+        this.logger.warn(message, meta)
     }
 
-    static success(message, meta = {}) {
-        LogManager.getInstance().logger.info(unknownColors.success(`${figures.tick} ${message}`), meta);
+    success(message, meta = {}) {
+        this.logger.info(unknownColors.success(`${figures.tick} ${message}`), meta)
     }
 
-    static debug(message, meta = {}) {
+    debug(message, meta = {}) {
         if (process.env.NODE_ENV !== 'production') {
-            LogManager.getInstance().logger.debug(message, meta);
+            this.logger.debug(message, meta)
         }
     }
 
-    static figlet(text) {
+    figlet(text) {
         return new Promise((resolve, reject) => {
             figlet(text, { 
                 font: 'Big',
@@ -154,13 +147,13 @@ class LogManager {
         });
     }
 
-    static requestLogger() {
+    requestLogger() {
         return (req, res, next) => {
             if (req.path.startsWith("/health")) return next();
             const start = process.hrtime();
             const requestId = Math.random().toString(36).substring(7);
 
-            LogManager.info(`→ ${req.method} ${req.path}`, {
+            this.info(`→ ${req.method} ${req.path}`, {
                 method: req.method,
                 path: req.path,
                 ip: req.ip,
@@ -174,11 +167,11 @@ class LogManager {
 
                 // Colored output for console only
                 const statusColor = status >= 500 ? unknownColors.error :
-                            status >= 400 ? unknownColors.warning :
+                            status >= 400 ? unknownColors.warn :
                             status >= 300 ? unknownColors.info :
                             unknownColors.success;
 
-                LogManager.info(`← ${req.method} ${req.path}`, {
+                this.info(`← ${req.method} ${req.path}`, {
                     status: status,
                     duration: `${duration}ms`,
                     'request-id': requestId
@@ -194,4 +187,7 @@ class LogManager {
     }
 }
 
-module.exports = LogManager;
+const logManagerInstance = new LogManager();
+Object.freeze(logManagerInstance);
+
+module.exports = logManagerInstance;
