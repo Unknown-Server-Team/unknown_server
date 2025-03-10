@@ -17,13 +17,21 @@ if (!fs.existsSync(LOG_DIR)) {
 
 // unknown brand colors using chalk
 const unknownColors = {
-    primary: chalk.hex('#FF4B91'),
-    secondary: chalk.hex('#FFB3B3'),
+    debug: chalk.hex('#FFB3B3'),
     success: chalk.hex('#59CE8F'),
     error: chalk.hex('#FF1E1E'),
-    warning: chalk.hex('#F7D060'),
-    info: chalk.hex('#4B56D2')
+    warn: chalk.hex('#F7D060'),
+    info: chalk.hex('#4B56D2'),
+    default: chalk.hex('#FF4B91')
 };
+
+const levelSymbols = {
+    error: figures.cross,
+    warn: figures.warning,
+    info: figures.info,
+    debug: figures.pointer,
+    default: figures.play
+}
 
 class LogManager {
     constructor() {
@@ -36,17 +44,9 @@ class LogManager {
 
     initLogger() {
         const logFormat = winston.format.printf(({ level, message, timestamp, ...meta }) => {
-            const color = level === 'error' ? unknownColors.error :
-                         level === 'warn' ? unknownColors.warning :
-                         level === 'info' ? unknownColors.info :
-                         level === 'debug' ? unknownColors.secondary :
-                         unknownColors.primary;
+            const color = unknownColors[level] || unknownColors.default
 
-            const symbol = level === 'error' ? figures.cross :
-                          level === 'warn' ? figures.warning :
-                          level === 'info' ? figures.info :
-                          level === 'debug' ? figures.pointer :
-                          figures.play;
+            const symbol = levelSymbols[level] || levelSymbols.default
 
             let output = `${chalk.gray(moment(timestamp).format('YYYY-MM-DD HH:mm:ss'))} `;
             output += color(`${symbol} [${level.toUpperCase()}] ${message}`);
