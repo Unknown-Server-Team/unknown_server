@@ -51,7 +51,7 @@ class LogManager {
             let output = `${chalk.gray(moment(timestamp).format('YYYY-MM-DD HH:mm:ss'))} `;
             output += color(`${symbol} [${level.toUpperCase()}] ${message}`);
 
-            if (Object.keys(meta).length > 0) {
+            if (Object.keys(meta.metadata).length > 0) {
                 const table = new Table({
                     chars: {
                         'top': '─', 'top-mid': '┬', 'top-left': '┌', 'top-right': '┐',
