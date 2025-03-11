@@ -158,6 +158,15 @@ app.use((err, req, res, next) => {
 // Server initialization
 const startServer = async () => {
     try {
+        // Check for required env variables
+        const requiredEnvVars = ['DB_HOST', 'DB_USER', 'DB_NAME', 'VERSION', 'JWT_SECRET', 'APP_URL'];
+        const missingEnnvVars = requiredEnvVars.filter(varName => !process.env[varName] || process.env[varName].trim() === '');
+        if (missingEnnvVars.length > 0) {
+            LogManager.warning('Missing mandatory environment variables:', missingEnnvVars);
+            LogManager.error('Please set the required environment variables before starting the server. Exitting with code 1.');
+            process.exit(1);
+        }
+
         // Only show banner in the primary process or if not in cluster mode
         if (!isClusterWorker) {
             const banner = await LogManager.figlet('UNKNOWN');
