@@ -14,7 +14,7 @@ const status = new Command('status')
             const health = await API.get('/health');
             console.log(chalk.bold('\nService Status:'));
             console.log(chalk.cyan('Status:'), health.status);
-            console.log(chalk.cyan('Version:'), process.env.VERSION || '2.2.0');
+            console.log(chalk.cyan('Version:'), process.env.VERSION);
             console.log(chalk.cyan('Timestamp:'), health.timestamp);
 
             if (options.verbose) {
@@ -47,7 +47,7 @@ status.runInteractive = async function() {
         
         console.log(chalk.bold('\nService Status:'));
         console.log(chalk.cyan('Status:'), health.status);
-        console.log(chalk.cyan('Version:'), process.env.VERSION || '2.2.0');
+        console.log(chalk.cyan('Version:'), process.env.VERSION);
         console.log(chalk.cyan('Timestamp:'), health.timestamp);
         
         const { showDetailed } = await inquirer.prompt([

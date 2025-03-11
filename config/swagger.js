@@ -13,7 +13,7 @@ const options = {
     openapi: '3.0.0',
     info: {
       title: 'Unknown Server API Documentation',
-      version: process.env.VERSION || '2.2.0',
+      version: process.env.VERSION,
       description: 'Complete API documentation for all versions',
       license: {
         name: 'MIT',

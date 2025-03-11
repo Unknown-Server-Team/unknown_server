@@ -21,7 +21,7 @@ router.get('/health', (req, res) => {
         status: 'healthy',
         timestamp: new Date().toISOString(),
         name: process.env.SERVICE_NAME || 'unknown-server',
-        version: process.env.VERSION || '1.0.0'
+        version: process.env.VERSION
     });
 });
 
