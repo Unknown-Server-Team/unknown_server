@@ -5,8 +5,8 @@ const path = require('path');
 const fs = require('fs');
 const Table = require('cli-table3');
 const figures = require('figures');
-const moment = require('moment');
 const figlet = require('figlet');
+const dayjs = require('dayjs');
 
 const LOG_DIR = path.join(__dirname, '..', 'logs');
 
@@ -17,13 +17,21 @@ if (!fs.existsSync(LOG_DIR)) {
 
 // unknown brand colors using chalk
 const unknownColors = {
-    primary: chalk.hex('#FF4B91'),
-    secondary: chalk.hex('#FFB3B3'),
+    debug: chalk.hex('#FFB3B3'),
     success: chalk.hex('#59CE8F'),
     error: chalk.hex('#FF1E1E'),
-    warning: chalk.hex('#F7D060'),
-    info: chalk.hex('#4B56D2')
+    warn: chalk.hex('#F7D060'),
+    info: chalk.hex('#4B56D2'),
+    default: chalk.hex('#FF4B91')
 };
+
+const levelSymbols = {
+    error: figures.cross,
+    warn: figures.warning,
+    info: figures.info,
+    debug: figures.pointer,
+    default: figures.play
+}
 
 class LogManager {
     constructor() {
@@ -36,22 +44,14 @@ class LogManager {
 
     initLogger() {
         const logFormat = winston.format.printf(({ level, message, timestamp, ...meta }) => {
-            const color = level === 'error' ? unknownColors.error :
-                         level === 'warn' ? unknownColors.warning :
-                         level === 'info' ? unknownColors.info :
-                         level === 'debug' ? unknownColors.secondary :
-                         unknownColors.primary;
+            const color = unknownColors[level] || unknownColors.default
 
-            const symbol = level === 'error' ? figures.cross :
-                          level === 'warn' ? figures.warning :
-                          level === 'info' ? figures.info :
-                          level === 'debug' ? figures.pointer :
-                          figures.play;
+            const symbol = levelSymbols[level] || levelSymbols.default
 
-            let output = `${chalk.gray(moment(timestamp).format('YYYY-MM-DD HH:mm:ss'))} `;
+            let output = `${chalk.gray(dayjs(timestamp).format('YYYY-MM-DD HH:mm:ss'))} `;
             output += color(`${symbol} [${level.toUpperCase()}] ${message}`);
 
-            if (Object.keys(meta).length > 0) {
+            if (Object.keys(meta.metadata).length > 0) {
                 const table = new Table({
                     chars: {
                         'top': '─', 'top-mid': '┬', 'top-left': '┌', 'top-right': '┐',
@@ -108,37 +108,30 @@ class LogManager {
         });
     }
 
-    static getInstance() {
-        if (!LogManager.instance) {
-            LogManager.instance = new LogManager();
-        }
-        return LogManager.instance;
+    info(message, meta = {}) {
+        this.logger.info(message, meta)
     }
 
-    static info(message, meta = {}) {
-        LogManager.getInstance().logger.info(message, meta);
-    }
-
-    static error(message, error = null) {
+    error(message, error = null) {
         const meta = error ? { error: { message: error.message, stack: error.stack } } : {};
-        LogManager.getInstance().logger.error(message, meta);
+        this.logger.error(message, meta)
     }
 
-    static warning(message, meta = {}) {
-        LogManager.getInstance().logger.warn(message, meta);
+    warning(message, meta = {}) {
+        this.logger.warn(message, meta)
     }
 
-    static success(message, meta = {}) {
-        LogManager.getInstance().logger.info(unknownColors.success(`${figures.tick} ${message}`), meta);
+    success(message, meta = {}) {
+        this.logger.info(unknownColors.success(`${figures.tick} ${message}`), meta)
     }
 
-    static debug(message, meta = {}) {
+    debug(message, meta = {}) {
         if (process.env.NODE_ENV !== 'production') {
-            LogManager.getInstance().logger.debug(message, meta);
+            this.logger.debug(message, meta)
         }
     }
 
-    static figlet(text) {
+    figlet(text) {
         return new Promise((resolve, reject) => {
             figlet(text, { 
                 font: 'Big',
@@ -154,13 +147,13 @@ class LogManager {
         });
     }
 
-    static requestLogger() {
+    requestLogger() {
         return (req, res, next) => {
             if (req.path.startsWith("/health")) return next();
             const start = process.hrtime();
             const requestId = Math.random().toString(36).substring(7);
 
-            LogManager.info(`→ ${req.method} ${req.path}`, {
+            this.info(`→ ${req.method} ${req.path}`, {
                 method: req.method,
                 path: req.path,
                 ip: req.ip,
@@ -174,11 +167,11 @@ class LogManager {
 
                 // Colored output for console only
                 const statusColor = status >= 500 ? unknownColors.error :
-                            status >= 400 ? unknownColors.warning :
+                            status >= 400 ? unknownColors.warn :
                             status >= 300 ? unknownColors.info :
                             unknownColors.success;
 
-                LogManager.info(`← ${req.method} ${req.path}`, {
+                this.info(`← ${req.method} ${req.path}`, {
                     status: status,
                     duration: `${duration}ms`,
                     'request-id': requestId
@@ -194,4 +187,7 @@ class LogManager {
     }
 }
 
-module.exports = LogManager;
+const logManagerInstance = new LogManager();
+Object.freeze(logManagerInstance);
+
+module.exports = logManagerInstance;
