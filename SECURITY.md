@@ -5,7 +5,7 @@
 If you discover a security vulnerability in Unknown Server, please follow these steps:
 
 1. **Do NOT disclose the vulnerability publicly**
-2. Email security@unknownserver.com with:
+2. Email unknown.server.team@gmail.com with:
    - A description of the vulnerability
    - Steps to reproduce
    - Potential impact
