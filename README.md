@@ -3,7 +3,6 @@
 <div align="center">
 
 [![Version](https://img.shields.io/badge/version-2.5.1-blue.svg)](https://github.com/santiadjmc/unknown/releases)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D16.0.0-brightgreen.svg)](https://nodejs.org/)
 [![Express.js](https://img.shields.io/badge/express.js-%5E4.18.0-lightgrey.svg)](https://expressjs.com/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
