@@ -20,6 +20,8 @@ export interface UserData {
     created_at?: Date;
     updated_at?: Date;
     email_verified?: boolean;
+    roles?: RoleRecord[];
+    permissions?: PermissionRecord[];
     [key: string]: any;
 }
 
@@ -282,6 +284,51 @@ export interface ServiceProxyConfig {
     routes: string[];
     loadBalancingStrategy?: 'round-robin' | 'least-connections' | 'random';
     middleware?: Array<(req: any) => void>;
+}
+
+// Additional interfaces for new managers
+export interface AuditEventData {
+    action_type: string;
+    admin_id?: number;
+    target_id?: number;
+    role_id?: number;
+    permission_id?: number;
+    metadata?: any;
+    ip_address?: string;
+}
+
+export interface AuditLogFilters {
+    action_type?: string;
+    admin_id?: number;
+    target_id?: number;
+    dateFrom?: string;
+    dateTo?: string;
+}
+
+export interface RoleAnalyticsData {
+    id: number;
+    role_id: number;
+    total_users: number;
+    total_actions: number;
+    last_used: Date;
+}
+
+export interface PermissionAnalyticsData {
+    id: number;
+    permission_id: number;
+    total_uses: number;
+    last_used: Date;
+}
+
+export interface AnalyticsReport {
+    timeframe: {
+        from: string;
+        to: string;
+    };
+    roles: any[];
+    permissions: any[];
+    auditActivity: any[];
+    generatedAt: Date;
 }
 
 // Environment Variables type
