@@ -35,6 +35,53 @@ export interface RegistrationData {
     roles?: string[];
 }
 
+// Auth API Response types
+export interface AuthResponse {
+    token: string;
+    user: UserData;
+    expiresIn?: number;
+}
+
+export interface LoginResponse extends AuthResponse {}
+
+export interface RegistrationResponse extends AuthResponse {}
+
+// Role and Permission types
+export interface RoleData {
+    id: number;
+    name: string;
+    description?: string;
+    permissions?: PermissionData[];
+}
+
+export interface PermissionData {
+    id: number;
+    name: string;
+    resource: string;
+    action: string;
+    description?: string;
+}
+
+// Request extensions
+export interface AuthenticatedRequest extends Request {
+    user?: UserData;
+    apiVersion?: string;
+    isCliRequest?: boolean;
+}
+
+export interface CliRequest extends AuthenticatedRequest {
+    isCliRequest: true;
+}
+
+// Rate limiter interfaces
+export interface RateLimiterConfig {
+    windowMs: number;
+    max: number;
+    message: string;
+    burstMultiplier?: number;
+    onLimitReached?: (req: Request) => void;
+}
+
 // API Response types
 export interface ApiResponse<T = any> {
     success: boolean;
