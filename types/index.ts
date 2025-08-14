@@ -62,11 +62,36 @@ export interface PermissionData {
     description?: string;
 }
 
+// Auth management interfaces
+export interface AuthResult {
+    success: boolean;
+    message?: string;
+    user?: UserData;
+    token?: string;
+}
+
+export interface TokenVerificationResult {
+    success: boolean;
+    user?: UserData;
+    expired?: boolean;
+}
+
+export interface EncryptionSettings {
+    saltLength: number;
+    keyAlgorithm: string;
+    iterations: number;
+    keyLength: number;
+}
+
 // Request extensions
 export interface AuthenticatedRequest extends Request {
     user?: UserData;
     apiVersion?: string;
     isCliRequest?: boolean;
+}
+
+export interface CliRequest extends AuthenticatedRequest {
+    isCliRequest: true;
 }
 
 export interface CliRequest extends AuthenticatedRequest {
