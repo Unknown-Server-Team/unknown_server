@@ -96,10 +96,6 @@ export interface CliRequest extends AuthenticatedRequest {
     isCliRequest: true;
 }
 
-export interface CliRequest extends AuthenticatedRequest {
-    isCliRequest: true;
-}
-
 // Rate limiter interfaces
 export interface RateLimiterConfig {
     windowMs: number;
@@ -346,4 +342,65 @@ export interface EnvironmentConfig {
     SERVER_WORKERS?: string;
     pm_id?: string;
     NODE_APP_INSTANCE?: string;
+    NVIDIA_API_KEY?: string;
+    NVIDIA_STT_FUNCTION_ID?: string;
+    NVIDIA_TTS_FUNCTION_ID?: string;
+    AI_RATE_LIMIT_MAX?: string;
+    AI_RATE_LIMIT_WINDOW_MS?: string;
+    AI_SYSTEM_INSTRUCTION?: string;
+}
+
+export interface PaginationParams {
+    page?: number;
+    limit?: number;
+    offset?: number;
+}
+
+export interface AuthManagerConfig {
+    jwtSecret: string;
+    jwtExpiration: string;
+    saltRounds?: number;
+}
+
+export interface AiChatRequest {
+    message: string;
+    sessionId?: string;
+    executeTools?: boolean;
+}
+
+export interface AiChatResponse {
+    sessionId: string;
+    text: string;
+    toolsExecuted?: Array<{ name: string; result: any }>;
+    toolCalls?: Array<{ name: string; args: any }>;
+}
+
+export interface AiSafetyRequest {
+    messages: Array<{ role: string; content: string }>;
+    timeoutMs?: number;
+}
+
+export interface AiSafetyResponse {
+    safe: boolean;
+    reason?: string;
+}
+
+export interface AiVisionRequest {
+    imageUrl: string;
+    language?: string;
+    timeoutMs?: number;
+}
+
+export interface AiTtsRequest {
+    text: string;
+    voice?: string;
+    languageCode?: string;
+    timeoutMs?: number;
+}
+
+export interface AiStatusResponse {
+    configured: boolean;
+    ttsAvailable: boolean;
+    sttAvailable: boolean;
+    activeSessions: number;
 }

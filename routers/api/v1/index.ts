@@ -1,10 +1,10 @@
 import express, { Request, Response, Router } from 'express';
 import os from 'os';
 
-// Import managers
 const { RatelimitManager } = require('../../../managers/RatelimitManager');
 const authRouter = require('./auth');
 const usersRouter = require('./users');
+const aiRouter = require('./ai');
 const LogManager = require('../../../managers/LogManager');
 const PerformanceManager = require('../../../managers/PerformanceManager');
 
@@ -57,11 +57,9 @@ const router: Router = express.Router();
 // Apply rate limiting to all API routes
 router.use(RatelimitManager.createApiLimiter());
 
-// Auth routes
 router.use('/auth', authRouter);
-
-// Users routes
 router.use('/users', usersRouter);
+router.use('/ai', aiRouter);
 
 /**
  * @swagger

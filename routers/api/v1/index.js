@@ -7,14 +7,17 @@ const os = require('os');
 const LogManager = require('../../../managers/LogManager');
 const PerformanceManager = require('../../../managers/PerformanceManager');
 
-// Apply rate limiting to all API routes
+let aiRouter = null;
+try {
+    aiRouter = require('./ai');
+} catch {
+    // AI router not available in this mode; run with npm run start:ts or npm run start:hybrid to enable
+}
+
 router.use(RatelimitManager.createApiLimiter());
-
-// Auth routes
 router.use('/auth', authRouter);
-
-// Users routes
 router.use('/users', usersRouter);
+if (aiRouter) router.use('/ai', aiRouter);
 
 /**
  * @swagger
