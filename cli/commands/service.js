@@ -5,7 +5,6 @@ const figures = require('figures');
 const ora = require('ora');
 const API = require('../utils/api');
 
-// Service status command
 const status = new Command('status')
     .description('Check service status')
     .option('-v, --verbose', 'Show detailed status')
@@ -37,19 +36,18 @@ const status = new Command('status')
         }
     });
 
-// Add interactive mode support
 status.runInteractive = async function() {
     const spinner = ora('Fetching service status...').start();
-    
+
     try {
         const health = await API.get('/health');
         spinner.succeed('Service status retrieved');
-        
+
         console.log(chalk.bold('\nService Status:'));
         console.log(chalk.cyan('Status:'), health.status);
         console.log(chalk.cyan('Version:'), process.env.VERSION);
         console.log(chalk.cyan('Timestamp:'), health.timestamp);
-        
+
         const { showDetailed } = await inquirer.prompt([
             {
                 type: 'confirm',
@@ -59,15 +57,15 @@ status.runInteractive = async function() {
                 prefix: chalk.cyan(figures.info)
             }
         ]);
-        
+
         if (showDetailed) {
             spinner.text = 'Fetching detailed metrics...';
             spinner.start();
-            
+
             try {
                 const metrics = await API.get('/metrics');
                 spinner.succeed('Metrics retrieved');
-                
+
                 console.log('\n', chalk.bold('Detailed Metrics:'));
                 console.table({
                     'CPU Usage': metrics.cpu.usage,
@@ -87,14 +85,13 @@ status.runInteractive = async function() {
     }
 };
 
-// Service metrics command
 const metrics = new Command('metrics')
     .description('View service metrics')
     .option('-t, --time <period>', 'Time period (hour/day/week)', 'hour')
     .action(async (options) => {
         try {
             const data = await API.get(`/metrics?period=${options.time}`);
-            
+
             console.log(chalk.bold('\nPerformance Metrics:'));
             console.log(chalk.cyan('\nResource Usage:'));
             console.table({
@@ -113,7 +110,7 @@ const metrics = new Command('metrics')
                 'Error Rate': data.requests.errorRate + '%',
                 'Requests/min': data.requests.perMinute.toFixed(2)
             });
-            
+
             if (data.topEndpoints && Object.keys(data.topEndpoints).length > 0) {
                 console.log(chalk.cyan('\nTop Endpoints:'));
                 const endpointTable = {};
@@ -130,10 +127,9 @@ const metrics = new Command('metrics')
         }
     });
 
-// Add interactive mode support
 metrics.runInteractive = async function() {
     const periods = ['hour', 'day', 'week'];
-    
+
     const { selectedPeriod } = await inquirer.prompt([
         {
             type: 'list',
@@ -146,13 +142,13 @@ metrics.runInteractive = async function() {
             prefix: chalk.cyan(figures.bar)
         }
     ]);
-    
+
     const spinner = ora(`Fetching ${selectedPeriod} metrics...`).start();
-    
+
     try {
         const data = await API.get(`/metrics?period=${selectedPeriod}`);
         spinner.succeed('Metrics retrieved');
-        
+
         console.log(chalk.bold('\nPerformance Metrics:'));
         console.log(chalk.cyan('\nResource Usage:'));
         console.table({
@@ -171,7 +167,7 @@ metrics.runInteractive = async function() {
             'Error Rate': data.requests.errorRate + '%',
             'Requests/min': data.requests.perMinute.toFixed(2)
         });
-        
+
         if (data.topEndpoints && Object.keys(data.topEndpoints).length > 0) {
             console.log(chalk.cyan('\nTop Endpoints:'));
             const endpointTable = {};
@@ -183,7 +179,7 @@ metrics.runInteractive = async function() {
             });
             console.table(endpointTable);
         }
-        
+
         if (data.slowestEndpoints && data.slowestEndpoints.length > 0) {
             console.log(chalk.cyan('\nSlowest Endpoints:'));
             console.table(data.slowestEndpoints.map(item => ({
@@ -198,7 +194,6 @@ metrics.runInteractive = async function() {
     }
 };
 
-// Route information command
 const routes = new Command('routes')
     .description('List API routes')
     .option('-v, --version <version>', 'API version', 'v1')
@@ -210,12 +205,11 @@ const routes = new Command('routes')
                     console.warn(chalk.yellow(`Warning: API version ${options.version} not found in available versions. Available versions: ${versions.versions.join(', ')}`));
                 }
             } catch (versionError) {
-                // Silently continue if versions endpoint is not available
             }
 
             const routes = await API.get(`/${options.version}/routes`);
             console.log(chalk.bold(`\nAPI Routes (${options.version}):`));
-            
+
             const groupedRoutes = routes.reduce((acc, route) => {
                 const group = route.path.split('/')[1];
                 if (!acc[group]) acc[group] = [];
@@ -238,10 +232,9 @@ const routes = new Command('routes')
         }
     });
 
-// Add interactive mode support
 routes.runInteractive = async function() {
     const spinner = ora('Fetching available API versions...').start();
-    
+
     try {
         let versions = ['v1'];
         try {
@@ -251,7 +244,7 @@ routes.runInteractive = async function() {
         } catch (versionError) {
             spinner.warn('Could not fetch available API versions, using default');
         }
-        
+
         const { selectedVersion } = await inquirer.prompt([
             {
                 type: 'list',
@@ -264,15 +257,15 @@ routes.runInteractive = async function() {
                 prefix: chalk.cyan(figures.arrowRight)
             }
         ]);
-        
+
         spinner.text = `Fetching ${selectedVersion} routes...`;
         spinner.start();
-        
+
         const routes = await API.get(`/${selectedVersion}/routes`);
         spinner.succeed('Routes retrieved');
-        
+
         console.log(chalk.bold(`\nAPI Routes (${selectedVersion}):`));
-        
+
         const groupedRoutes = routes.reduce((acc, route) => {
             const group = route.path.split('/')[1];
             if (!acc[group]) acc[group] = [];

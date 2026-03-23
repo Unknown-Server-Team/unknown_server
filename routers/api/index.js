@@ -6,13 +6,10 @@ const { RatelimitManager } = require('../../managers/RatelimitManager');
 const VersionManager = require('../../managers/VersionManager');
 const v1Router = require('./v1');
 
-// Initialize version manager with v1 routes
 VersionManager.registerVersion('v1', v1Router);
 
-// Apply version middleware
 router.use(VersionManager.createVersionMiddleware());
 
-// Version-specific routes
 router.use('/v1', v1Router);
 
 /**
@@ -48,7 +45,6 @@ router.get('/versions', (req, res) => {
  *         description: Health check information
  */
 router.get('/health', (req, res) => {
-    // Redirect to v1 health endpoint for backward compatibility
     v1Router.handle(req, res);
 });
 
@@ -72,15 +68,12 @@ router.get('/health', (req, res) => {
  *         description: Performance metrics
  */
 router.get('/metrics', (req, res) => {
-    // Redirect to v1 metrics endpoint for backward compatibility
     v1Router.handle(req, res);
 });
 
-// Documentation routes
 router.use('/docs', swaggerUi.serve);
 router.get('/docs', swaggerUi.setup(require('../../config/swagger')));
 
-// Serve OpenAPI spec
 router.get('/docs.json', (req, res) => {
     res.setHeader('Content-Type', 'application/json');
     res.send(require('../../config/swagger'));

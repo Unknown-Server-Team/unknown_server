@@ -1,14 +1,14 @@
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { Request, Response, NextFunction } from 'express';
-import { 
-    UserData, 
-    RegistrationData, 
-    AuthResult, 
-    TokenVerificationResult, 
-    EncryptionSettings, 
+import {
+    UserData,
+    RegistrationData,
+    AuthResult,
+    TokenVerificationResult,
+    EncryptionSettings,
     AuthManagerConfig,
-    AuthenticatedRequest 
+    AuthenticatedRequest
 } from '../types';
 
 const LogManager = require('./LogManager');
@@ -51,11 +51,9 @@ class AuthManager {
      */
     async hashPassword(password: string): Promise<string> {
         try {
-            // Generate a random salt
             const salt = crypto.randomBytes(this.encryptionSettings.saltLength).toString('hex');
-            
-            // Use worker thread to perform CPU-intensive encryption
-            const result: EncryptionResult = await WorkerThreadManager.executeTask('encryption', 
+
+            const result: EncryptionResult = await WorkerThreadManager.executeTask('encryption',
                 {
                     text: password,
                     key: salt
@@ -64,9 +62,7 @@ class AuthManager {
                     operation: 'encrypt'
                 }
             );
-            
-            // Format the hash with the salt for storage
-            // Format: salt:iv:encrypted
+
             return `${salt}:${result.iv}:${result.result}`;
         } catch (error) {
             LogManager.error('Password hashing failed', error);
@@ -84,7 +80,6 @@ class AuthManager {
                 return false;
             }
 
-            // Use worker thread for decryption
             const result = await WorkerThreadManager.executeTask('encryption',
                 {
                     encryptedText: encrypted,
@@ -113,8 +108,8 @@ class AuthManager {
                 email: user.email
             };
 
-            return jwt.sign(payload, this.secret, { 
-                expiresIn: this.tokenExpiration 
+            return jwt.sign(payload, this.secret, {
+                expiresIn: this.tokenExpiration
             });
         } catch (error) {
             LogManager.error('Token generation failed', error);
@@ -129,7 +124,7 @@ class AuthManager {
         try {
             const decoded = jwt.verify(token, this.secret) as JwtPayload;
             const user = await userQueries.getUserById(decoded.userId);
-            
+
             if (!user) {
                 return { success: false };
             }
@@ -155,7 +150,7 @@ class AuthManager {
      */
     async initiateEmailVerification(user: UserData): Promise<void> {
         const token = await this.generateVerificationToken();
-        const expires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+        const expires = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
         await userQueries.setEmailVerificationToken(user.id, token, expires);
         await EmailManager.sendVerificationEmail(user.email, token);
@@ -179,7 +174,7 @@ class AuthManager {
             }
 
             const token = await this.generatePasswordResetToken();
-            const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+            const expires = new Date(Date.now() + 60 * 60 * 1000);
 
             await userQueries.setPasswordResetToken(user.id, token, expires);
             await EmailManager.sendPasswordResetEmail(user.email, token);
@@ -236,7 +231,7 @@ class AuthManager {
         return async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
             try {
                 const token = req.headers.authorization?.split(' ')[1];
-                
+
                 if (!token) {
                     return res.status(401).json({ error: 'No token provided' });
                 }
@@ -251,7 +246,6 @@ class AuthManager {
 
                 req.user = verificationResult.user;
 
-                // Check role requirements if specified
                 if (options.roles && options.roles.length > 0) {
                     const hasRequiredRole = await RoleManager.hasAnyRole(req.user!.id, options.roles);
                     if (!hasRequiredRole) {
@@ -286,10 +280,8 @@ class AuthManager {
             const result = await userQueries.createUser(userDataWithHashedPassword);
             const user = await userQueries.getUserById(result.insertId);
 
-            // Assign default role
             await RoleManager.assignUserRole(user.id, 'user');
 
-            // Initiate email verification
             await this.initiateEmailVerification(user);
 
             const token = await this.generateToken(user);
@@ -318,7 +310,6 @@ class AuthManager {
 
             const token = await this.generateToken(user);
 
-            // Remove password from user object before returning
             const { password: _, ...safeUser } = user;
 
             return { success: true, user: safeUser, token };

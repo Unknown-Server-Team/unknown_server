@@ -7,7 +7,6 @@ const LogManager = require('../../../managers/LogManager');
 const ValidationMiddleware = require('../../../managers/ValidationMiddleware');
 const { RatelimitManager } = require('../../../managers/RatelimitManager');
 
-// Profile update rate limiter
 const profileUpdateLimiter = RatelimitManager.create({
     windowMs: 15 * 60 * 1000,
     max: 5,
@@ -51,7 +50,7 @@ router.get('/',
             const page = parseInt(req.query.page) || 1;
             const limit = parseInt(req.query.limit) || 10;
             const users = await userQueries.getUsers(page, limit);
-            
+
             res.json(users);
         } catch (error) {
             LogManager.error('Failed to fetch users', error);
@@ -88,7 +87,6 @@ router.get('/:id',
                 return res.status(404).json({ error: 'User not found' });
             }
 
-            // Check if requesting user has permission to view this user
             if (req.user.id !== user.id && !await RoleManager.hasRole(req.user.id, 'admin')) {
                 return res.status(403).json({ error: 'Insufficient permissions' });
             }
@@ -131,8 +129,7 @@ router.put('/:id',
     profileUpdateLimiter,
     async (req, res) => {
         try {
-            // Only allow users to update their own profile unless they're admin
-            if (req.user.id !== parseInt(req.params.id) && 
+            if (req.user.id !== parseInt(req.params.id) &&
                 !await RoleManager.hasRole(req.user.id, 'admin')) {
                 return res.status(403).json({ error: 'Insufficient permissions' });
             }

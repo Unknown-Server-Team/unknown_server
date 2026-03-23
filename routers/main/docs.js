@@ -4,14 +4,12 @@ const path = require('path');
 const fs = require('fs').promises;
 const marked = require('marked');
 
-// Initialize markdown renderer
 marked.setOptions({
     highlight: function(code, lang) {
         return code;
     }
 });
 
-// Render markdown files as HTML
 async function renderMarkdown(filePath) {
     try {
         const content = await fs.readFile(filePath, 'utf8');
@@ -22,11 +20,10 @@ async function renderMarkdown(filePath) {
     }
 }
 
-// Documentation routes
 router.get('/api', async (req, res) => {
     try {
         const markdown = await renderMarkdown(path.join(__dirname, '../../docs/api.md'));
-        res.render('documentation', { 
+        res.render('documentation', {
             title: 'API Reference',
             content: markdown
         });
@@ -38,7 +35,7 @@ router.get('/api', async (req, res) => {
 router.get('/deployment', async (req, res) => {
     try {
         const markdown = await renderMarkdown(path.join(__dirname, '../../docs/deployment.md'));
-        res.render('documentation', { 
+        res.render('documentation', {
             title: 'Deployment Guide',
             content: markdown
         });
@@ -50,7 +47,7 @@ router.get('/deployment', async (req, res) => {
 router.get('/security', async (req, res) => {
     try {
         const markdown = await renderMarkdown(path.join(__dirname, '../../docs/security.md'));
-        res.render('documentation', { 
+        res.render('documentation', {
             title: 'Security Guide',
             content: markdown
         });
@@ -62,7 +59,7 @@ router.get('/security', async (req, res) => {
 router.get('/roles-and-permissions', async (req, res) => {
     try {
         const markdown = await renderMarkdown(path.join(__dirname, '../../docs/roles-and-permissions.md'));
-        res.render('documentation', { 
+        res.render('documentation', {
             title: 'Roles and Permissions Guide',
             content: markdown
         });

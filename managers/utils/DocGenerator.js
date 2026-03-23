@@ -42,7 +42,6 @@ class DocGenerator {
                 await fs.mkdir(path.dirname(outputPath), { recursive: true });
                 await fs.writeFile(outputPath, content, 'utf8');
 
-                // Validate generated documentation
                 const validation = await MarkdownValidator.validateFile(outputPath, {
                     requiredSections: [
                         'Overview',
@@ -54,12 +53,11 @@ class DocGenerator {
                 });
 
                 if (!validation.isValid) {
-                    LogManager.warning(`Documentation validation issues for ${version}:`, 
+                    LogManager.warning(`Documentation validation issues for ${version}:`,
                         validation.errors
                     );
                 }
 
-                // Add deprecation notice if needed
                 if (VersionManager.isDeprecated(version)) {
                     const deprecationNotice = `
 > ⚠️ **Deprecation Notice**
@@ -76,9 +74,8 @@ class DocGenerator {
                 }
             }
 
-            // Generate main API documentation that links to all versions
             await this.generateMainDoc(versions);
-            
+
             return true;
         } catch (error) {
             LogManager.error('Failed to generate version documentation', error);

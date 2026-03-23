@@ -37,7 +37,7 @@ class VersionManager {
     createVersionMiddleware() {
         return (req, res, next) => {
             const version = req.headers['accept-version'] || 'v1';
-            
+
             if (!this.versions.has(version)) {
                 return res.status(400).json({
                     error: 'Unsupported API version',

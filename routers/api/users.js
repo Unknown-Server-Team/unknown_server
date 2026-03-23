@@ -5,22 +5,21 @@ const ValidationMiddleware = require('../../managers/ValidationMiddleware');
 const { userQueries } = require('../../database/mainQueries');
 const { RatelimitManager } = require('../../managers/RatelimitManager');
 
-// Create specific limiters for user operations
 const userListLimiter = RatelimitManager.create({
-    windowMs: 60 * 1000, // 1 minute
-    max: 30, // 30 requests per minute for listing users
+    windowMs: 60 * 1000,
+    max: 30,
     message: 'Too many user list requests, please try again later'
 });
 
 const userProfileLimiter = RatelimitManager.create({
     windowMs: 60 * 1000,
-    max: 60, // 60 requests per minute for profile views
+    max: 60,
     message: 'Too many profile requests, please try again later'
 });
 
 const userUpdateLimiter = RatelimitManager.create({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 10, // 10 update requests per 15 minutes
+    windowMs: 15 * 60 * 1000,
+    max: 10,
     message: 'Too many profile update requests, please try again later'
 });
 
@@ -96,7 +95,7 @@ const userUpdateLimiter = RatelimitManager.create({
  *                     limit:
  *                       type: integer
  */
-router.get('/', 
+router.get('/',
     AuthManager.getAuthMiddleware({ roles: ['admin'] }),
     userListLimiter,
     ValidationMiddleware.validateQuery({
@@ -167,14 +166,13 @@ router.get('/:id',
                 return res.status(404).json({ error: 'User not found' });
             }
 
-            // Users can only view their own profile unless they're admin
             if (req.params.id !== req.user.id && !await RoleManager.hasRole(req.user.id, 'admin')) {
                 return res.status(403).json({ error: 'Insufficient permissions' });
             }
 
             const sanitizedUser = ValidationManager.sanitizeUser(user);
             const roles = await RoleManager.getUserRoles(user.id);
-            
+
             res.json({
                 ...sanitizedUser,
                 roles
@@ -228,7 +226,6 @@ router.patch('/:id',
     ValidationMiddleware.validateId(),
     async (req, res) => {
         try {
-            // Users can only update their own profile unless they're admin
             if (req.params.id !== req.user.id && !await RoleManager.hasRole(req.user.id, 'admin')) {
                 return res.status(403).json({ error: 'Insufficient permissions' });
             }
@@ -239,7 +236,7 @@ router.patch('/:id',
             if (name !== undefined) {
                 const nameValidation = ValidationManager.validateName(name);
                 if (!nameValidation.isValid) {
-                    return res.status(400).json({ 
+                    return res.status(400).json({
                         error: 'Invalid name',
                         details: { name: nameValidation.errors }
                     });
@@ -249,13 +246,13 @@ router.patch('/:id',
 
             if (email !== undefined) {
                 if (!ValidationManager.validateEmail(email)) {
-                    return res.status(400).json({ 
+                    return res.status(400).json({
                         error: 'Invalid email',
                         details: { email: ['Invalid email format'] }
                     });
                 }
                 updates.email = email;
-                updates.email_verified = false; // Require re-verification for new email
+                updates.email_verified = false;
             }
 
             if (Object.keys(updates).length === 0) {
@@ -267,7 +264,6 @@ router.patch('/:id',
                 return res.status(404).json({ error: 'User not found' });
             }
 
-            // If email was updated, send verification
             if (updates.email) {
                 const user = await userQueries.getUserById(req.params.id);
                 await AuthManager.initiateEmailVerification(user);
@@ -308,7 +304,6 @@ router.delete('/:id',
     ValidationMiddleware.validateId(),
     async (req, res) => {
         try {
-            // Prevent deleting the last admin
             const isAdmin = await RoleManager.hasRole(req.params.id, 'admin');
             if (isAdmin) {
                 const adminCount = await userQueries.countUsersByRole('admin');
@@ -323,7 +318,7 @@ router.delete('/:id',
             }
 
             await SessionManager.invalidateUserSessions(req.params.id);
-            
+
             res.json({ message: 'User deleted successfully' });
         } catch (error) {
             LogManager.error('Failed to delete user', error);

@@ -67,7 +67,6 @@ class API {
             const data = await response.json();
 
             if (!response.ok) {
-                // Enhanced error handling with validation errors
                 if (response.status === 400 && data.details) {
                     const errorMessage = Object.entries(data.details)
                         .map(([field, errors]) => `${field}: ${errors.join(', ')}`)

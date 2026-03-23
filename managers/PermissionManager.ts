@@ -12,7 +12,7 @@ class PermissionManager {
     private CACHE_TTL: number;
 
     constructor() {
-        this.CACHE_TTL = 300; // 5 minutes
+        this.CACHE_TTL = 300;
     }
 
     async getPermissions(): Promise<PermissionRecord[]> {
@@ -37,12 +37,12 @@ class PermissionManager {
 
         try {
             const [permissions] = await db.query(`
-                SELECT p.* 
+                SELECT p.*
                 FROM permissions p
                 JOIN role_permissions rp ON p.id = rp.permission_id
                 WHERE rp.role_id = ?
             `, [roleId]);
-            
+
             await CacheManager.set(cacheKey, permissions, this.CACHE_TTL);
             return permissions;
         } catch (error) {
@@ -58,13 +58,13 @@ class PermissionManager {
 
         try {
             const [permissions] = await db.query(`
-                SELECT DISTINCT p.* 
+                SELECT DISTINCT p.*
                 FROM permissions p
                 JOIN role_permissions rp ON p.id = rp.permission_id
                 JOIN user_roles ur ON rp.role_id = ur.role_id
                 WHERE ur.user_id = ?
             `, [userId]);
-            
+
             await CacheManager.set(cacheKey, permissions, this.CACHE_TTL);
             return permissions;
         } catch (error) {
@@ -111,8 +111,7 @@ class PermissionManager {
                 'INSERT INTO role_permissions (role_id, permission_id) VALUES (?, ?)',
                 [roleId, permissionId]
             );
-            
-            // Invalidate related caches
+
             await CacheManager.del(`role:${roleId}:permissions`);
             const [userRoles] = await db.query(
                 'SELECT user_id FROM user_roles WHERE role_id = ?',
@@ -135,8 +134,7 @@ class PermissionManager {
                 'DELETE FROM role_permissions WHERE role_id = ? AND permission_id = ?',
                 [roleId, permissionId]
             );
-            
-            // Invalidate related caches
+
             await CacheManager.del(`role:${roleId}:permissions`);
             const [userRoles] = await db.query(
                 'SELECT user_id FROM user_roles WHERE role_id = ?',
@@ -161,7 +159,7 @@ class PermissionManager {
                 }
 
                 const hasPermissions = await this.checkPermissions(
-                    req.user.id, 
+                    req.user.id,
                     Array.isArray(permissions) ? permissions : [permissions],
                     options.requireAll
                 );
@@ -170,7 +168,6 @@ class PermissionManager {
                     return res.status(403).json({ error: 'Insufficient permissions' });
                 }
 
-                // Cache permissions in request for subsequent middleware
                 if (!req.permissions) {
                     req.permissions = await this.getUserPermissions(req.user.id);
                 }
@@ -183,7 +180,6 @@ class PermissionManager {
         };
     }
 
-    // Cache user permissions for performance
     async cacheUserPermissions(userId: number): Promise<PermissionRecord[]> {
         try {
             const permissions = await this.getUserPermissions(userId);
@@ -196,7 +192,6 @@ class PermissionManager {
         }
     }
 
-    // Utility method to check multiple permissions at once
     async checkPermissions(userId: number, requiredPermissions: string[], requireAll: boolean = false): Promise<boolean> {
         try {
             const userPermissions = await this.getUserPermissions(userId);

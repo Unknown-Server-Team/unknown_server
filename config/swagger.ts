@@ -5,22 +5,18 @@ const DocumentationValidator = require('../managers/DocumentationValidator');
 const VersionManager = require('../managers/VersionManager');
 const LogManager = require('../managers/LogManager');
 
-// Interface for swagger specifications
 interface SwaggerSpecs {
     customCss?: string;
     [key: string]: any;
 }
 
-// Interface for validation result
 interface ValidationResult {
     isValid: boolean;
     errors: string[];
 }
 
-// Get the supported API versions
 const supportedVersions: string[] = VersionManager.getSupportedVersions();
 
-// Define the OpenAPI options directly here rather than using DocumentationValidator
 const options: swaggerJsdoc.Options = {
     definition: {
         openapi: '3.0.0',
@@ -51,6 +47,10 @@ const options: swaggerJsdoc.Options = {
             {
                 name: 'Authorization',
                 description: 'Role and permission management'
+            },
+            {
+                name: 'AI',
+                description: 'NVIDIA NIM AI capabilities: chat, vision, speech, safety'
             }
         ],
         components: {
@@ -72,9 +72,7 @@ const options: swaggerJsdoc.Options = {
             { sessionAuth: [] }
         ]
     },
-    // Search for API routes in all version folders
     apis: [
-        // Include base API routes
         path.join(process.cwd(), 'routers/api/*.js'),
         path.join(process.cwd(), 'routers/api/*.ts'),
         // Include versioned API routes - dynamically include all supported versions
@@ -82,7 +80,6 @@ const options: swaggerJsdoc.Options = {
             path.join(process.cwd(), `routers/api/${version}/**/*.js`),
             path.join(process.cwd(), `routers/api/${version}/**/*.ts`)
         ]),
-        // Include managers that might have API documentation
         path.join(process.cwd(), 'managers/*.js'),
         path.join(process.cwd(), 'managers/*.ts')
     ]

@@ -59,7 +59,7 @@ class WebsocketManager {
     private monitoringRoom?: string;
 
     constructor() {
-        this.connections = new Map(); // Change to Map for better lookup by ID
+        this.connections = new Map();
         this.events = new Map();
         this.rooms = new Map();
         this.middlewares = [];
@@ -68,27 +68,22 @@ class WebsocketManager {
     }
 
     initialize(server: Server, options: WebSocketInitOptions = {}): void {
-        // Check if we're in cluster mode
         this.isClusterMode = options.isClusterWorker || false;
         this.workerId = options.workerId || process.pid;
-        
-        this.wss = new WebSocket.Server({ 
+
+        this.wss = new WebSocket.Server({
             server,
-            // In cluster mode, use client tracking to help with managing connections
-            clientTracking: true 
+            clientTracking: true
         });
-        
+
         this.wss.on('connection', (ws: ExtendedWebSocket, req: IncomingMessage) => {
-            // Assign a unique ID to each connection that's consistent across the cluster
             ws.id = crypto.randomBytes(16).toString('hex');
             this.handleConnection(ws, req);
         });
 
-        // In cluster mode, listen for messages from master process
         if (this.isClusterMode && process.on) {
             process.on('message', (message: ClusterMessage) => {
                 if (message.type === 'websocket:broadcast') {
-                    // Handle broadcasts from other workers
                     this.handleClusterBroadcast(message);
                 }
             });
@@ -97,15 +92,12 @@ class WebsocketManager {
         LogManager.info(`WebSocket server initialized${this.isClusterMode ? ` (worker ${this.workerId})` : ''}`);
     }
 
-    // Handle broadcasts from other worker processes
     private handleClusterBroadcast(message: ClusterMessage): void {
         switch (message.action) {
             case 'broadcast':
-                // Broadcast to all local connections
                 this.localBroadcast(message.data);
                 break;
             case 'room':
-                // Broadcast to specific room
                 if (message.room) {
                     this.localRoomBroadcast(message.room, message.data);
                 }
@@ -115,14 +107,12 @@ class WebsocketManager {
         }
     }
 
-    // Add auth event handling methods
     initializeAuthEvents(): void {
-        // Auth events registration
         this.registerEvent('auth:roleChange', async (ws: ExtendedWebSocket, data: any) => {
             if (!this.verifyAuthority(ws, ['role:write'])) {
                 return this.sendError(ws, 'Insufficient permissions');
             }
-            
+
             this.broadcast({
                 type: 'auth:roleUpdated',
                 data: {
@@ -136,7 +126,7 @@ class WebsocketManager {
             if (!this.verifyAuthority(ws, ['permission:write'])) {
                 return this.sendError(ws, 'Insufficient permissions');
             }
-            
+
             this.broadcast({
                 type: 'auth:permissionUpdated',
                 data: {
@@ -148,10 +138,8 @@ class WebsocketManager {
     }
 
     initializeMonitoringEvents(): void {
-        // Create monitoring room
         this.monitoringRoom = 'system:monitoring';
 
-        // Register monitoring events
         this.registerEvent('monitoring:subscribe', async (ws: ExtendedWebSocket, data: any) => {
             if (!ws.user || !await permissionManager.hasPermission(ws.user.id, 'system:admin')) {
                 return this.sendError(ws, 'Insufficient permissions for monitoring');
@@ -164,10 +152,9 @@ class WebsocketManager {
             this.leaveRoom(ws, this.monitoringRoom!);
         });
 
-        // Set up periodic monitoring updates
         setInterval(() => {
             this.broadcastMonitoringData();
-        }, 5000); // Every 5 seconds
+        }, 5000);
     }
 
     private async sendMonitoringData(ws: ExtendedWebSocket): Promise<void> {
@@ -185,7 +172,7 @@ class WebsocketManager {
 
     private async broadcastMonitoringData(): Promise<void> {
         if (!this.monitoringRoom) return;
-        
+
         const monitoringData = {
             type: 'monitoring:update',
             data: {
@@ -200,7 +187,7 @@ class WebsocketManager {
 
     notifySecurityEvent(eventType: string, data: any): void {
         if (!this.monitoringRoom) return;
-        
+
         const securityEvent = {
             type: 'security:alert',
             eventType,
@@ -211,7 +198,7 @@ class WebsocketManager {
     }
 
     private verifyAuthority(ws: ExtendedWebSocket, requiredPermissions: string[]): boolean {
-        return !!(ws.user && ws.permissions && 
+        return !!(ws.user && ws.permissions &&
             requiredPermissions.some(perm => ws.permissions!.includes(perm)));
     }
 
@@ -225,11 +212,9 @@ class WebsocketManager {
     attachUserData(ws: ExtendedWebSocket, user: any, permissions: string[]): void {
         ws.user = user;
         ws.permissions = permissions;
-        
-        // Join user-specific room
+
         this.joinRoom(ws, `user:${user.id}`);
-        
-        // Join role-based rooms
+
         if (user.roles) {
             user.roles.forEach((role: any) => {
                 this.joinRoom(ws, `role:${role.name}`);
@@ -245,7 +230,6 @@ class WebsocketManager {
     }
 
     notifyPermissionUpdate(roleId: number, permissions: any[]): void {
-        // Notify all users with this role
         this.broadcast({
             type: 'auth:rolePermissionsUpdated',
             data: { roleId, permissions }
@@ -253,16 +237,14 @@ class WebsocketManager {
     }
 
     private handleConnection(ws: ExtendedWebSocket, req: IncomingMessage): void {
-        // Run through middlewares
         if (!this.runMiddlewares(ws, req)) {
             ws.close();
             return;
         }
 
-        // Store connection in map using the unique ID as key
         this.connections.set(ws.id, ws);
-        
-        LogManager.info('New WebSocket connection', { 
+
+        LogManager.info('New WebSocket connection', {
             id: ws.id,
             ip: req.socket?.remoteAddress,
             totalConnections: this.connections.size,
@@ -279,15 +261,13 @@ class WebsocketManager {
         ws.on('message', async (data: WebSocket.Data) => {
             try {
                 const message: WebSocketMessage = JSON.parse(data.toString());
-                
-                // Handle authentication on connection
+
                 if (message.type === 'auth:authenticate') {
                     const { token } = message;
-                    
-                    // Need to dynamically require here to avoid circular dependency
+
                     const { authManager } = await import('./AuthManager');
                     const user = await authManager.verifyToken(token!);
-                    
+
                     if (user) {
                         const permissions = await permissionManager.getUserPermissions(user.id);
                         this.attachUserData(ws, user, permissions.map(p => p.name));
@@ -305,7 +285,6 @@ class WebsocketManager {
             }
         });
 
-        // Track connection in SessionMonitor
         if (ws.user) {
             sessionMonitor.trackSession(ws.user.id, ws.id, {
                 ip: req.socket?.remoteAddress,
@@ -326,9 +305,8 @@ class WebsocketManager {
             this.handleDisconnection(ws);
         });
 
-        // Send welcome message
-        ws.send(JSON.stringify({ 
-            type: 'connection', 
+        ws.send(JSON.stringify({
+            type: 'connection',
             message: 'Connected to WebSocket server',
             workerId: this.workerId,
             connectionId: ws.id
@@ -336,7 +314,6 @@ class WebsocketManager {
     }
 
     private handleDisconnection(ws: ExtendedWebSocket): void {
-        // Remove from all rooms
         ws.rooms.forEach(room => {
             this.leaveRoom(ws, room);
         });
@@ -392,12 +369,9 @@ class WebsocketManager {
         LogManager.info('Registered WebSocket event', { event });
     }
 
-    // Modified broadcast method to support cluster mode
     broadcast(data: any, exclude: ExtendedWebSocket | null = null): void {
-        // Local broadcast
         this.localBroadcast(data, exclude);
-        
-        // In cluster mode, notify other workers
+
         if (this.isClusterMode && process.send) {
             process.send({
                 type: 'websocket:broadcast',
@@ -408,12 +382,11 @@ class WebsocketManager {
             });
         }
     }
-    
-    // Broadcast only to connections on this worker
+
     private localBroadcast(data: any, exclude: ExtendedWebSocket | null = null): void {
         const message = JSON.stringify(data);
         const excludeId = exclude ? exclude.id : null;
-        
+
         for (const [id, client] of this.connections.entries()) {
             if (id !== excludeId && client.readyState === WebSocket.OPEN) {
                 client.send(message);
@@ -425,9 +398,9 @@ class WebsocketManager {
         if (!this.rooms.has(room)) {
             this.rooms.set(room, new Set());
         }
-        this.rooms.get(room)!.add(ws.id); // Store connection ID instead of object
+        this.rooms.get(room)!.add(ws.id);
         ws.rooms.add(room);
-        LogManager.debug('Client joined room', { 
+        LogManager.debug('Client joined room', {
             connectionId: ws.id,
             room,
             clients: this.rooms.get(room)!.size,
@@ -437,13 +410,13 @@ class WebsocketManager {
 
     leaveRoom(ws: ExtendedWebSocket, room: string): void {
         if (this.rooms.has(room)) {
-            this.rooms.get(room)!.delete(ws.id); // Delete by ID
+            this.rooms.get(room)!.delete(ws.id);
             if (this.rooms.get(room)!.size === 0) {
                 this.rooms.delete(room);
             }
         }
         ws.rooms.delete(room);
-        LogManager.debug('Client left room', { 
+        LogManager.debug('Client left room', {
             connectionId: ws.id,
             room,
             remainingClients: this.rooms.has(room) ? this.rooms.get(room)!.size : 0,
@@ -452,10 +425,8 @@ class WebsocketManager {
     }
 
     broadcastToRoom(room: string, data: any, exclude: ExtendedWebSocket | null = null): void {
-        // Local room broadcast
         this.localRoomBroadcast(room, data, exclude);
-        
-        // In cluster mode, notify other workers
+
         if (this.isClusterMode && process.send) {
             process.send({
                 type: 'websocket:broadcast',
@@ -467,18 +438,15 @@ class WebsocketManager {
             });
         }
     }
-    
-    // Broadcast only to room members on this worker
+
     private localRoomBroadcast(room: string, data: any, exclude: ExtendedWebSocket | null = null): void {
         if (!this.rooms.has(room)) return;
 
         const message = JSON.stringify(data);
         const excludeId = exclude ? exclude.id : null;
-        
-        // Get connection IDs in this room
+
         const roomMembers = this.rooms.get(room)!;
-        
-        // Send to each connection
+
         for (const id of roomMembers) {
             if (id !== excludeId) {
                 const client = this.connections.get(id);
@@ -520,7 +488,7 @@ class WebsocketManager {
         this.wss?.on('close', () => {
             clearInterval(interval);
         });
-        
+
         LogManager.info('WebSocket heartbeat started', { worker: this.workerId });
     }
 
@@ -533,7 +501,6 @@ class WebsocketManager {
         });
     }
 
-    // Add method to broadcast system notifications
     broadcastSystemNotification(title: string, message: string, level: string = 'info'): void {
         const notification: SystemNotification = {
             type: 'system:notification',

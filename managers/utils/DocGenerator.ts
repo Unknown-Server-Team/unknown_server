@@ -48,11 +48,10 @@ export class DocGenerator {
                 await fs.mkdir(path.dirname(outputPath), { recursive: true });
                 await fs.writeFile(outputPath, content, 'utf8');
 
-                // Validate generated documentation
                 const validation = await markdownValidator.validateFile(outputPath, {
                     requiredSections: [
                         'Overview',
-                        'Authentication', 
+                        'Authentication',
                         'Endpoints'
                     ],
                     checkCodeBlocks: true,
@@ -81,7 +80,7 @@ export class DocGenerator {
 
         const content = this.buildMigrationContent(fromVersion, toVersion);
         await fs.writeFile(migrationPath, content, 'utf8');
-        
+
         LogManager.info(`Generated migration guide: ${fromVersion} → ${toVersion}`);
         return migrationPath;
     }
@@ -113,12 +112,12 @@ This guide helps you migrate from API version ${fromVersion} to ${toVersion}.
 
 ### Before (${fromVersion})
 \`\`\`javascript
-// Old API usage example
+Previous endpoint usage:
 \`\`\`
 
 ### After (${toVersion})
 \`\`\`javascript
-// New API usage example
+Updated endpoint usage:
 \`\`\`
 
 ## Migration Steps
@@ -135,24 +134,22 @@ For migration support, please contact [support@unknown-server.com](mailto:suppor
 
     static async generateApiReference(options: DocGenerationOptions = {}): Promise<void> {
         const { formatType = 'markdown', outputDir = 'docs/api' } = options;
-        
+
         await fs.mkdir(path.join(process.cwd(), outputDir), { recursive: true });
-        
+
         const versions = VersionManager.getSupportedVersions();
         for (const version of versions) {
             const fileName = `${version}.${formatType}`;
             const filePath = path.join(process.cwd(), outputDir, fileName);
-            
+
             const content = await this.generateVersionReference(version, formatType);
             await fs.writeFile(filePath, content, 'utf8');
         }
-        
+
         LogManager.info(`Generated API reference in ${formatType} format`);
     }
 
     private static async generateVersionReference(version: string, format: string): Promise<string> {
-        // This would be implemented based on your API structure
-        // For now, return a basic template
         return `# API Reference - ${version}
 
 ## Authentication
@@ -166,17 +163,17 @@ Documentation for ${version} endpoints would be generated here.
     static async validateAllDocs(): Promise<{ isValid: boolean; errors: string[] }> {
         const docsDir = path.join(process.cwd(), 'docs');
         const errors: string[] = [];
-        
+
         try {
             const files = await this.findMarkdownFiles(docsDir);
-            
+
             for (const file of files) {
                 const validation = await markdownValidator.validateFile(file);
                 if (!validation.isValid) {
                     errors.push(`${file}: ${validation.errors.join(', ')}`);
                 }
             }
-            
+
             return {
                 isValid: errors.length === 0,
                 errors
@@ -192,12 +189,12 @@ Documentation for ${version} endpoints would be generated here.
 
     private static async findMarkdownFiles(dir: string): Promise<string[]> {
         const files: string[] = [];
-        
+
         const entries = await fs.readdir(dir, { withFileTypes: true });
-        
+
         for (const entry of entries) {
             const fullPath = path.join(dir, entry.name);
-            
+
             if (entry.isDirectory()) {
                 const subFiles = await this.findMarkdownFiles(fullPath);
                 files.push(...subFiles);
@@ -205,7 +202,7 @@ Documentation for ${version} endpoints would be generated here.
                 files.push(fullPath);
             }
         }
-        
+
         return files;
     }
 }

@@ -12,12 +12,10 @@ import * as Winston from 'winston';
 
 const LOG_DIR = path.join(__dirname, '..', 'logs');
 
-// Create logs directory if it doesn't exist
 if (!fs.existsSync(LOG_DIR)) {
     fs.mkdirSync(LOG_DIR, { recursive: true });
 }
 
-// unknown brand colors using chalk
 const unknownColors = {
     debug: chalk.hex('#FFB3B3'),
     success: chalk.hex('#59CE8F'),
@@ -49,7 +47,7 @@ interface LogInfo {
 
 class LogManager {
     private static instance: LogManager;
-    private logger!: Winston.Logger; // Using definite assignment assertion since it's initialized in initLogger()
+    private logger!: Winston.Logger;
 
     constructor() {
         if (!LogManager.instance) {
@@ -81,7 +79,7 @@ class LogManager {
 
                 for (const [key, value] of Object.entries(meta)) {
                     if (key !== 'splat') {
-                        table.push([unknownColors.info(key), typeof value === 'object' ? 
+                        table.push([unknownColors.info(key), typeof value === 'object' ?
                             JSON.stringify(value, null, 2) : value.toString()]);
                     }
                 }
@@ -150,7 +148,7 @@ class LogManager {
 
     figlet(text: string): Promise<string> {
         return new Promise((resolve, reject) => {
-            figlet(text, { 
+            figlet(text, {
                 font: 'Big',
                 horizontalLayout: 'default',
                 verticalLayout: 'default'
@@ -182,7 +180,6 @@ class LogManager {
                 const duration = (diff[0] * 1e3 + diff[1] * 1e-6).toFixed(2);
                 const status = res.statusCode;
 
-                // Colored output for console only
                 const statusColor = status >= 500 ? unknownColors.error :
                             status >= 400 ? unknownColors.warn :
                             status >= 300 ? unknownColors.info :

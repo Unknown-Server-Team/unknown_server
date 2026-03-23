@@ -3,7 +3,6 @@ import nodemailer, { Transporter, SendMailOptions } from 'nodemailer';
 const LogManager = require('./LogManager');
 const VersionManager = require('./VersionManager');
 
-// Email configuration interface
 interface EmailConfig {
     host?: string;
     port?: number;
@@ -14,18 +13,15 @@ interface EmailConfig {
     };
 }
 
-// Email template data interface
 interface EmailTemplateData {
     [key: string]: string;
 }
 
-// Email templates interface
 interface EmailTemplates {
     verification: string;
     passwordReset: string;
 }
 
-// Send mail result interface
 interface SendMailResult {
     messageId: string;
     accepted?: string[];
@@ -48,28 +44,24 @@ class EmailManager {
         };
 
         this.transporter = nodemailer.createTransporter(config);
-        
-        // Load email templates from default ones
+
         this.templates = {
             verification: this.getDefaultVerificationTemplate(),
             passwordReset: this.getDefaultPasswordResetTemplate()
         };
     }
 
-    // Get the latest non-deprecated API version
     private getActiveApiVersion(): string {
         try {
-            // Get all supported versions
             const supportedVersions: string[] = VersionManager.getSupportedVersions();
-            
-            // Filter out deprecated versions and get the latest
+
             return supportedVersions
                 .filter((v: string) => !VersionManager.isDeprecated(v))
                 .sort()
-                .pop() || 'v1'; // Default to v1 as fallback
+                .pop() || 'v1';
         } catch (error) {
             LogManager.error('Failed to get active API version', error);
-            return 'v1'; // Default to v1 in case of error
+            return 'v1';
         }
     }
 
@@ -95,7 +87,7 @@ class EmailManager {
         try {
             const apiVersion = this.getActiveApiVersion();
             const verificationUrl = `${process.env.APP_URL}/api/${apiVersion}/auth/verify-email/${token}`;
-            
+
             const templateData: EmailTemplateData = {
                 appName: process.env.APP_NAME || 'Unknown Server',
                 userName: email,
@@ -105,7 +97,7 @@ class EmailManager {
 
             const html = this.processTemplate(this.templates.verification, templateData);
             const result = await this.sendEmail(email, 'Verify Your Email Address', html);
-            
+
             return result !== null;
         } catch (error) {
             LogManager.error('Failed to send verification email', error);
@@ -117,7 +109,7 @@ class EmailManager {
         try {
             const apiVersion = this.getActiveApiVersion();
             const resetUrl = `${process.env.APP_URL}/api/${apiVersion}/auth/reset-password/${token}`;
-            
+
             const templateData: EmailTemplateData = {
                 appName: process.env.APP_NAME || 'Unknown Server',
                 userName: email,
@@ -128,7 +120,7 @@ class EmailManager {
 
             const html = this.processTemplate(this.templates.passwordReset, templateData);
             const result = await this.sendEmail(email, 'Reset Your Password', html);
-            
+
             return result !== null;
         } catch (error) {
             LogManager.error('Failed to send password reset email', error);
@@ -136,7 +128,6 @@ class EmailManager {
         }
     }
 
-    // Process a template by replacing variables with actual values
     private processTemplate(template: string, data: EmailTemplateData): string {
         let processed = template;
         Object.entries(data).forEach(([key, value]) => {
@@ -145,8 +136,7 @@ class EmailManager {
         });
         return processed;
     }
-    
-    // Default email template for verification
+
     private getDefaultVerificationTemplate(): string {
         return `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -163,8 +153,7 @@ class EmailManager {
             </div>
         `;
     }
-    
-    // Default email template for password reset
+
     private getDefaultPasswordResetTemplate(): string {
         return `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">

@@ -1,7 +1,6 @@
 const LogManager = require('./LogManager');
 import { Request, Response, NextFunction, Router } from 'express';
 
-// Extend Request interface to include apiVersion
 declare global {
     namespace Express {
         interface Request {
@@ -50,7 +49,7 @@ class VersionManager {
     createVersionMiddleware() {
         return (req: Request, res: Response, next: NextFunction): void => {
             const version = req.headers['accept-version'] as string || 'v1';
-            
+
             if (!this.versions.has(version)) {
                 res.status(400).json({
                     error: 'Unsupported API version',

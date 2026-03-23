@@ -18,14 +18,12 @@ class AuthMonitor {
 
         this.thresholds = {
             maxFailedAttempts: 5,
-            suspiciousLoginWindow: 300000, // 5 minutes
-            bruteForceWindow: 900000, // 15 minutes
+            suspiciousLoginWindow: 300000,
+            bruteForceWindow: 900000,
             maxRoleChangesPerHour: 20
         };
 
-        // Track failed login attempts by IP
         this.failedAttempts = new Map();
-        // Track role changes by admin
         this.roleChangeHistory = new Map();
     }
 
@@ -39,7 +37,6 @@ class AuthMonitor {
             this.trackFailedAttempt(ip);
         }
 
-        // Track suspicious activities
         if (this.isActivitySuspicious(ip, userId)) {
             this.recordSuspiciousActivity({
                 type: 'login_attempt',
@@ -54,12 +51,11 @@ class AuthMonitor {
     trackFailedAttempt(ip) {
         const attempts = this.failedAttempts.get(ip) || [];
         attempts.push(Date.now());
-        
-        // Keep only attempts within the brute force window
+
         const recentAttempts = attempts.filter(
             time => time > Date.now() - this.thresholds.bruteForceWindow
         );
-        
+
         this.failedAttempts.set(ip, recentAttempts);
 
         if (recentAttempts.length >= this.thresholds.maxFailedAttempts) {
@@ -91,7 +87,7 @@ class AuthMonitor {
 
     trackRoleChange(adminId, targetUserId, roleChanges) {
         this.metrics.roleChanges++;
-        
+
         const adminHistory = this.roleChangeHistory.get(adminId) || [];
         adminHistory.push({
             timestamp: Date.now(),
@@ -99,7 +95,6 @@ class AuthMonitor {
             changes: roleChanges
         });
 
-        // Keep only last hour's changes
         const recentChanges = adminHistory.filter(
             change => change.timestamp > Date.now() - 3600000
         );
@@ -141,7 +136,6 @@ class AuthMonitor {
         this.metrics.suspiciousActivities.push(activity);
         LogManager.warning('Suspicious activity detected', activity);
 
-        // Keep only last 100 suspicious activities
         if (this.metrics.suspiciousActivities.length > 100) {
             this.metrics.suspiciousActivities.shift();
         }
@@ -151,7 +145,7 @@ class AuthMonitor {
         return {
             ...this.metrics,
             activeTokenCount: this.metrics.activeTokens.size,
-            failureRate: this.metrics.loginAttempts ? 
+            failureRate: this.metrics.loginAttempts ?
                 (this.metrics.failedLogins / this.metrics.loginAttempts) * 100 : 0,
             suspiciousActivityCount: this.metrics.suspiciousActivities.length,
             recentSuspiciousActivities: this.metrics.suspiciousActivities.slice(-10)
@@ -159,13 +153,12 @@ class AuthMonitor {
     }
 
     async cacheMetrics() {
-        await CacheManager.set('auth:metrics', this.getMetrics(), 300); // Cache for 5 minutes
+        await CacheManager.set('auth:metrics', this.getMetrics(), 300);
     }
 
     clearOldData() {
         const now = Date.now();
-        
-        // Clear old failed attempts
+
         for (const [ip, attempts] of this.failedAttempts.entries()) {
             const recentAttempts = attempts.filter(
                 time => time > now - this.thresholds.bruteForceWindow
@@ -177,7 +170,6 @@ class AuthMonitor {
             }
         }
 
-        // Clear old role change history
         for (const [adminId, changes] of this.roleChangeHistory.entries()) {
             const recentChanges = changes.filter(
                 change => change.timestamp > now - 3600000
@@ -191,10 +183,8 @@ class AuthMonitor {
     }
 
     startMonitoring() {
-        // Cache metrics every 5 minutes
         setInterval(() => this.cacheMetrics(), 300000);
-        
-        // Clear old data every hour
+
         setInterval(() => this.clearOldData(), 3600000);
     }
 }
