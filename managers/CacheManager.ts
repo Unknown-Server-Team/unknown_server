@@ -5,7 +5,6 @@ import { Request, Response, NextFunction } from 'express';
 
 const LogManager = require('./LogManager');
 
-// Interfaces for cache management
 interface CacheStats {
     hits: number;
     misses: number;
@@ -53,41 +52,33 @@ class CacheManager {
     private workerId: number;
 
     constructor() {
-        // Standard TTL of 5 minutes, check for expired entries every minute
         this.cache = new NodeCache({ stdTTL: 300, checkperiod: 60 });
-        
-        // Track cache statistics
+
         this.stats = {
             hits: 0,
             misses: 0,
             keys: 0
         };
 
-        // Memory usage tracking
         this.memoryUsageHistory = [];
         this.memoryLeakDetectionEnabled = true;
-        this.memoryLeakThreshold = 0.10; // 10% growth in 5 consecutive checks indicates potential leak
+        this.memoryLeakThreshold = 0.10;
         this.memoryCheckInterval = null;
-        
-        // Setup cluster-aware capabilities if worker
+
         this.isClusterWorker = cluster.isWorker;
         this.workerId = this.isClusterWorker && cluster.worker ? cluster.worker.id : 0;
-        
-        // Initialize cluster communication for cache sync
+
         this.initializeClusterCommunication();
-        
-        // Start memory leak detection
+
         this.startMemoryMonitoring();
     }
 
     private initializeClusterCommunication(): void {
         if (this.isClusterWorker) {
-            // Listen for cache operations from other workers
             process.on('message', (message: any) => {
                 if (message && message.type === 'cache:operation') {
-                    // Skip processing messages originating from this worker
                     if (message.workerId === this.workerId) return;
-                    
+
                     const cacheMessage = message as CacheMessage;
                     switch (cacheMessage.operation) {
                         case 'set':
@@ -127,59 +118,50 @@ class CacheManager {
         }
 
         this.memoryCheckInterval = setInterval(() => {
-            // Get current memory usage
             const memoryUsage = process.memoryUsage();
-            const heapUsed = memoryUsage.heapUsed / 1024 / 1024; // MB
+            const heapUsed = memoryUsage.heapUsed / 1024 / 1024;
             const timestamp = Date.now();
-            
-            // Store history (keep last 10 readings)
+
             this.memoryUsageHistory.push({ timestamp, heapUsed });
             if (this.memoryUsageHistory.length > 10) {
                 this.memoryUsageHistory.shift();
             }
-            
-            // Check for memory leaks if we have enough data points
+
             if (this.memoryUsageHistory.length >= 5 && this.memoryLeakDetectionEnabled) {
                 this.detectMemoryLeak();
             }
-            
-            // Log memory stats periodically (every 5 checks)
+
             if (this.memoryUsageHistory.length % 5 === 0) {
                 const cacheStats = this.getStats();
                 LogManager.debug(`Memory usage: ${heapUsed.toFixed(2)} MB, Cache entries: ${cacheStats.keys}, Cache memory: ${(cacheStats.memoryUsage / 1024 / 1024).toFixed(2)} MB`);
             }
-        }, 60000); // Check every minute
+        }, 60000);
     }
 
     private detectMemoryLeak(): void {
         if (this.memoryUsageHistory.length < 5) return;
 
-        // Check the last 5 readings
         const recentReadings = this.memoryUsageHistory.slice(-5);
         let consistentGrowth = true;
-        
-        // Check if memory usage has consistently increased
+
         for (let i = 1; i < recentReadings.length; i++) {
             if (recentReadings[i].heapUsed <= recentReadings[i-1].heapUsed) {
                 consistentGrowth = false;
                 break;
             }
         }
-        
-        // Calculate growth percentage
+
         if (consistentGrowth) {
             const firstReading = recentReadings[0].heapUsed;
             const lastReading = recentReadings[recentReadings.length - 1].heapUsed;
             const growthPercentage = (lastReading - firstReading) / firstReading;
-            
+
             if (growthPercentage >= this.memoryLeakThreshold) {
                 LogManager.warning(`Potential memory leak detected! Memory grew by ${(growthPercentage * 100).toFixed(2)}% over the last 5 checks.`);
-                
-                // Check if cache growth correlates with memory growth
-                const cacheSize = this.cache.getStats().vsize / 1024 / 1024; // MB
+
+                const cacheSize = this.cache.getStats().vsize / 1024 / 1024;
                 LogManager.warning(`Current cache size: ${cacheSize.toFixed(2)} MB`);
-                
-                // Get heap snapshot if in development
+
                 if (process.env.NODE_ENV === 'development') {
                     LogManager.info('In development mode - consider using --inspect flag with Chrome DevTools to capture heap snapshots');
                 }
@@ -201,8 +183,7 @@ class CacheManager {
         try {
             this.cache.set(key, value, ttl);
             this.stats.keys = this.cache.keys().length;
-            
-            // Broadcast to other workers
+
             this.broadcastOperation('set', { key, value, ttl });
             return true;
         } catch (error) {
@@ -215,8 +196,7 @@ class CacheManager {
         try {
             this.cache.del(key);
             this.stats.keys = this.cache.keys().length;
-            
-            // Broadcast to other workers
+
             this.broadcastOperation('del', { key });
             return true;
         } catch (error) {
@@ -230,8 +210,7 @@ class CacheManager {
             this.cache.flushAll();
             this.stats.keys = 0;
             LogManager.info('Cache flushed successfully');
-            
-            // Broadcast to other workers
+
             this.broadcastOperation('flush');
             return true;
         } catch (error) {
@@ -249,16 +228,16 @@ class CacheManager {
             worker: this.workerId
         };
     }
-    
+
     getMemoryStats(): MemoryStats {
         const memUsage = process.memoryUsage();
         return {
-            rss: memUsage.rss / 1024 / 1024, // MB
-            heapTotal: memUsage.heapTotal / 1024 / 1024, // MB
-            heapUsed: memUsage.heapUsed / 1024 / 1024, // MB
-            external: memUsage.external / 1024 / 1024, // MB
+            rss: memUsage.rss / 1024 / 1024,
+            heapTotal: memUsage.heapTotal / 1024 / 1024,
+            heapUsed: memUsage.heapUsed / 1024 / 1024,
+            external: memUsage.external / 1024 / 1024,
             history: this.memoryUsageHistory,
-            cacheSize: this.cache.getStats().vsize / 1024 / 1024 // MB
+            cacheSize: this.cache.getStats().vsize / 1024 / 1024
         };
     }
 
@@ -275,10 +254,8 @@ class CacheManager {
                 return res.json(cachedData);
             }
 
-            // Store original res.json
             const originalJson = res.json.bind(res);
 
-            // Override res.json
             res.json = (data: any) => {
                 this.set(cacheKey, data, ttl);
                 return originalJson(data);

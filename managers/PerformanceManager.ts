@@ -114,36 +114,31 @@ class PerformanceManager {
             maxMemoryUsage: 0,
             cpuUsage: [],
             slowestEndpoints: new Map(),
-            // New metrics
             requestsPerMinute: [],
             historyRetentionHours: 24,
             responseTimeHistory: [],
             alerts: new Map()
         };
-        
+
         this.thresholds = {
             memoryWarning: 0.85,
             slowResponseTime: 1000,
             highCpuUsage: 0.8,
-            requestRateWarning: 1000, // requests per minute
-            errorRateWarning: 0.1, // 10% error rate
-            alertCooldown: 300000 // 5 minutes between repeated alerts
+            requestRateWarning: 1000,
+            errorRateWarning: 0.1,
+            alertCooldown: 300000
         };
 
-        // Start monitoring system resources
         this.startMonitoring();
         this.startMetricsCleaning();
     }
 
     private startMonitoring(): void {
-        // Monitor every 30 seconds
         setInterval(() => this.monitorResources(), 30000);
-        // Track requests per minute
         setInterval(() => this.trackRequestRate(), 60000);
     }
 
     private startMetricsCleaning(): void {
-        // Clean old metrics every hour
         setInterval(() => this.cleanOldMetrics(), 3600000);
     }
 
@@ -151,29 +146,24 @@ class PerformanceManager {
         const now = Date.now();
         const retentionTime = this.metrics.historyRetentionHours * 3600000;
 
-        // Clean response time history
         this.metrics.responseTimeHistory = this.metrics.responseTimeHistory.filter(
             item => (now - item.timestamp) < retentionTime
         );
 
-        // Clean CPU usage history (keep last hour)
-        if (this.metrics.cpuUsage.length > 120) { // 30-second intervals for 1 hour
+        if (this.metrics.cpuUsage.length > 120) {
             this.metrics.cpuUsage = this.metrics.cpuUsage.slice(-120);
         }
 
-        // Clean requests per minute history
         this.metrics.requestsPerMinute = this.metrics.requestsPerMinute.filter(
             item => (now - item.timestamp) < retentionTime
         );
 
-        // Clean old alerts
         for (const [key, timestamp] of this.metrics.alerts) {
             if (now - timestamp > retentionTime) {
                 this.metrics.alerts.delete(key);
             }
         }
 
-        // Memory optimization for endpoints
         if (Object.keys(this.metrics.endpoints).length > 1000) {
             const sortedEndpoints = Object.entries(this.metrics.endpoints)
                 .sort((a, b) => b[1].count - a[1].count)
@@ -187,7 +177,6 @@ class PerformanceManager {
         const memoryUsage = used.heapUsed / used.heapTotal;
         this.metrics.maxMemoryUsage = Math.max(this.metrics.maxMemoryUsage, memoryUsage);
 
-        // Detailed CPU monitoring
         const cpus = os.cpus();
         const cpuUsage: CpuUsageSnapshot = {
             timestamp: Date.now(),
@@ -205,10 +194,9 @@ class PerformanceManager {
 
     private checkThresholds(memoryUsage: number, cpuUsage: number): void {
         const now = Date.now();
-        
-        // Memory check with cooldown
-        if (memoryUsage > this.thresholds.memoryWarning && 
-            (!this.metrics.alerts.has('memory') || 
+
+        if (memoryUsage > this.thresholds.memoryWarning &&
+            (!this.metrics.alerts.has('memory') ||
              now - this.metrics.alerts.get('memory')! > this.thresholds.alertCooldown)) {
             LogManager.warning('High memory usage', {
                 usage: `${(memoryUsage * 100).toFixed(2)}%`,
@@ -217,9 +205,8 @@ class PerformanceManager {
             this.metrics.alerts.set('memory', now);
         }
 
-        // CPU check with cooldown
-        if (cpuUsage > this.thresholds.highCpuUsage && 
-            (!this.metrics.alerts.has('cpu') || 
+        if (cpuUsage > this.thresholds.highCpuUsage &&
+            (!this.metrics.alerts.has('cpu') ||
              now - this.metrics.alerts.get('cpu')! > this.thresholds.alertCooldown)) {
             LogManager.warning('High CPU usage', {
                 usage: `${(cpuUsage * 100).toFixed(2)}%`,
@@ -237,13 +224,12 @@ class PerformanceManager {
             errors: this.metrics.errors
         });
 
-        // Calculate current request rate
         const minuteAgo = now - 60000;
         const recentRequests = this.metrics.requestsPerMinute.filter(r => r.timestamp > minuteAgo);
         const requestRate = recentRequests.reduce((acc, curr) => acc + curr.count, 0);
 
-        if (requestRate > this.thresholds.requestRateWarning && 
-            (!this.metrics.alerts.has('requestRate') || 
+        if (requestRate > this.thresholds.requestRateWarning &&
+            (!this.metrics.alerts.has('requestRate') ||
              now - this.metrics.alerts.get('requestRate')! > this.thresholds.alertCooldown)) {
             LogManager.warning(`High request rate: ${requestRate} requests/minute`);
             this.metrics.alerts.set('requestRate', now);
@@ -256,17 +242,14 @@ class PerformanceManager {
         this.metrics.totalResponseTime += responseTime;
         this.metrics.avgResponseTime = this.metrics.totalResponseTime / this.metrics.requests;
 
-        // Track response time history
         this.metrics.responseTimeHistory.push({
             timestamp: now,
             responseTime,
             endpoint
         });
 
-        // Track status codes
         this.metrics.statusCodes[statusCode] = (this.metrics.statusCodes[statusCode] || 0) + 1;
 
-        // Track endpoints
         if (!this.metrics.endpoints[endpoint]) {
             this.metrics.endpoints[endpoint] = {
                 count: 0,
@@ -281,7 +264,6 @@ class PerformanceManager {
         endpointMetrics.avgTime = endpointMetrics.totalTime / endpointMetrics.count;
         endpointMetrics.lastUsed = now;
 
-        // Track slow endpoints
         if (responseTime > this.thresholds.slowResponseTime) {
             this.metrics.slowestEndpoints.set(endpoint, {
                 responseTime,
@@ -315,10 +297,9 @@ class PerformanceManager {
         const minuteAgo = now - 60000;
         const hourAgo = now - 3600000;
 
-        // Calculate trends
         const recentRequests = this.metrics.responseTimeHistory.filter(r => r.timestamp > minuteAgo);
         const hourlyRequests = this.metrics.responseTimeHistory.filter(r => r.timestamp > hourAgo);
-        
+
         const currentResponseTime = recentRequests.reduce((acc, curr) => acc + curr.responseTime, 0) / (recentRequests.length || 1);
         const hourlyResponseTime = hourlyRequests.reduce((acc, curr) => acc + curr.responseTime, 0) / (hourlyRequests.length || 1);
 

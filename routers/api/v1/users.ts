@@ -1,7 +1,6 @@
 import express, { Request, Response, Router } from 'express';
 import { AuthenticatedRequest, UserData, PaginatedResponse } from '../../../types';
 
-// Import managers
 const AuthManager = require('../../../managers/AuthManager');
 const RoleManager = require('../../../managers/RoleManager');
 const { userQueries } = require('../../../database/mainQueries');
@@ -11,20 +10,17 @@ const { RatelimitManager } = require('../../../managers/RatelimitManager');
 
 const router: Router = express.Router();
 
-// Profile update rate limiter
 const profileUpdateLimiter = RatelimitManager.create({
     windowMs: 15 * 60 * 1000,
     max: 5,
     message: 'Too many profile update requests, please try again later'
 });
 
-// Interface for query parameters
 interface UsersQuery {
     page?: string;
     limit?: string;
 }
 
-// Interface for user update data
 interface UserUpdateData {
     name?: string;
     email?: string;
@@ -69,10 +65,10 @@ router.get('/',
             const page = parseInt(query.page || '1', 10);
             const limit = parseInt(query.limit || '10', 10);
             const offset = (page - 1) * limit;
-            
+
             const users = await userQueries.getUsers(offset, limit);
             const totalCount = await userQueries.getUserCount();
-            
+
             const response: PaginatedResponse<UserData> = {
                 success: true,
                 data: users,
@@ -83,13 +79,13 @@ router.get('/',
                     pages: Math.ceil(totalCount / limit)
                 }
             };
-            
+
             res.json(response);
         } catch (error) {
             LogManager.error('Failed to fetch users', error);
-            res.status(500).json({ 
+            res.status(500).json({
                 success: false,
-                error: 'Failed to fetch users' 
+                error: 'Failed to fetch users'
             });
         }
     }
@@ -124,19 +120,18 @@ router.get('/:id',
         try {
             const userId = parseInt(req.params.id, 10);
             const user = await userQueries.getUserById(userId);
-            
+
             if (!user) {
-                return res.status(404).json({ 
+                return res.status(404).json({
                     success: false,
-                    error: 'User not found' 
+                    error: 'User not found'
                 });
             }
 
-            // Check if requesting user has permission to view this user
             if (req.user && req.user.id !== user.id && !await RoleManager.hasRole(req.user.id, 'admin')) {
-                return res.status(403).json({ 
+                return res.status(403).json({
                     success: false,
-                    error: 'Insufficient permissions' 
+                    error: 'Insufficient permissions'
                 });
             }
 
@@ -146,9 +141,9 @@ router.get('/:id',
             });
         } catch (error) {
             LogManager.error('Failed to fetch user', error);
-            res.status(500).json({ 
+            res.status(500).json({
                 success: false,
-                error: 'Failed to fetch user' 
+                error: 'Failed to fetch user'
             });
         }
     }
@@ -193,19 +188,18 @@ router.put('/:id',
     async (req: AuthenticatedRequest, res: Response) => {
         try {
             const userId = parseInt(req.params.id, 10);
-            
-            // Only allow users to update their own profile unless they're admin
-            if (req.user && req.user.id !== userId && 
+
+            if (req.user && req.user.id !== userId &&
                 !await RoleManager.hasRole(req.user.id, 'admin')) {
-                return res.status(403).json({ 
+                return res.status(403).json({
                     success: false,
-                    error: 'Insufficient permissions' 
+                    error: 'Insufficient permissions'
                 });
             }
 
             const updateData: UserUpdateData = req.body;
             const updatedUser = await userQueries.updateUser(userId, updateData);
-            
+
             res.json({
                 success: true,
                 data: updatedUser,
@@ -213,9 +207,9 @@ router.put('/:id',
             });
         } catch (error) {
             LogManager.error('Failed to update user', error);
-            res.status(500).json({ 
+            res.status(500).json({
                 success: false,
-                error: 'Failed to update user' 
+                error: 'Failed to update user'
             });
         }
     }
@@ -248,11 +242,11 @@ router.delete('/:id',
         try {
             const userId = parseInt(req.params.id, 10);
             const result = await userQueries.deleteUser(userId);
-            
+
             if (result) {
-                res.json({ 
+                res.json({
                     success: true,
-                    message: 'User deleted successfully' 
+                    message: 'User deleted successfully'
                 });
             } else {
                 res.status(404).json({
@@ -262,9 +256,9 @@ router.delete('/:id',
             }
         } catch (error) {
             LogManager.error('Failed to delete user', error);
-            res.status(500).json({ 
+            res.status(500).json({
                 success: false,
-                error: 'Failed to delete user' 
+                error: 'Failed to delete user'
             });
         }
     }

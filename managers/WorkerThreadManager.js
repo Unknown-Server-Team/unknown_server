@@ -40,13 +40,10 @@ class WorkerThreadManager {
     executeTask(taskType, data, options = {}) {
         return new Promise((resolve, reject) => {
             try {
-                // Determine the worker script path based on task type
                 const workerPath = this._getWorkerPath(taskType);
-                
-                // Generate a unique task ID
+
                 const taskId = `${taskType}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-                
-                // Create a new worker
+
                 const worker = new Worker(workerPath, {
                     workerData: {
                         taskId,
@@ -54,8 +51,7 @@ class WorkerThreadManager {
                         options
                     }
                 });
-                
-                // Store the worker and task info
+
                 this.workers.set(taskId, worker);
                 this.taskQueue.set(taskId, {
                     resolve,
@@ -63,29 +59,25 @@ class WorkerThreadManager {
                     startTime: Date.now(),
                     taskType
                 });
-                
+
                 this.activeWorkers++;
-                
-                // Handle worker messages
+
                 worker.on('message', (message) => {
                     if (message.error) {
                         this.taskQueue.get(taskId).reject(new Error(message.error));
                     } else {
                         this.taskQueue.get(taskId).resolve(message.result);
                     }
-                    
-                    // Clean up resources
+
                     this._cleanupWorker(taskId);
                 });
-                
-                // Handle worker errors
+
                 worker.on('error', (err) => {
                     LogManager.error(`Worker thread error (${taskType})`, err);
                     this.taskQueue.get(taskId).reject(err);
                     this._cleanupWorker(taskId);
                 });
-                
-                // Handle worker exit
+
                 worker.on('exit', (code) => {
                     if (code !== 0 && this.taskQueue.has(taskId)) {
                         LogManager.error(`Worker stopped with exit code ${code}`);
@@ -95,9 +87,9 @@ class WorkerThreadManager {
                         this._cleanupWorker(taskId);
                     }
                 });
-                
+
                 LogManager.debug(`Started worker thread for task ${taskType} (${taskId})`);
-                
+
             } catch (err) {
                 LogManager.error('Failed to create worker thread', err);
                 reject(err);
@@ -116,11 +108,11 @@ class WorkerThreadManager {
             worker.terminate().catch(err => {
                 LogManager.error(`Error terminating worker ${taskId}`, err);
             });
-            
+
             this.workers.delete(taskId);
             this.taskQueue.delete(taskId);
             this.activeWorkers--;
-            
+
             LogManager.debug(`Worker thread ${taskId} terminated. Active workers: ${this.activeWorkers}`);
         }
     }
@@ -132,7 +124,6 @@ class WorkerThreadManager {
      * @private
      */
     _getWorkerPath(taskType) {
-        // Map task types to worker script paths
         const workerPaths = {
             'encryption': path.join(__dirname, 'workers', 'encryption.worker.js'),
             'compression': path.join(__dirname, 'workers', 'compression.worker.js'),
@@ -140,7 +131,7 @@ class WorkerThreadManager {
             'imageProcessing': path.join(__dirname, 'workers', 'imageProcessing.worker.js'),
             'default': path.join(__dirname, 'workers', 'generic.worker.js')
         };
-        
+
         return workerPaths[taskType] || workerPaths.default;
     }
 
@@ -167,9 +158,9 @@ class WorkerThreadManager {
      */
     async shutdownAll() {
         LogManager.info(`Shutting down ${this.workers.size} worker threads`);
-        
+
         const terminationPromises = [];
-        
+
         for (const [taskId, worker] of this.workers.entries()) {
             terminationPromises.push(
                 worker.terminate().catch(err => {
@@ -177,13 +168,13 @@ class WorkerThreadManager {
                 })
             );
         }
-        
+
         await Promise.allSettled(terminationPromises);
-        
+
         this.workers.clear();
         this.taskQueue.clear();
         this.activeWorkers = 0;
-        
+
         LogManager.info('All worker threads shut down');
     }
 }

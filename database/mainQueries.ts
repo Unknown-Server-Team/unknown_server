@@ -1,10 +1,10 @@
-import { 
-    UserQueries, 
-    RoleHierarchyQueries, 
-    DatabaseQueries, 
-    UserRecord, 
-    RoleRecord, 
-    RegistrationData 
+import {
+    UserQueries,
+    RoleHierarchyQueries,
+    DatabaseQueries,
+    UserRecord,
+    RoleRecord,
+    RegistrationData
 } from '../types';
 
 const db = require('./db');
@@ -12,7 +12,6 @@ const LogManager = require('../managers/LogManager');
 
 async function initializeQueries(): Promise<void> {
     try {
-        // Create users table
         await db.query(`
             CREATE TABLE IF NOT EXISTS users (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -32,7 +31,6 @@ async function initializeQueries(): Promise<void> {
             )
         `);
 
-        // Create roles table
         await db.query(`
             CREATE TABLE IF NOT EXISTS roles (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -44,7 +42,6 @@ async function initializeQueries(): Promise<void> {
             )
         `);
 
-        // Create roles_hierarchy table for role inheritance
         await db.query(`
             CREATE TABLE IF NOT EXISTS roles_hierarchy (
                 parent_role_id INT NOT NULL,
@@ -58,7 +55,6 @@ async function initializeQueries(): Promise<void> {
             )
         `);
 
-        // Create permissions table
         await db.query(`
             CREATE TABLE IF NOT EXISTS permissions (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -75,7 +71,6 @@ async function initializeQueries(): Promise<void> {
             )
         `);
 
-        // Create role_permissions table
         await db.query(`
             CREATE TABLE IF NOT EXISTS role_permissions (
                 role_id INT NOT NULL,
@@ -89,7 +84,6 @@ async function initializeQueries(): Promise<void> {
             )
         `);
 
-        // Create user_roles table
         await db.query(`
             CREATE TABLE IF NOT EXISTS user_roles (
                 user_id INT NOT NULL,
@@ -103,7 +97,6 @@ async function initializeQueries(): Promise<void> {
             )
         `);
 
-        // Create sessions table for session management
         await db.query(`
             CREATE TABLE IF NOT EXISTS sessions (
                 id VARCHAR(128) NOT NULL PRIMARY KEY,
@@ -118,7 +111,6 @@ async function initializeQueries(): Promise<void> {
             )
         `);
 
-        // Create rate_limiting table for tracking requests
         await db.query(`
             CREATE TABLE IF NOT EXISTS rate_limiting (
                 id VARCHAR(255) NOT NULL PRIMARY KEY,
@@ -130,7 +122,6 @@ async function initializeQueries(): Promise<void> {
             )
         `);
 
-        // Create audit_logs table for security tracking
         await db.query(`
             CREATE TABLE IF NOT EXISTS audit_logs (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -150,15 +141,12 @@ async function initializeQueries(): Promise<void> {
             )
         `);
 
-        // Initialize default roles if they don't exist
         LogManager.info('Initializing default roles and permissions...');
-        
-        // Check if roles already exist
+
         const existingRoles = await db.query('SELECT COUNT(*) as count FROM roles');
         const roleCount = existingRoles[0]?.count || 0;
-        
+
         if (roleCount === 0) {
-            // Create default roles
             const roles = [
                 { name: 'admin', description: 'Administrator with full system access' },
                 { name: 'moderator', description: 'Moderator with limited administrative privileges' },
@@ -166,14 +154,13 @@ async function initializeQueries(): Promise<void> {
             ];
 
             const insertedRoles: { [key: string]: RoleRecord } = {};
-            
+
             for (const role of roles) {
                 const result = await db.query(
                     'INSERT INTO roles (name, description) VALUES (?, ?)',
                     [role.name, role.description]
                 );
-                
-                // Get the inserted role for hierarchy setup
+
                 const insertedRole = await db.query(
                     'SELECT * FROM roles WHERE id = ?',
                     [result.insertId]
@@ -181,7 +168,6 @@ async function initializeQueries(): Promise<void> {
                 insertedRoles[role.name] = insertedRole[0];
             }
 
-            // Set up initial permissions
             const permissions = [
                 { name: 'read', resource: 'users', action: 'view', description: 'View user information' },
                 { name: 'write', resource: 'users', action: 'create', description: 'Create new users' },
@@ -194,7 +180,7 @@ async function initializeQueries(): Promise<void> {
             ];
 
             const insertedPermissions: { [key: string]: number } = {};
-            
+
             for (const permission of permissions) {
                 const result = await db.query(
                     'INSERT INTO permissions (name, resource, action, description) VALUES (?, ?, ?, ?)',
@@ -203,12 +189,10 @@ async function initializeQueries(): Promise<void> {
                 insertedPermissions[`${permission.name}:${permission.resource}:${permission.action}`] = result.insertId;
             }
 
-            // Assign permissions to roles
             const adminRole = insertedRoles['admin'];
             const moderatorRole = insertedRoles['moderator'];
             const userRole = insertedRoles['user'];
 
-            // Admin gets all permissions
             for (const permissionId of Object.values(insertedPermissions)) {
                 await db.query(
                     'INSERT INTO role_permissions (role_id, permission_id) VALUES (?, ?)',
@@ -216,7 +200,6 @@ async function initializeQueries(): Promise<void> {
                 );
             }
 
-            // Moderator gets user management and read permissions
             const moderatorPermissions = [
                 insertedPermissions['read:users:view'],
                 insertedPermissions['write:users:create'],
@@ -232,7 +215,6 @@ async function initializeQueries(): Promise<void> {
                 );
             }
 
-            // User gets basic read permissions
             const userPermissions = [
                 insertedPermissions['read:users:view'],
                 insertedPermissions['read:system:view']
@@ -245,16 +227,13 @@ async function initializeQueries(): Promise<void> {
                 );
             }
 
-            // Set up initial role hierarchy (admin > moderator > user)
             await db.query('DELETE FROM roles_hierarchy');
-            
-            // Admin is parent of moderator
+
             await db.query(
                 'INSERT IGNORE INTO roles_hierarchy (parent_role_id, child_role_id) VALUES (?, ?)',
                 [adminRole.id, moderatorRole.id]
             );
-            
-            // Moderator is parent of user
+
             await db.query(
                 'INSERT IGNORE INTO roles_hierarchy (parent_role_id, child_role_id) VALUES (?, ?)',
                 [moderatorRole.id, userRole.id]
@@ -268,7 +247,6 @@ async function initializeQueries(): Promise<void> {
     }
 }
 
-// Add role hierarchy queries to use with RoleManager
 const roleHierarchyQueries: RoleHierarchyQueries = {
     async getChildRoles(roleId: number): Promise<RoleRecord[]> {
         const roles = await db.query(
@@ -291,7 +269,6 @@ const roleHierarchyQueries: RoleHierarchyQueries = {
     },
 
     async addChildRole(parentRoleId: number, childRoleId: number): Promise<any> {
-        // Check for circular references before adding
         const isCircular = await this.wouldCreateCircularReference(parentRoleId, childRoleId);
         if (isCircular) {
             throw new Error('Adding this role relationship would create a circular reference');
@@ -313,29 +290,28 @@ const roleHierarchyQueries: RoleHierarchyQueries = {
     },
 
     async wouldCreateCircularReference(parentRoleId: number, childRoleId: number): Promise<boolean> {
-        // Check if childRoleId is already a parent of parentRoleId (direct or indirect)
         const checkCircular = async (currentRoleId: number, targetRoleId: number, visited: Set<number>): Promise<boolean> => {
             if (visited.has(currentRoleId)) {
-                return true; // Circular reference detected
+                return true;
             }
-            
+
             if (currentRoleId === targetRoleId) {
-                return true; // Direct circular reference
+                return true;
             }
-            
+
             visited.add(currentRoleId);
-            
+
             const parentRoles = await this.getParentRoles(currentRoleId);
-            
+
             for (const parentRole of parentRoles) {
                 if (await checkCircular(parentRole.id, targetRoleId, new Set(visited))) {
                     return true;
                 }
             }
-            
+
             return false;
         };
-        
+
         return checkCircular(childRoleId, parentRoleId, new Set());
     }
 };
@@ -429,7 +405,7 @@ const userQueries: UserQueries = {
 
     async countUsersByRole(roleName: string): Promise<number> {
         const result = await db.query(`
-            SELECT COUNT(DISTINCT ur.user_id) as count 
+            SELECT COUNT(DISTINCT ur.user_id) as count
             FROM user_roles ur
             JOIN roles r ON ur.role_id = r.id
             WHERE r.name = ?

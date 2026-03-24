@@ -13,12 +13,11 @@ const SessionManager = require('../../../managers/SessionManager');
 const AuthMonitor = require('../../../managers/AuthMonitor');
 const { query } = require('../../../database/db');
 
-// Define enhanced rate limiters with new features
 const loginLimiter = RatelimitManager.create({
     windowMs: 15 * 60 * 1000,
     max: 5,
     message: 'Too many login attempts, please try again later',
-    burstMultiplier: 1.5, // Allow small bursts
+    burstMultiplier: 1.5,
     onLimitReached: (req) => {
         const ip = req.ip;
         AuthMonitor.trackLoginAttempt(false, ip);
@@ -31,7 +30,7 @@ const registrationLimiter = RatelimitManager.create({
     windowMs: 60 * 60 * 1000,
     max: 3,
     message: 'Too many accounts created from this IP',
-    burstMultiplier: 1, // No burst allowed for registration
+    burstMultiplier: 1,
     onLimitReached: (req) => {
         const ip = req.ip;
         WebsocketManager.notifySecurityEvent('registration_rate_limit', { ip });
@@ -43,7 +42,7 @@ const passwordResetLimiter = RatelimitManager.create({
     windowMs: 60 * 60 * 1000,
     max: 3,
     message: 'Too many password reset requests',
-    burstMultiplier: 1, // No burst allowed for password reset
+    burstMultiplier: 1,
     onLimitReached: (req) => {
         const ip = req.ip;
         WebsocketManager.notifySecurityEvent('password_reset_rate_limit', { ip });
@@ -62,22 +61,18 @@ const emailVerificationLimiter = RatelimitManager.create({
     }
 });
 
-// CLI API Key validation middleware
 const validateCliApiKey = (req, res, next) => {
     try {
-        // Get CLI API key from environment variable
         const cliApiKey = process.env.CLI_API_KEY;
         if (!cliApiKey) {
             LogManager.warning('CLI API key not configured in environment');
             return next();
         }
 
-        // Check for CLI API key in header
         const requestApiKey = req.headers['x-cli-api-key'];
-        
-        // Set a flag to indicate if this is an authenticated CLI request
+
         req.isCliRequest = requestApiKey === cliApiKey;
-        
+
         next();
     } catch (error) {
         LogManager.error('Error validating CLI API key', error);
@@ -168,7 +163,7 @@ const validateCliApiKey = (req, res, next) => {
 router.post('/register',
     ValidationMiddleware.validateRegistration,
     registrationLimiter,
-    validateCliApiKey,  // Add CLI API key validation
+    validateCliApiKey,
     async (req, res) => {
         try {
             const validation = ValidationManager.validateRegistration(req.body);
@@ -178,60 +173,50 @@ router.post('/register',
                     details: validation.errors
                 });
             }
-            
+
             const foundUser = await userQueries.getUserByEmail(req.body.email);
             if (foundUser) {
                 return res.status(409).json({ error: 'Email already exists' });
             }
-            
-            // Extract roles from request if CLI API key is valid
+
             const customRoles = req.isCliRequest && req.body.roles ? req.body.roles : null;
-            
-            // Log attempt to assign custom roles without CLI API key
+
             if (!req.isCliRequest && req.body.roles) {
                 LogManager.warning('Attempt to assign custom roles without valid CLI API key', {
                     ip: req.ip,
                     roles: req.body.roles
                 });
             }
-            
-            // Create user data object (remove roles to ensure AuthManager doesn't process them directly)
+
             const userData = { ...req.body };
             if (userData.roles) delete userData.roles;
-            
-            // Create the user (this also assigns the default role)
+
             const userId = await AuthManager.createUser(userData);
             const user = await userQueries.getUserById(userId);
 
-            // Assign custom roles if provided from CLI with valid API key
             if (customRoles && customRoles.length > 0) {
                 try {
-                    // Get all available roles
                     const availableRoles = await RoleManager.getRoles();
                     const availableRoleNames = availableRoles.map(role => role.name);
-                    
-                    // Filter to valid roles only
+
                     const validRoles = customRoles.filter(role => availableRoleNames.includes(role));
-                    
-                    // Log warning for invalid roles
+
                     const invalidRoles = customRoles.filter(role => !availableRoleNames.includes(role));
                     if (invalidRoles.length > 0) {
-                        LogManager.warning('Attempted to assign invalid roles', { 
+                        LogManager.warning('Attempted to assign invalid roles', {
                             invalidRoles,
                             userId
                         });
                     }
-                    
-                    // Assign each valid role
+
                     for (const roleName of validRoles) {
                         const role = availableRoles.find(r => r.name === roleName);
                         if (role) {
                             await RoleManager.assignRole(userId, role.id);
-                            
-                            // Log the role assignment in audit log
+
                             await AuthAnalytics.logAuditEvent({
                                 action_type: 'role_assign',
-                                admin_id: null, // System assigned from CLI
+                                admin_id: null,
                                 target_id: userId,
                                 role_id: role.id,
                                 metadata: { source: 'cli_registration' },
@@ -239,7 +224,7 @@ router.post('/register',
                             });
                         }
                     }
-                    
+
                     LogManager.info('Assigned custom roles to user from CLI', {
                         userId,
                         roles: validRoles
@@ -248,10 +233,8 @@ router.post('/register',
                     LogManager.error('Failed to assign custom roles to user', roleError);
                 }
             } else {
-                // Get the default role that was assigned
                 const defaultRole = await RoleManager.getDefaultRole();
                 if (defaultRole) {
-                    // Log the role assignment in audit log
                     await AuthAnalytics.logAuditEvent({
                         action_type: 'role_assign',
                         admin_id: userId,
@@ -264,16 +247,13 @@ router.post('/register',
             }
 
             try {
-                // Generate verification token and send email
                 await AuthManager.initiateEmailVerification(user);
             }
             catch (error) {
                 LogManager.error('Failed to send verification email', error);
             }
 
-            // Get user roles without using getUserWithRolesAndPermissions which is causing the error
             const roles = await RoleManager.getUserRoles(userId);
-            // Get user permissions separately
             let permissions = [];
             try {
                 permissions = await PermissionManager.getUserPermissions(userId);
@@ -342,19 +322,16 @@ router.post('/login', ValidationMiddleware.validateLogin, loginLimiter, async (r
     try {
         const { email, password } = req.body;
 
-        // Get user
         const user = await userQueries.getUserByEmail(email);
         if (!user) {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
 
-        // Verify password
         const isValid = await AuthManager.comparePassword(password, user.password);
         if (!isValid) {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
 
-        // Generate token
         const token = await AuthManager.generateToken(user);
 
         res.json({
@@ -620,7 +597,6 @@ router.get('/user/:userId/roles',
     AuthManager.getAuthMiddleware(),
     async (req, res) => {
         try {
-            // Users can only view their own roles unless they're admin
             if (req.params.userId != req.user.id && !await RoleManager.hasRole(req.user.id, 'admin')) {
                 return res.status(403).json({ error: 'Insufficient permissions' });
             }
@@ -701,7 +677,6 @@ router.delete('/user/:userId/roles/:roleId',
     AuthManager.getAuthMiddleware({ roles: ['admin'] }),
     async (req, res) => {
         try {
-            // Prevent removing the last admin role
             if (await RoleManager.hasRole(req.params.userId, 'admin')) {
                 const roles = await RoleManager.getUserRoles(req.params.userId);
                 const adminRoles = roles.filter(r => r.name === 'admin');
@@ -845,7 +820,6 @@ router.delete('/roles/:roleId/permissions/:permissionId',
     RoleManager.createRoleAndPermissionMiddleware(['admin'], ['permission:write']),
     async (req, res) => {
         try {
-            // Prevent removing critical permissions from admin role
             const [role] = await db.query('SELECT name FROM roles WHERE id = ?', [req.params.roleId]);
             if (role?.name === 'admin') {
                 const [[permission]] = await db.query(
@@ -914,12 +888,10 @@ router.get('/my-permissions',
  */
 router.post('/logout', AuthManager.getAuthMiddleware(), async (req, res) => {
     try {
-        // If there's a session, invalidate it
         if (req.session) {
             await SessionManager.invalidateSession(req.session.id);
         }
 
-        // If there's a token, add it to blacklist
         const token = AuthManager.extractToken(req);
         if (token) {
             await AuthMonitor.removeToken(token);

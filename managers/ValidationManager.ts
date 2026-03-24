@@ -94,12 +94,10 @@ class ValidationManager {
     static validateRegistration(data: RegistrationData): RegistrationValidationResult {
         const errors: Record<string, string[]> = {};
 
-        // Validate email
         if (!data.email || !this.validateEmail(data.email)) {
             errors.email = ['Invalid email address'];
         }
 
-        // Validate password
         if (data.password) {
             const passwordValidation = this.validatePassword(data.password);
             if (!passwordValidation.isValid) {
@@ -107,7 +105,6 @@ class ValidationManager {
             }
         }
 
-        // Validate name
         if (data.name) {
             const nameValidation = this.validateName(data.name);
             if (!nameValidation.isValid) {
@@ -115,7 +112,6 @@ class ValidationManager {
             }
         }
 
-        // Validate roles if provided (CLI only)
         if (data.roles !== undefined) {
             if (!Array.isArray(data.roles)) {
                 errors.roles = ['Roles must be an array'];
@@ -135,14 +131,14 @@ class ValidationManager {
 
     static sanitizeUser(user: UserData | null): Omit<UserData, 'password' | 'password_reset_token' | 'email_verification_token'> | null {
         if (!user) return null;
-        
+
         const { password, password_reset_token, email_verification_token, ...safeUser } = user;
         return safeUser;
     }
 
     static validate(schema: ValidationSchema, data: Record<string, any>): GenericValidationResult {
         const errors: Record<string, string[]> = {};
-        
+
         Object.entries(schema).forEach(([field, rules]) => {
             if (rules.required && !data[field]) {
                 errors[field] = [`${field} is required`];
@@ -179,22 +175,18 @@ class ValidationManager {
 
     static sanitizeInput(data: any): any {
         if (!data) return data;
-        
+
         const sanitized: any = {};
         for (const [key, value] of Object.entries(data)) {
             if (typeof value === 'string') {
-                // Remove any HTML tags and trim
                 sanitized[key] = value.replace(/<[^>]*>/g, '').trim();
             } else if (Array.isArray(value)) {
-                // Recursively sanitize arrays
-                sanitized[key] = value.map(item => 
+                sanitized[key] = value.map(item =>
                     typeof item === 'object' ? this.sanitizeInput(item) : item
                 );
             } else if (typeof value === 'object' && value !== null) {
-                // Recursively sanitize nested objects
                 sanitized[key] = this.sanitizeInput(value);
             } else {
-                // Keep other types as is
                 sanitized[key] = value;
             }
         }

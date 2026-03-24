@@ -7,10 +7,8 @@ class DocumentationValidator {
     static validateVersionedDocs(specs) {
         const errors = [];
         const supportedVersions = VersionManager.getSupportedVersions();
-        
-        // Check paths for proper versioning
+
         Object.keys(specs.paths).forEach(path => {
-            // API paths should include version
             if (path.startsWith('/api/')) {
                 const hasVersion = supportedVersions.some(v => path.includes(`/${v}/`));
                 if (!hasVersion) {
@@ -19,7 +17,6 @@ class DocumentationValidator {
             }
         });
 
-        // Check deprecation notices
         supportedVersions.forEach(version => {
             if (VersionManager.isDeprecated(version)) {
                 const versionPaths = Object.keys(specs.paths).filter(p => p.includes(`/${version}/`));
@@ -34,7 +31,6 @@ class DocumentationValidator {
             }
         });
 
-        // Validate tags and descriptions
         if (specs.paths) {
             Object.entries(specs.paths).forEach(([path, methods]) => {
                 Object.entries(methods).forEach(([method, operation]) => {

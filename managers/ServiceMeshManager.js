@@ -11,9 +11,8 @@ class ServiceMeshManager extends EventEmitter {
         this.metrics = new Map();
         this.healthChecks = new Map();
         this.proxyRoutes = new Map();
-        this.serviceDiscovery = new Map(); // New service discovery map
-        
-        // Mesh configuration
+        this.serviceDiscovery = new Map();
+
         this.config = {
             healthCheckInterval: 10000,
             metricCollectionInterval: 5000,
@@ -21,11 +20,10 @@ class ServiceMeshManager extends EventEmitter {
             loadBalancingStrategy: 'round-robin',
             maxConcurrentRequests: 100,
             autoRecoveryEnabled: true,
-            autoRecoveryInterval: 60000, // 1 minute
-            failureThreshold: 3, // Number of failures before marking service as unhealthy
+            autoRecoveryInterval: 60000,
+            failureThreshold: 3,
         };
-        
-        // Start automatic recovery if enabled
+
         if (this.config.autoRecoveryEnabled) {
             this._startAutoRecovery();
         }
@@ -33,7 +31,7 @@ class ServiceMeshManager extends EventEmitter {
 
     registerService(serviceConfig) {
         const { name, url, healthCheck, version, tags = [], discoverable = true } = serviceConfig;
-        
+
         const service = {
             name,
             url,
@@ -55,8 +53,7 @@ class ServiceMeshManager extends EventEmitter {
 
         this.services.set(name, service);
         this.startHealthCheck(name);
-        
-        // Add to service discovery if discoverable
+
         if (discoverable) {
             this.serviceDiscovery.set(name, {
                 name,
@@ -67,10 +64,10 @@ class ServiceMeshManager extends EventEmitter {
                 lastUpdate: Date.now()
             });
         }
-        
+
         this.emit('service:registered', { service });
         LogManager.info('Service registered in mesh', { name, url, version, tags });
-        
+
         return service;
     }
 
@@ -95,7 +92,7 @@ class ServiceMeshManager extends EventEmitter {
             try {
                 const isHealthy = await service.healthCheck(service);
                 const previousStatus = service.status;
-                
+
                 if (isHealthy) {
                     service.status = 'healthy';
                     service.failureCount = 0;
@@ -105,12 +102,11 @@ class ServiceMeshManager extends EventEmitter {
                         service.status = 'unhealthy';
                     }
                 }
-                
+
                 service.lastSeen = Date.now();
 
-                // Update availability percentage
                 const totalChecks = service.metrics.requestCount + 1;
-                service.metrics.availabilityPercentage = 
+                service.metrics.availabilityPercentage =
                     ((totalChecks - service.metrics.errorCount) / totalChecks) * 100;
 
                 if (previousStatus !== service.status) {
@@ -119,14 +115,13 @@ class ServiceMeshManager extends EventEmitter {
                         status: service.status,
                         previousStatus
                     });
-                    
-                    // Update service discovery status
+
                     if (service.discoverable && this.serviceDiscovery.has(serviceName)) {
                         const discoveryRecord = this.serviceDiscovery.get(serviceName);
                         discoveryRecord.status = service.status;
                         discoveryRecord.lastUpdate = Date.now();
                     }
-                    
+
                     LogManager.info(`Service ${serviceName} status changed from ${previousStatus} to ${service.status}`);
                 }
             } catch (error) {
@@ -151,12 +146,12 @@ class ServiceMeshManager extends EventEmitter {
         };
 
         this.proxyRoutes.set(serviceName, proxy);
-        LogManager.info(`Service proxy setup for ${serviceName}`, { 
+        LogManager.info(`Service proxy setup for ${serviceName}`, {
             target: proxy.target,
             routes: proxy.routes,
             strategy: routeConfig.loadBalancingStrategy || 'round-robin'
         });
-        
+
         return proxy;
     }
 
@@ -168,7 +163,7 @@ class ServiceMeshManager extends EventEmitter {
                 return endpoints[current];
             },
             'least-connections': (endpoints) => {
-                return endpoints.reduce((min, endpoint) => 
+                return endpoints.reduce((min, endpoint) =>
                     (endpoint.activeConnections < min.activeConnections) ? endpoint : min
                 );
             },
@@ -176,24 +171,21 @@ class ServiceMeshManager extends EventEmitter {
                 return endpoints[Math.floor(Math.random() * endpoints.length)];
             },
             'weighted': (endpoints) => {
-                // Filter out endpoints with zero weight
                 const validEndpoints = endpoints.filter(e => e.weight > 0);
                 if (validEndpoints.length === 0) return endpoints[0];
-                
-                // Calculate total weight
+
                 const totalWeight = validEndpoints.reduce((sum, endpoint) => sum + endpoint.weight, 0);
-                
-                // Select endpoint based on weight
+
                 let random = Math.random() * totalWeight;
                 for (const endpoint of validEndpoints) {
                     random -= endpoint.weight;
                     if (random <= 0) return endpoint;
                 }
-                
+
                 return validEndpoints[0];
             }
         };
-        
+
         return strategies[strategy] || strategies['round-robin'];
     }
 
@@ -202,9 +194,8 @@ class ServiceMeshManager extends EventEmitter {
         if (!service) {
             throw new Error(`Service ${serviceName} not found`);
         }
-        
+
         if (service.status !== 'healthy') {
-            // Try one more health check before failing
             const isHealthy = await service.healthCheck(service);
             if (!isHealthy) {
                 throw new Error(`Service ${serviceName} is not available`);
@@ -220,38 +211,35 @@ class ServiceMeshManager extends EventEmitter {
                 throw new Error(`No proxy configuration for ${serviceName}`);
             }
 
-            // Apply middleware
             for (const middleware of proxy.middleware) {
                 await middleware(req);
             }
 
-            // Route the request with timeout
             const timeoutPromise = new Promise((_, reject) => {
-                setTimeout(() => reject(new Error(`Request to ${serviceName} timed out`)), 
+                setTimeout(() => reject(new Error(`Request to ${serviceName} timed out`)),
                     proxy.timeout);
             });
-            
+
             const requestPromise = this._executeRequestWithRetry(req, proxy);
             const response = await Promise.race([requestPromise, timeoutPromise]);
-            
-            // Update metrics
+
             const responseTime = Date.now() - startTime;
             this.updateMetrics(serviceName, responseTime, true);
-            
+
             return response;
         } catch (error) {
             const responseTime = Date.now() - startTime;
             this.updateMetrics(serviceName, responseTime, false);
-            
-            LogManager.error(`Service request failed for ${serviceName}`, { 
-                path: req.path, 
-                error: error.message 
+
+            LogManager.error(`Service request failed for ${serviceName}`, {
+                path: req.path,
+                error: error.message
             });
-            
+
             throw error;
         }
     }
-    
+
     async _executeRequestWithRetry(req, proxy) {
         let lastError;
         for (let attempt = 0; attempt < proxy.retryAttempts; attempt++) {
@@ -259,9 +247,8 @@ class ServiceMeshManager extends EventEmitter {
                 return await this.routeRequest(req, proxy);
             } catch (error) {
                 lastError = error;
-                // Wait with exponential backoff before retrying
                 if (attempt < proxy.retryAttempts - 1) {
-                    await new Promise(resolve => 
+                    await new Promise(resolve =>
                         setTimeout(resolve, Math.pow(2, attempt) * 100));
                 }
             }
@@ -273,13 +260,11 @@ class ServiceMeshManager extends EventEmitter {
         const endpoint = proxy.loadBalancer(proxy.routes);
         const cacheKey = `mesh:${req.method}:${req.path}`;
 
-        // Check cache for GET requests
         if (req.method === 'GET') {
             const cached = await CacheManager.get(cacheKey);
             if (cached) return cached;
         }
 
-        // Make the request
         const response = await fetch(`${endpoint}${req.path}`, {
             method: req.method,
             headers: req.headers,
@@ -290,7 +275,6 @@ class ServiceMeshManager extends EventEmitter {
             throw new Error(`Service returned ${response.status}: ${response.statusText}`);
         }
 
-        // Cache successful GET responses
         if (req.method === 'GET') {
             const data = await response.json();
             await CacheManager.set(cacheKey, data, 300);
@@ -306,32 +290,28 @@ class ServiceMeshManager extends EventEmitter {
 
         service.metrics.requestCount++;
         if (!success) service.metrics.errorCount++;
-        
-        // Update average response time
+
         const prevAvg = service.metrics.avgResponseTime;
         const requestCount = service.metrics.requestCount;
-        service.metrics.avgResponseTime = 
+        service.metrics.avgResponseTime =
             (prevAvg * (requestCount - 1) + responseTime) / requestCount;
-        
-        // Store response times for p95 calculation
+
         if (!this.metrics.has(serviceName)) {
             this.metrics.set(serviceName, []);
         }
         const responseTimes = this.metrics.get(serviceName);
         responseTimes.push(responseTime);
-        
-        // Keep only last 100 response times for memory efficiency
+
         if (responseTimes.length > 100) {
             responseTimes.shift();
         }
-        
-        // Calculate p95 response time
+
         if (responseTimes.length > 10) {
             const sortedTimes = [...responseTimes].sort((a, b) => a - b);
             const p95Index = Math.floor(sortedTimes.length * 0.95);
             service.metrics.p95ResponseTime = sortedTimes[p95Index];
         }
-            
+
         PerformanceManager.trackServiceMetrics(serviceName, {
             responseTime,
             success,
@@ -352,7 +332,7 @@ class ServiceMeshManager extends EventEmitter {
                 res.json(result);
             } catch (error) {
                 LogManager.error('Service mesh error', error);
-                res.status(503).json({ 
+                res.status(503).json({
                     error: 'Service temporarily unavailable',
                     service: serviceName,
                     message: error.message
@@ -383,8 +363,7 @@ class ServiceMeshManager extends EventEmitter {
         }
         return metrics;
     }
-    
-    // Get services by tags
+
     getServicesByTag(tag) {
         const result = [];
         for (const [name, service] of this.services) {
@@ -399,15 +378,13 @@ class ServiceMeshManager extends EventEmitter {
         }
         return result;
     }
-    
-    // Discover services
+
     discoverServices(filters = {}) {
         const result = [];
         for (const [name, service] of this.serviceDiscovery) {
-            // Apply filters if provided
             if (filters.tag && !service.tags.includes(filters.tag)) continue;
             if (filters.status && service.status !== filters.status) continue;
-            
+
             result.push({
                 name: service.name,
                 url: service.url,
@@ -419,8 +396,7 @@ class ServiceMeshManager extends EventEmitter {
         }
         return result;
     }
-    
-    // Attempt to recover services automatically
+
     _startAutoRecovery() {
         setInterval(() => {
             this.services.forEach(async (service, name) => {
@@ -431,14 +407,13 @@ class ServiceMeshManager extends EventEmitter {
                         if (isHealthy) {
                             service.status = 'healthy';
                             service.failureCount = 0;
-                            
-                            // Update service discovery
+
                             if (service.discoverable && this.serviceDiscovery.has(name)) {
                                 const discoveryRecord = this.serviceDiscovery.get(name);
                                 discoveryRecord.status = 'healthy';
                                 discoveryRecord.lastUpdate = Date.now();
                             }
-                            
+
                             LogManager.info(`Successfully recovered service: ${name}`);
                             this.emit('service:recovered', { service: name });
                         }
@@ -449,21 +424,18 @@ class ServiceMeshManager extends EventEmitter {
             });
         }, this.config.autoRecoveryInterval);
     }
-    
-    // Unregister a service
+
     unregisterService(serviceName) {
-        // Clear health checks
         if (this.healthChecks.has(serviceName)) {
             clearInterval(this.healthChecks.get(serviceName));
             this.healthChecks.delete(serviceName);
         }
-        
-        // Remove from maps
+
         this.services.delete(serviceName);
         this.serviceDiscovery.delete(serviceName);
         this.proxyRoutes.delete(serviceName);
         this.metrics.delete(serviceName);
-        
+
         LogManager.info(`Service ${serviceName} unregistered from mesh`);
         this.emit('service:unregistered', { service: serviceName });
     }

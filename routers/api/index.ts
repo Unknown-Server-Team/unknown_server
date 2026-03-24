@@ -9,13 +9,10 @@ const swaggerSpecs = require('../../config/swagger');
 
 const router: Router = express.Router();
 
-// Initialize version manager with v1 routes
 VersionManager.registerVersion('v1', v1Router);
 
-// Apply version middleware
 router.use(VersionManager.createVersionMiddleware());
 
-// Version-specific routes
 router.use('/v1', v1Router);
 
 /**
@@ -51,7 +48,6 @@ router.get('/versions', (req: Request, res: Response) => {
  *         description: Health check information
  */
 router.get('/health', (req: Request, res: Response) => {
-    // Redirect to v1 health endpoint for backward compatibility
     v1Router.handle(req, res);
 });
 
@@ -75,15 +71,12 @@ router.get('/health', (req: Request, res: Response) => {
  *         description: Performance metrics
  */
 router.get('/metrics', (req: Request, res: Response) => {
-    // Redirect to v1 metrics endpoint for backward compatibility
     v1Router.handle(req, res);
 });
 
-// Documentation routes
 router.use('/docs', swaggerUi.serve);
 router.get('/docs', swaggerUi.setup(swaggerSpecs));
 
-// Serve OpenAPI spec
 router.get('/docs.json', (req: Request, res: Response) => {
     res.setHeader('Content-Type', 'application/json');
     res.send(swaggerSpecs);

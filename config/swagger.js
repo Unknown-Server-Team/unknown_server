@@ -4,10 +4,8 @@ const VersionManager = require('../managers/VersionManager');
 const LogManager = require('../managers/LogManager');
 const path = require('path');
 
-// Get the supported API versions
 const supportedVersions = VersionManager.getSupportedVersions();
 
-// Define the OpenAPI options directly here rather than using DocumentationValidator
 const options = {
   definition: {
     openapi: '3.0.0',
@@ -38,6 +36,10 @@ const options = {
       {
         name: 'Authorization',
         description: 'Role and permission management'
+      },
+      {
+        name: 'AI',
+        description: 'NVIDIA NIM AI capabilities: chat, vision, speech, safety'
       }
     ],
     components: {
@@ -59,13 +61,10 @@ const options = {
       { sessionAuth: [] }
     ]
   },
-  // Search for API routes in all version folders
   apis: [
-    // Include base API routes
     path.join(process.cwd(), 'routers/api/*.js'),
     // Include versioned API routes - dynamically include all supported versions
     ...supportedVersions.map(version => path.join(process.cwd(), `routers/api/${version}/**/*.js`)),
-    // Include managers that might have API documentation
     path.join(process.cwd(), 'managers/*.js')
   ]
 };

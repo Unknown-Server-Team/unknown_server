@@ -13,12 +13,11 @@ const SessionManager = require('../../managers/SessionManager');
 const AuthMonitor = require('../../managers/AuthMonitor');
 const { query } = require('../../database/db');
 
-// Define enhanced rate limiters with new features
 const loginLimiter = RatelimitManager.create({
     windowMs: 15 * 60 * 1000,
     max: 5,
     message: 'Too many login attempts, please try again later',
-    burstMultiplier: 1.5, // Allow small bursts
+    burstMultiplier: 1.5,
     onLimitReached: (req) => {
         const ip = req.ip;
         AuthMonitor.trackLoginAttempt(false, ip);
@@ -31,7 +30,7 @@ const registrationLimiter = RatelimitManager.create({
     windowMs: 60 * 60 * 1000,
     max: 3,
     message: 'Too many accounts created from this IP',
-    burstMultiplier: 1, // No burst allowed for registration
+    burstMultiplier: 1,
     onLimitReached: (req) => {
         const ip = req.ip;
         WebsocketManager.notifySecurityEvent('registration_rate_limit', { ip });
@@ -43,7 +42,7 @@ const passwordResetLimiter = RatelimitManager.create({
     windowMs: 60 * 60 * 1000,
     max: 3,
     message: 'Too many password reset requests',
-    burstMultiplier: 1, // No burst allowed for password reset
+    burstMultiplier: 1,
     onLimitReached: (req) => {
         const ip = req.ip;
         WebsocketManager.notifySecurityEvent('password_reset_rate_limit', { ip });
@@ -150,8 +149,7 @@ router.post('/register',
             if (foundUser) {
                 return res.status(409).json({ error: 'Email already exists' });
             }
-            
-            // Create the user (this also assigns the default role)
+
             const userId = await AuthManager.createUser(req.body);
             const user = await userQueries.getUserById(userId);
 
@@ -159,11 +157,9 @@ router.post('/register',
                 throw new Error('Failed to create user');
             }
 
-            // Get the authentication details including roles and permissions
             const userAuth = await RoleManager.getUserWithRolesAndPermissions(userId);
 
             try {
-                // Generate verification token and send email
                 await AuthManager.initiateEmailVerification(user);
             } catch (error) {
                 LogManager.error('Failed to send verification email', error);
@@ -230,19 +226,16 @@ router.post('/login', ValidationMiddleware.validateLogin, loginLimiter, async (r
     try {
         const { email, password } = req.body;
 
-        // Get user
         const user = await userQueries.getUserByEmail(email);
         if (!user) {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
 
-        // Verify password
         const isValid = await AuthManager.comparePassword(password, user.password);
         if (!isValid) {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
 
-        // Generate token
         const token = await AuthManager.generateToken(user);
 
         res.json({
@@ -507,7 +500,6 @@ router.get('/user/:userId/roles',
     AuthManager.getAuthMiddleware(),
     async (req, res) => {
         try {
-            // Users can only view their own roles unless they're admin
             if (req.params.userId != req.user.id && !await RoleManager.hasRole(req.user.id, 'admin')) {
                 return res.status(403).json({ error: 'Insufficient permissions' });
             }
@@ -588,7 +580,6 @@ router.delete('/user/:userId/roles/:roleId',
     AuthManager.getAuthMiddleware({ roles: ['admin'] }),
     async (req, res) => {
         try {
-            // Prevent removing the last admin role
             if (await RoleManager.hasRole(req.params.userId, 'admin')) {
                 const roles = await RoleManager.getUserRoles(req.params.userId);
                 const adminRoles = roles.filter(r => r.name === 'admin');
@@ -732,7 +723,6 @@ router.delete('/roles/:roleId/permissions/:permissionId',
     RoleManager.createRoleAndPermissionMiddleware(['admin'], ['permission:write']),
     async (req, res) => {
         try {
-            // Prevent removing critical permissions from admin role
             const [role] = await db.query('SELECT name FROM roles WHERE id = ?', [req.params.roleId]);
             if (role?.name === 'admin') {
                 const [[permission]] = await db.query(
@@ -801,12 +791,10 @@ router.get('/my-permissions',
  */
 router.post('/logout', AuthManager.getAuthMiddleware(), async (req, res) => {
     try {
-        // If there's a session, invalidate it
         if (req.session) {
             await SessionManager.invalidateSession(req.session.id);
         }
 
-        // If there's a token, add it to blacklist
         const token = AuthManager.extractToken(req);
         if (token) {
             await AuthMonitor.removeToken(token);

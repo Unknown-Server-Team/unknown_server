@@ -51,7 +51,7 @@ class SessionMonitor {
         this.thresholds = {
             maxSessionsPerUser: 5,
             maxConcurrentLogins: 3,
-            sessionInactivityTimeout: 30 * 60 * 1000, // 30 minutes
+            sessionInactivityTimeout: 30 * 60 * 1000,
             suspiciousActivityThreshold: 3
         };
 
@@ -60,8 +60,7 @@ class SessionMonitor {
 
     trackSession(userId: number, sessionId: string, metadata: any = {}): void {
         const userSessions = this.activeSessions.get(userId) || new Map<string, SessionInfo>();
-        
-        // Check for suspicious concurrent sessions
+
         if (userSessions.size >= this.thresholds.maxConcurrentLogins) {
             this.recordSuspiciousActivity({
                 type: 'concurrent_sessions',
@@ -113,15 +112,13 @@ class SessionMonitor {
         this.suspiciousActivities.push(activity);
         LogManager.warning('Suspicious session activity detected', activity);
 
-        // Keep only last 100 activities
         if (this.suspiciousActivities.length > 100) {
             this.suspiciousActivities.shift();
         }
 
-        // Check if user has reached suspicious activity threshold
         const recentUserActivities = this.suspiciousActivities.filter(
-            a => a.userId === activity.userId && 
-            a.timestamp > Date.now() - 24 * 60 * 60 * 1000 // Last 24 hours
+            a => a.userId === activity.userId &&
+            a.timestamp > Date.now() - 24 * 60 * 60 * 1000
         );
 
         if (recentUserActivities.length >= this.thresholds.suspiciousActivityThreshold) {
@@ -131,34 +128,29 @@ class SessionMonitor {
 
     private async handleSuspiciousUser(userId: number): Promise<void> {
         LogManager.error('Multiple suspicious activities detected for user', { userId });
-        
-        // Get all user sessions
+
         const userSessions = this.activeSessions.get(userId);
         if (userSessions) {
-            // Invalidate all sessions
             for (const sessionId of userSessions.keys()) {
                 await CacheManager.del(`session:${sessionId}`);
                 this.removeSession(userId, sessionId);
             }
         }
 
-        // Notify admin (you would implement this based on your notification system)
         this.notifyAdmin({
             type: 'suspicious_user',
             userId,
             activities: this.suspiciousActivities
                 .filter(a => a.userId === userId)
-                .slice(-5) // Last 5 activities
+                .slice(-5)
         });
     }
 
     private notifyAdmin(data: AdminNotification): void {
-        // Implementation would depend on your notification system
         LogManager.error('Security alert', data);
     }
 
     private startMonitoring(): void {
-        // Check for inactive sessions every minute
         setInterval(() => {
             const now = Date.now();
             for (const [userId, userSessions] of this.activeSessions) {
@@ -171,7 +163,6 @@ class SessionMonitor {
             }
         }, 60000);
 
-        // Log session statistics every 5 minutes
         setInterval(() => {
             const stats = this.getSessionStats();
             LogManager.info('Session statistics', stats);
@@ -182,10 +173,10 @@ class SessionMonitor {
         let totalSessions = 0;
         const userCounts = new Map<number, number>();
         const now = Date.now();
-        const activeInLast = { 
-            '5m': 0, 
-            '15m': 0, 
-            '1h': 0 
+        const activeInLast = {
+            '5m': 0,
+            '15m': 0,
+            '1h': 0
         };
 
         for (const [userId, userSessions] of this.activeSessions) {

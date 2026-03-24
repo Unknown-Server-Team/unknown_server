@@ -1,5 +1,4 @@
 const jwt = require('jsonwebtoken');
-// Remove bcrypt dependency
 const crypto = require('crypto');
 const LogManager = require('./LogManager');
 const EmailManager = require('./EmailManager');
@@ -12,7 +11,6 @@ class AuthManager {
     constructor() {
         this.secret = process.env.JWT_SECRET || 'your-secret-key';
         this.tokenExpiration = process.env.JWT_EXPIRATION || '24h';
-        // Add encryption settings to use with worker threads
         this.encryptionSettings = {
             saltLength: 16,
             keyAlgorithm: 'sha256',
@@ -28,11 +26,9 @@ class AuthManager {
      */
     async hashPassword(password) {
         try {
-            // Generate a random salt
             const salt = crypto.randomBytes(this.encryptionSettings.saltLength).toString('hex');
-            
-            // Use worker thread to perform CPU-intensive encryption
-            const result = await WorkerThreadManager.executeTask('encryption', 
+
+            const result = await WorkerThreadManager.executeTask('encryption',
                 {
                     text: password,
                     key: salt
@@ -41,9 +37,7 @@ class AuthManager {
                     operation: 'encrypt'
                 }
             );
-            
-            // Format the hash with the salt for storage
-            // Format: salt:iv:encrypted
+
             return `${salt}:${result.iv}:${result.result}`;
         } catch (error) {
             LogManager.error('Password hashing failed', error);
@@ -59,16 +53,14 @@ class AuthManager {
      */
     async comparePassword(password, hashedPassword) {
         try {
-            // Split the stored hash into components
             const [salt, iv, hash] = hashedPassword.split(':');
-            
+
             if (!salt || !iv || !hash) {
                 LogManager.error('Invalid password hash format');
                 return false;
             }
-            
-            // Use worker thread to perform CPU-intensive decryption
-            const result = await WorkerThreadManager.executeTask('encryption', 
+
+            const result = await WorkerThreadManager.executeTask('encryption',
                 {
                     text: hash,
                     key: salt,
@@ -78,8 +70,7 @@ class AuthManager {
                     operation: 'decrypt'
                 }
             );
-            
-            // Compare the decrypted password with the provided password
+
             return result.result === password;
         } catch (error) {
             LogManager.error('Password comparison failed', error);
@@ -94,14 +85,12 @@ class AuthManager {
         }
 
         const roles = await RoleManager.getUserRoles(user.id);
-        // Ensure roles is always an array before mapping
         const roleArray = Array.isArray(roles) ? roles : [];
-        // Map the array to get role names
         const roleNames = roleArray.map(r => r.name);
 
         return jwt.sign(
-            { 
-                id: user.id, 
+            {
+                id: user.id,
                 email: user.email,
                 roles: roleNames
             },
@@ -125,7 +114,7 @@ class AuthManager {
 
     async initiateEmailVerification(user) {
         const token = await this.generateVerificationToken();
-        const expires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+        const expires = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
         await userQueries.setVerificationToken(user.id, token, expires);
         await EmailManager.sendVerificationEmail(user, token);
@@ -140,7 +129,7 @@ class AuthManager {
         if (!user) return false;
 
         const token = await this.generatePasswordResetToken();
-        const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+        const expires = new Date(Date.now() + 60 * 60 * 1000);
 
         await userQueries.setPasswordResetToken(user.id, token, expires);
         await EmailManager.sendPasswordResetEmail(user, token);
@@ -179,7 +168,7 @@ class AuthManager {
             }
 
             if (options.requireVerified && !user.email_verified) {
-                return res.status(403).json({ 
+                return res.status(403).json({
                     error: 'Email not verified',
                     verificationRequired: true
                 });
@@ -192,7 +181,6 @@ class AuthManager {
                 }
             }
 
-            // Attach full user object and roles to request
             req.user = user;
             req.userRoles = await RoleManager.getUserRoles(user.id);
             next();
@@ -208,10 +196,8 @@ class AuthManager {
 
     async createUser(userData, initialRole = 'user') {
         try {
-            // Hash password first
             const hashedPassword = await this.hashPassword(userData.password);
-            
-            // Create user with hashed password
+
             const result = await userQueries.createUser({
                 email: userData.email,
                 password: hashedPassword,
@@ -225,7 +211,6 @@ class AuthManager {
             const userId = result.insertId;
 
             try {
-                // Get default role and assign it
                 const defaultRole = await RoleManager.getDefaultRole();
                 if (!defaultRole) {
                     LogManager.error('Default role not found', { roleName: initialRole });
@@ -235,7 +220,6 @@ class AuthManager {
                 await RoleManager.assignRole(userId, defaultRole.id);
                 LogManager.info('User created with default role', { userId, roleId: defaultRole.id });
 
-                // If additional roles were specified and this is a CLI request (has API key)
                 if (userData.roles && Array.isArray(userData.roles)) {
                     for (const roleName of userData.roles) {
                         const [role] = await db.query('SELECT id FROM roles WHERE name = ?', [roleName]);
@@ -245,7 +229,6 @@ class AuthManager {
                     }
                 }
             } catch (roleError) {
-                // If role assignment fails, delete the user and throw
                 await userQueries.deleteUser(userId);
                 throw roleError;
             }

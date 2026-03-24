@@ -3,7 +3,6 @@ const LogManager = require('../managers/LogManager');
 
 async function initializeQueries() {
     try {
-        // Create users table
         await db.query(`
             CREATE TABLE IF NOT EXISTS users (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -23,7 +22,6 @@ async function initializeQueries() {
             )
         `);
 
-        // Create roles table
         await db.query(`
             CREATE TABLE IF NOT EXISTS roles (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -35,7 +33,6 @@ async function initializeQueries() {
             )
         `);
 
-        // Create roles_hierarchy table for role inheritance
         await db.query(`
             CREATE TABLE IF NOT EXISTS roles_hierarchy (
                 parent_role_id INT NOT NULL,
@@ -49,7 +46,6 @@ async function initializeQueries() {
             )
         `);
 
-        // Create user_roles junction table
         await db.query(`
             CREATE TABLE IF NOT EXISTS user_roles (
                 user_id INT NOT NULL,
@@ -61,7 +57,6 @@ async function initializeQueries() {
             )
         `);
 
-        // Create permissions table
         await db.query(`
             CREATE TABLE IF NOT EXISTS permissions (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -73,7 +68,6 @@ async function initializeQueries() {
             )
         `);
 
-        // Create role_permissions junction table
         await db.query(`
             CREATE TABLE IF NOT EXISTS role_permissions (
                 role_id INT NOT NULL,
@@ -85,7 +79,6 @@ async function initializeQueries() {
             )
         `);
 
-        // Create audit log table
         await db.query(`
             CREATE TABLE IF NOT EXISTS auth_audit_log (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -105,7 +98,6 @@ async function initializeQueries() {
             )
         `);
 
-        // Create analytics tables
         await db.query(`
             CREATE TABLE IF NOT EXISTS role_analytics (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -133,17 +125,15 @@ async function initializeQueries() {
             )
         `);
 
-        // Insert default roles
         await db.query(`
-            INSERT IGNORE INTO roles (name, description) VALUES 
+            INSERT IGNORE INTO roles (name, description) VALUES
             ('admin', 'Full system access'),
             ('moderator', 'Content moderation access'),
             ('user', 'Standard user access')
         `);
 
-        // Insert default permissions
         await db.query(`
-            INSERT IGNORE INTO permissions (name, description) VALUES 
+            INSERT IGNORE INTO permissions (name, description) VALUES
             ('user:read', 'Read user information'),
             ('user:write', 'Create or update user information'),
             ('user:delete', 'Delete user accounts'),
@@ -155,7 +145,6 @@ async function initializeQueries() {
             ('system:admin', 'Full system administration')
         `);
 
-        // Set up initial role permissions
         const roles = await db.query('SELECT id, name FROM roles');
         const permissions = await db.query('SELECT id, name FROM permissions');
 
@@ -166,10 +155,8 @@ async function initializeQueries() {
         const userRole = findByName(roles, 'user');
 
         if (adminRole && moderatorRole && userRole) {
-            // Clear existing role_permissions to avoid duplicates
             await db.query('DELETE FROM role_permissions');
 
-            // Admin gets all permissions
             for (const permission of permissions) {
                 await db.query(
                     'INSERT IGNORE INTO role_permissions (role_id, permission_id) VALUES (?, ?)',
@@ -177,7 +164,6 @@ async function initializeQueries() {
                 );
             }
 
-            // Moderator permissions
             const moderatorPermissions = ['user:read', 'role:read', 'permission:read'];
             for (const permission of permissions) {
                 if (moderatorPermissions.includes(permission.name)) {
@@ -188,7 +174,6 @@ async function initializeQueries() {
                 }
             }
 
-            // User permissions
             const userPermissions = ['user:read'];
             for (const permission of permissions) {
                 if (userPermissions.includes(permission.name)) {
@@ -199,16 +184,13 @@ async function initializeQueries() {
                 }
             }
 
-            // Set up initial role hierarchy (admin > moderator > user)
             await db.query('DELETE FROM roles_hierarchy');
-            
-            // Admin is parent of moderator
+
             await db.query(
                 'INSERT IGNORE INTO roles_hierarchy (parent_role_id, child_role_id) VALUES (?, ?)',
                 [adminRole.id, moderatorRole.id]
             );
-            
-            // Moderator is parent of user
+
             await db.query(
                 'INSERT IGNORE INTO roles_hierarchy (parent_role_id, child_role_id) VALUES (?, ?)',
                 [moderatorRole.id, userRole.id]
@@ -222,7 +204,6 @@ async function initializeQueries() {
     }
 }
 
-// Add role hierarchy queries to use with RoleManager
 const roleHierarchyQueries = {
     async getChildRoles(roleId) {
         const roles = await db.query(
@@ -245,7 +226,6 @@ const roleHierarchyQueries = {
     },
 
     async addChildRole(parentRoleId, childRoleId) {
-        // Check for circular references before adding
         const isCircular = await this.wouldCreateCircularReference(parentRoleId, childRoleId);
         if (isCircular) {
             throw new Error('Adding this relationship would create a circular reference in the role hierarchy');
@@ -268,28 +248,26 @@ const roleHierarchyQueries = {
 
     async wouldCreateCircularReference(parentRoleId, childRoleId) {
         if (parentRoleId === childRoleId) {
-            return true; // Self-reference is circular
+            return true;
         }
 
-        // Check if child is already an ancestor of the parent (which would create a loop)
         const ancestors = await this.getAllAncestors(parentRoleId);
         return ancestors.some(role => role.id === Number(childRoleId));
     },
 
     async getAllAncestors(roleId) {
-        // Get all roles that are ancestors (direct or indirect parents) of the given role
         const ancestors = [];
         const queue = [roleId];
         const visited = new Set();
 
         while (queue.length > 0) {
             const currentId = queue.shift();
-            
+
             if (visited.has(currentId)) continue;
             visited.add(currentId);
 
             const parents = await this.getParentRoles(currentId);
-            
+
             for (const parent of parents) {
                 ancestors.push(parent);
                 queue.push(parent.id);
@@ -300,19 +278,18 @@ const roleHierarchyQueries = {
     },
 
     async getAllDescendants(roleId) {
-        // Get all roles that are descendants (direct or indirect children) of the given role
         const descendants = [];
         const queue = [roleId];
         const visited = new Set();
 
         while (queue.length > 0) {
             const currentId = queue.shift();
-            
+
             if (visited.has(currentId)) continue;
             visited.add(currentId);
 
             const children = await this.getChildRoles(currentId);
-            
+
             for (const child of children) {
                 descendants.push(child);
                 queue.push(child.id);
@@ -371,14 +348,14 @@ const userQueries = {
             'SELECT id FROM users WHERE email_verification_token = ? AND email_verification_expires > NOW() AND email_verified = FALSE',
             [token]
         );
-        
+
         if (users.length === 0) return null;
 
         await db.query(
             'UPDATE users SET email_verified = TRUE, email_verification_token = NULL, email_verification_expires = NULL WHERE id = ?',
             [users[0].id]
         );
-        
+
         return users[0];
     },
 
@@ -421,7 +398,7 @@ const userQueries = {
 
     async countUsersByRole(roleName) {
         const [[result]] = await db.query(`
-            SELECT COUNT(DISTINCT ur.user_id) as count 
+            SELECT COUNT(DISTINCT ur.user_id) as count
             FROM user_roles ur
             JOIN roles r ON ur.role_id = r.id
             WHERE r.name = ?

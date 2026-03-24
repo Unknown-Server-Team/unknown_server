@@ -52,24 +52,20 @@ class ValidationManager {
     static validateRegistration(data) {
         const errors = {};
 
-        // Validate email
         if (!data.email || !this.validateEmail(data.email)) {
             errors.email = ['Invalid email address'];
         }
 
-        // Validate password
         const passwordValidation = this.validatePassword(data.password);
         if (!passwordValidation.isValid) {
             errors.password = passwordValidation.errors;
         }
 
-        // Validate name
         const nameValidation = this.validateName(data.name);
         if (!nameValidation.isValid) {
             errors.name = nameValidation.errors;
         }
 
-        // Validate roles if provided (CLI only)
         if (data.roles !== undefined) {
             if (!Array.isArray(data.roles)) {
                 errors.roles = ['Roles must be an array'];
@@ -89,14 +85,14 @@ class ValidationManager {
 
     static sanitizeUser(user) {
         if (!user) return null;
-        
+
         const { password, password_reset_token, email_verification_token, ...safeUser } = user;
         return safeUser;
     }
 
     static validate(schema, data) {
         const errors = {};
-        
+
         Object.entries(schema).forEach(([field, rules]) => {
             if (rules.required && !data[field]) {
                 errors[field] = [`${field} is required`];
@@ -133,22 +129,18 @@ class ValidationManager {
 
     static sanitizeInput(data) {
         if (!data) return data;
-        
+
         const sanitized = {};
         for (const [key, value] of Object.entries(data)) {
             if (typeof value === 'string') {
-                // Remove any HTML tags and trim
                 sanitized[key] = value.replace(/<[^>]*>/g, '').trim();
             } else if (Array.isArray(value)) {
-                // Recursively sanitize arrays
-                sanitized[key] = value.map(item => 
+                sanitized[key] = value.map(item =>
                     typeof item === 'object' ? this.sanitizeInput(item) : item
                 );
             } else if (typeof value === 'object' && value !== null) {
-                // Recursively sanitize nested objects
                 sanitized[key] = this.sanitizeInput(value);
             } else {
-                // Keep other types as is
                 sanitized[key] = value;
             }
         }

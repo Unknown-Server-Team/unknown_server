@@ -6,7 +6,6 @@ const ora = require('ora');
 const open = require('open');
 const API = require('../utils/api');
 
-// Serve documentation command
 const serve = new Command('serve')
     .description('Open API documentation in browser')
     .option('-p, --port <number>', 'Port number', '3000')
@@ -20,7 +19,6 @@ const serve = new Command('serve')
         }
     });
 
-// Add interactive mode support
 serve.runInteractive = async function() {
     const { port } = await inquirer.prompt([
         {
@@ -32,9 +30,9 @@ serve.runInteractive = async function() {
             prefix: chalk.magenta(figures.pointer)
         }
     ]);
-    
+
     const spinner = ora('Opening API documentation...').start();
-    
+
     try {
         const url = `http://localhost:${port}/api-docs`;
         await open(url);
@@ -45,7 +43,6 @@ serve.runInteractive = async function() {
     }
 };
 
-// Generate documentation command
 const generate = new Command('generate')
     .description('Generate API documentation')
     .option('-f, --format <type>', 'Output format (html/markdown/pdf)', 'html')
@@ -54,21 +51,17 @@ const generate = new Command('generate')
         try {
             const spinner = ora('Generating documentation...').start();
             const spec = await API.get('/docs.json');
-            
-            // Generate documentation based on format
+
             switch (options.format) {
                 case 'html':
-                    // Simulate document generation (this would be replaced with actual generation logic)
                     await new Promise(resolve => setTimeout(resolve, 1000));
                     spinner.succeed(`Documentation generated at ${options.output}/index.html`);
                     break;
                 case 'markdown':
-                    // Simulate document generation
                     await new Promise(resolve => setTimeout(resolve, 1000));
                     spinner.succeed(`Documentation generated at ${options.output}/api.md`);
                     break;
                 case 'pdf':
-                    // Simulate document generation
                     await new Promise(resolve => setTimeout(resolve, 1000));
                     spinner.succeed(`Documentation generated at ${options.output}/api.pdf`);
                     break;
@@ -80,7 +73,6 @@ const generate = new Command('generate')
         }
     });
 
-// Add interactive mode support
 generate.runInteractive = async function() {
     const { format, outputPath } = await inquirer.prompt([
         {
@@ -102,11 +94,10 @@ generate.runInteractive = async function() {
             prefix: chalk.magenta(figures.pointer)
         }
     ]);
-    
+
     const spinner = ora('Fetching API specification...').start();
-    
+
     try {
-        // Try to fetch the API spec
         let spec;
         try {
             spec = await API.get('/docs.json');
@@ -115,15 +106,12 @@ generate.runInteractive = async function() {
             spinner.warn('Could not fetch API specification, generating from template');
             spinner.text = 'Generating documentation from template...';
         }
-        
-        // Process based on selected format
+
         switch (format) {
             case 'html':
-                // Simulate document generation (replace with actual logic)
                 await new Promise(resolve => setTimeout(resolve, 1500));
                 spinner.succeed(`HTML documentation generated at ${outputPath}/index.html`);
-                
-                // Ask if user wants to open the generated docs
+
                 const { openDocs } = await inquirer.prompt([
                     {
                         type: 'confirm',
@@ -133,7 +121,7 @@ generate.runInteractive = async function() {
                         prefix: chalk.cyan(figures.info)
                     }
                 ]);
-                
+
                 if (openDocs) {
                     try {
                         await open(`${outputPath}/index.html`);
@@ -142,25 +130,24 @@ generate.runInteractive = async function() {
                     }
                 }
                 break;
-                
+
             case 'markdown':
                 await new Promise(resolve => setTimeout(resolve, 1200));
                 spinner.succeed(`Markdown documentation generated at ${outputPath}/api.md`);
                 break;
-                
+
             case 'pdf':
                 await new Promise(resolve => setTimeout(resolve, 2000));
                 spinner.succeed(`PDF documentation generated at ${outputPath}/api.pdf`);
                 break;
         }
-        
+
     } catch (error) {
         spinner.fail('Failed to generate documentation');
         console.error(chalk.red('Error:', error.message));
     }
 };
 
-// Export OpenAPI spec command
 const exportSpec = new Command('export')
     .description('Export OpenAPI specification')
     .option('-f, --format <type>', 'Output format (json/yaml)', 'json')
@@ -170,8 +157,7 @@ const exportSpec = new Command('export')
             const spinner = ora('Exporting OpenAPI specification...').start();
             const spec = await API.get('/docs.json');
             const outputPath = options.output || `./openapi.${options.format}`;
-            
-            // Simulate export (this would be replaced with actual export logic)
+
             await new Promise(resolve => setTimeout(resolve, 1000));
             spinner.succeed(`OpenAPI specification exported to ${outputPath}`);
         } catch (error) {
@@ -179,7 +165,6 @@ const exportSpec = new Command('export')
         }
     });
 
-// Add interactive mode support
 exportSpec.runInteractive = async function() {
     const { format, outputPath } = await inquirer.prompt([
         {
@@ -200,19 +185,17 @@ exportSpec.runInteractive = async function() {
             prefix: chalk.magenta(figures.pointer)
         }
     ]);
-    
+
     const spinner = ora('Fetching OpenAPI specification...').start();
-    
+
     try {
-        // Try to fetch the API spec
         try {
             const spec = await API.get('/docs.json');
             spinner.text = 'Exporting specification...';
-            
-            // Simulate export (replace with actual logic)
+
             await new Promise(resolve => setTimeout(resolve, 1000));
             spinner.succeed(`OpenAPI specification exported to ${outputPath}`);
-            
+
         } catch (specError) {
             spinner.fail('Could not fetch API specification');
             console.error(chalk.red('Error:', specError.message));

@@ -11,7 +11,6 @@ const pool = mysql.createPool({
     queueLimit: 0
 });
 
-// Promisify the pool query method
 const query = (sql, params) => {
     return new Promise((resolve, reject) => {
         pool.query(sql, params, (error, results) => {

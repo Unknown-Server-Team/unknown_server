@@ -13,28 +13,24 @@ class EmailManager {
                 pass: process.env.SMTP_PASS
             }
         });
-        
-        // Load email templates from default ones
+
         this.templates = {
             verification: this.getDefaultVerificationTemplate(),
             passwordReset: this.getDefaultPasswordResetTemplate()
         };
     }
 
-    // Get the latest non-deprecated API version
     getActiveApiVersion() {
         try {
-            // Get all supported versions
             const supportedVersions = VersionManager.getSupportedVersions();
-            
-            // Filter out deprecated versions and get the latest
+
             return supportedVersions
                 .filter(v => !VersionManager.isDeprecated(v))
                 .sort()
-                .pop() || 'v1'; // Default to v1 as fallback
+                .pop() || 'v1';
         } catch (error) {
             LogManager.error('Failed to get active API version', error);
-            return 'v1'; // Default to v1 in case of error
+            return 'v1';
         }
     }
 
@@ -56,18 +52,16 @@ class EmailManager {
 
     async sendVerificationEmail(user, token) {
         try {
-            // Get active API version for the URL
             const apiVersion = this.getActiveApiVersion();
             const verificationUrl = `${process.env.APP_URL}/api/${apiVersion}/auth/verify-email/${token}`;
-            
-            // Process template with data
+
             const html = this.processTemplate(this.templates.verification, {
                 appName: process.env.APP_NAME || 'Unknown Server',
                 userName: user.name || user.email,
                 verificationUrl,
                 supportEmail: process.env.SUPPORT_EMAIL || process.env.SMTP_FROM_EMAIL
             });
-            
+
             return await this.sendEmail(user.email, `Verify your email for ${process.env.APP_NAME || 'Unknown Server'}`, html);
         } catch (error) {
             LogManager.error('Failed to send verification email', error);
@@ -77,11 +71,9 @@ class EmailManager {
 
     async sendPasswordResetEmail(user, token) {
         try {
-            // Get active API version for the URL
             const apiVersion = this.getActiveApiVersion();
             const resetUrl = `${process.env.APP_URL}/reset-password/${token}`;
-            
-            // Process template with data
+
             const html = this.processTemplate(this.templates.passwordReset, {
                 appName: process.env.APP_NAME || 'Unknown Server',
                 userName: user.name || user.email,
@@ -89,15 +81,14 @@ class EmailManager {
                 expirationTime: '1 hour',
                 supportEmail: process.env.SUPPORT_EMAIL || process.env.SMTP_FROM_EMAIL
             });
-            
+
             return await this.sendEmail(user.email, `Reset your password for ${process.env.APP_NAME || 'Unknown Server'}`, html);
         } catch (error) {
             LogManager.error('Failed to send password reset email', error);
             throw error;
         }
     }
-    
-    // Process a template by replacing variables with actual values
+
     processTemplate(template, data) {
         let processed = template;
         Object.entries(data).forEach(([key, value]) => {
@@ -106,8 +97,7 @@ class EmailManager {
         });
         return processed;
     }
-    
-    // Default email template for verification
+
     getDefaultVerificationTemplate() {
         return `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -124,8 +114,7 @@ class EmailManager {
             </div>
         `;
     }
-    
-    // Default email template for password reset
+
     getDefaultPasswordResetTemplate() {
         return `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
