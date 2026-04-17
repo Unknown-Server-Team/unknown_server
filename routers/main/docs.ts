@@ -5,14 +5,6 @@ import { marked } from 'marked';
 
 const router: Router = express.Router();
 
-// Initialize markdown renderer
-marked.setOptions({
-    highlight: function(code: string, lang: string) {
-        return code;
-    }
-});
-
-// Render markdown files as HTML
 async function renderMarkdown(filePath: string): Promise<string> {
     try {
         const content = await fs.readFile(filePath, 'utf8');
@@ -23,9 +15,8 @@ async function renderMarkdown(filePath: string): Promise<string> {
     }
 }
 
-// Documentation route handler
-async function renderDocumentation(filePath: string, title: string) {
-    return async (req: Request, res: Response) => {
+function renderDocumentation(filePath: string, title: string) {
+    return async (_req: Request, res: Response) => {
         try {
             const markdown = await renderMarkdown(path.join(__dirname, filePath));
             res.render('documentation', { 
@@ -38,7 +29,6 @@ async function renderDocumentation(filePath: string, title: string) {
     };
 }
 
-// Documentation routes
 router.get('/api', renderDocumentation('../../docs/api.md', 'API Reference'));
 
 router.get('/deployment', renderDocumentation('../../docs/deployment.md', 'Deployment Guide'));

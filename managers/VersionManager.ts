@@ -1,28 +1,23 @@
-const LogManager = require('./LogManager');
-import { Request, Response, NextFunction, Router } from 'express';
+import type { NextFunction, Response, Router } from 'express';
+import type { VersionedRequest, UnsupportedVersionResponse } from '../types/version';
+import type { LogManagerModule } from '../types/modules';
 
-// Extend Request interface to include apiVersion
-declare global {
-    namespace Express {
-        interface Request {
-            apiVersion?: string;
-        }
-    }
-}
+const LogManager = require('./LogManager') as LogManagerModule;
 
 class VersionManager {
     private versions: Map<string, Router>;
     private deprecatedVersions: Set<string>;
 
     constructor() {
-        this.versions = new Map();
-        this.deprecatedVersions = new Set();
+        this.versions = new Map<string, Router>();
+        this.deprecatedVersions = new Set<string>();
     }
 
     registerVersion(version: string, router: Router): void {
         if (this.versions.has(version)) {
             throw new Error(`Version ${version} already registered`);
         }
+
         this.versions.set(version, router);
         LogManager.info(`API version ${version} registered`);
     }
@@ -35,6 +30,7 @@ class VersionManager {
         if (!this.versions.has(version)) {
             throw new Error(`Version ${version} not found`);
         }
+
         this.deprecatedVersions.add(version);
         LogManager.warning(`API version ${version} marked as deprecated, will be removed after ${deprecationDate}`);
     }
@@ -47,20 +43,20 @@ class VersionManager {
         return Array.from(this.versions.keys());
     }
 
-    createVersionMiddleware() {
-        return (req: Request, res: Response, next: NextFunction): void => {
-            const version = req.headers['accept-version'] as string || 'v1';
-            
+    createVersionMiddleware(): (req: VersionedRequest, res: Response<UnsupportedVersionResponse>, next: NextFunction) => Response<UnsupportedVersionResponse> | void {
+        return (req: VersionedRequest, res: Response<UnsupportedVersionResponse>, next: NextFunction): Response<UnsupportedVersionResponse> | void => {
+            const headerVersion = req.headers['accept-version'];
+            const version = typeof headerVersion === 'string' ? headerVersion : 'v1';
+
             if (!this.versions.has(version)) {
-                res.status(400).json({
+                return res.status(400).json({
                     error: 'Unsupported API version',
                     supportedVersions: this.getSupportedVersions()
                 });
-                return;
             }
 
             if (this.isDeprecated(version)) {
-                res.set('Warning', `299 - "This API version is deprecated"`);
+                res.set('Warning', '299 - "This API version is deprecated"');
             }
 
             req.apiVersion = version;
@@ -69,4 +65,7 @@ class VersionManager {
     }
 }
 
-module.exports = new VersionManager();
+const versionManager = new VersionManager();
+
+module.exports = versionManager;
+module.exports.VersionManager = versionManager;

@@ -1,23 +1,21 @@
-const chalk = require('chalk');
-const winston = require('winston');
-const DailyRotateFile = require('winston-daily-rotate-file');
-const path = require('path');
-const fs = require('fs');
-const Table = require('cli-table3');
-const figures = require('figures');
-const figlet = require('figlet');
-const dayjs = require('dayjs');
-import { Request, Response, NextFunction } from 'express';
-import * as Winston from 'winston';
+import { NextFunction, Request, Response } from 'express';
+import * as fs from 'fs';
+import * as path from 'path';
+import dayjs from 'dayjs';
+import figlet from 'figlet';
+import Table from 'cli-table3';
+import chalk from 'chalk';
+import figures from 'figures';
+import winston from 'winston';
+import DailyRotateFile from 'winston-daily-rotate-file';
+import type { LogMetadata, LogInfo } from '../types/index';
 
 const LOG_DIR = path.join(__dirname, '..', 'logs');
 
-// Create logs directory if it doesn't exist
 if (!fs.existsSync(LOG_DIR)) {
     fs.mkdirSync(LOG_DIR, { recursive: true });
 }
 
-// unknown brand colors using chalk
 const unknownColors = {
     debug: chalk.hex('#FFB3B3'),
     success: chalk.hex('#59CE8F'),
@@ -25,7 +23,7 @@ const unknownColors = {
     warn: chalk.hex('#F7D060'),
     info: chalk.hex('#4B56D2'),
     default: chalk.hex('#FF4B91')
-};
+} as const;
 
 const levelSymbols = {
     error: figures.cross,
@@ -33,64 +31,71 @@ const levelSymbols = {
     info: figures.info,
     debug: figures.pointer,
     default: figures.play
-};
+} as const;
 
-interface LogMetadata {
-    [key: string]: any;
-}
-
-interface LogInfo {
-    level: string;
-    message: string;
-    timestamp: string;
-    metadata: LogMetadata;
-    [key: string]: any;
+interface ErrorMetadata {
+    error: {
+        message: string;
+        stack: string | undefined;
+    };
 }
 
 class LogManager {
     private static instance: LogManager;
-    private logger!: Winston.Logger; // Using definite assignment assertion since it's initialized in initLogger()
+    private logger!: winston.Logger;
 
     constructor() {
         if (!LogManager.instance) {
             LogManager.instance = this;
-            this.initLogger();
+            this.logger = this.initLogger();
         }
         return LogManager.instance;
     }
 
-    private initLogger(): void {
-        const logFormat = winston.format.printf((info: LogInfo) => {
-            const { level, message, timestamp, ...meta } = info;
+    private initLogger(): winston.Logger {
+        const logFormat = winston.format.printf((info: any) => {
+            const { level, message, timestamp, ...meta } = info as LogInfo;
             const color = unknownColors[level as keyof typeof unknownColors] || unknownColors.default;
             const symbol = levelSymbols[level as keyof typeof levelSymbols] || levelSymbols.default;
 
             let output = `${chalk.gray(dayjs(timestamp).format('YYYY-MM-DD HH:mm:ss'))} `;
             output += color(`${symbol} [${level.toUpperCase()}] ${message}`);
 
-            if (Object.keys(meta.metadata).length > 0) {
+            const metadata = meta.metadata || {};
+
+            if (Object.keys(metadata).length > 0) {
                 const table = new Table({
                     chars: {
-                        'top': '─', 'top-mid': '┬', 'top-left': '┌', 'top-right': '┐',
-                        'bottom': '─', 'bottom-mid': '┴', 'bottom-left': '└', 'bottom-right': '┘',
-                        'left': '│', 'left-mid': '├', 'mid': '─', 'mid-mid': '┼',
-                        'right': '│', 'right-mid': '┤', 'middle': '│'
+                        top: '─',
+                        'top-mid': '┬',
+                        'top-left': '┌',
+                        'top-right': '┐',
+                        bottom: '─',
+                        'bottom-mid': '┴',
+                        'bottom-left': '└',
+                        'bottom-right': '┘',
+                        left: '│',
+                        'left-mid': '├',
+                        mid: '─',
+                        'mid-mid': '┼',
+                        right: '│',
+                        'right-mid': '┤',
+                        middle: '│'
                     },
                     style: { 'padding-left': 1, 'padding-right': 1 }
                 });
 
                 for (const [key, value] of Object.entries(meta)) {
                     if (key !== 'splat') {
-                        table.push([unknownColors.info(key), typeof value === 'object' ? 
-                            JSON.stringify(value, null, 2) : value.toString()]);
+                        table.push([unknownColors.info(key), typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value)]);
                     }
                 }
-                output += '\n' + table.toString();
+                output += `\n${table.toString()}`;
             }
             return output;
         });
 
-        this.logger = winston.createLogger({
+        return winston.createLogger({
             level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
             format: winston.format.combine(
                 winston.format.timestamp(),
@@ -130,7 +135,7 @@ class LogManager {
     }
 
     error(message: string, error: Error | null = null): void {
-        const meta = error ? { error: { message: error.message, stack: error.stack } } : {};
+        const meta: ErrorMetadata | Record<string, never> = error ? { error: { message: error.message, stack: error.stack } } : {};
         this.logger.error(message, meta);
     }
 
@@ -150,23 +155,29 @@ class LogManager {
 
     figlet(text: string): Promise<string> {
         return new Promise((resolve, reject) => {
-            figlet(text, { 
-                font: 'Big',
-                horizontalLayout: 'default',
-                verticalLayout: 'default'
-            }, (err: Error | null, data?: string) => {
-                if (err) {
-                    reject(err);
-                    return;
+            figlet(
+                text,
+                {
+                    font: 'Big',
+                    horizontalLayout: 'default',
+                    verticalLayout: 'default'
+                },
+                (err: Error | null, data?: string) => {
+                    if (err) {
+                        reject(err);
+                        return;
+                    }
+                    resolve(data as string);
                 }
-                resolve(data || '');
-            });
+            );
         });
     }
 
-    requestLogger() {
+    requestLogger(): (req: Request, res: Response, next: NextFunction) => void {
         return (req: Request, res: Response, next: NextFunction): void => {
-            if (req.path.startsWith("/health")) return next();
+            if (req.path.startsWith('/health')) {
+                return next();
+            }
             const start = process.hrtime();
             const requestId = Math.random().toString(36).substring(7);
 
@@ -181,15 +192,10 @@ class LogManager {
                 const diff = process.hrtime(start);
                 const duration = (diff[0] * 1e3 + diff[1] * 1e-6).toFixed(2);
                 const status = res.statusCode;
-
-                // Colored output for console only
-                const statusColor = status >= 500 ? unknownColors.error :
-                            status >= 400 ? unknownColors.warn :
-                            status >= 300 ? unknownColors.info :
-                            unknownColors.success;
+                const statusColor = status >= 500 ? unknownColors.error : status >= 400 ? unknownColors.warn : status >= 300 ? unknownColors.info : unknownColors.success;
 
                 this.info(`← ${req.method} ${req.path}`, {
-                    status: status,
+                    status,
                     duration: `${duration}ms`,
                     'request-id': requestId
                 });

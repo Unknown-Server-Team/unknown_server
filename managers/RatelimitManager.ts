@@ -1,49 +1,27 @@
-import { LogManager } from './LogManager';
-import { authMonitor } from './AuthMonitor';
-import { websocketManager } from './WebsocketManager';
-import { Request, Response, NextFunction } from 'express';
+import type { Request, Response, NextFunction } from 'express';
+import type {
+    RateLimitConfig,
+    RequestData,
+    LimiterStore,
+    BurstStats,
+    TokenBucket,
+    IPStatus
+} from '../types/rateLimit';
+import type { LogManagerModule, AuthMonitorModule, WebsocketManagerModule } from '../types/modules';
 
-interface RateLimitConfig {
-    windowMs: number;
-    max: number;
-    message: string | object;
-    burstMultiplier?: number;
-    keyGenerator?: (req: Request) => string;
-    onLimitReached?: (req: Request) => void;
-}
-
-interface RequestData {
-    count: number;
-    timestamps: number[];
-}
-
-interface LimiterStore {
-    store: Map<string, RequestData>;
-    config: RateLimitConfig;
-}
-
-interface BurstStats {
-    count: number;
-    firstRequest: number;
-}
-
-interface TokenBucket {
-    tokens: number;
-    lastRefill: number;
-    capacity: number;
-}
-
-type IPStatus = 'whitelisted' | 'blacklisted' | 'normal';
+const LogManager = require('./LogManager') as LogManagerModule;
+const authMonitor = require('./AuthMonitor') as AuthMonitorModule;
+const websocketManager = require('./WebsocketManager') as WebsocketManagerModule;
 
 export class RatelimitManager {
     private static whitelist = new Set<string>();
     private static blacklist = new Set<string>();
-    private static customStores = new Map<string, any>();
+    private static customStores = new Map<string, unknown>();
     private static limiters = new Map<string, LimiterStore>();
     private static burstProtection = new Map<string, BurstStats>();
     private static tokenBuckets = new Map<string, Map<string, TokenBucket>>();
 
-    static create(options: Partial<RateLimitConfig> = {}) {
+    static create(options: Partial<RateLimitConfig> = {}): (req: Request, res: Response, next: NextFunction) => Promise<Response | void> {
         const config: RateLimitConfig = {
             windowMs: 15 * 60 * 1000,
             max: 100,
@@ -59,7 +37,7 @@ export class RatelimitManager {
         this.limiters.set(limiterId, { store, config });
         this.tokenBuckets.set(limiterId, tokenBucket);
 
-        return async (req: Request, res: Response, next: NextFunction) => {
+        return async (req: Request, res: Response, next: NextFunction): Promise<Response | void> => {
             if (this.shouldSkipRateLimit(req)) {
                 return next();
             }
@@ -67,7 +45,6 @@ export class RatelimitManager {
             const key = this.generateKey(req, options.keyGenerator);
             const now = Date.now();
 
-            // Check DDoS protection first
             if (this.isDDoSAttack(key, now)) {
                 this.blacklistIP(key);
                 return res.status(403).json({
@@ -75,14 +52,12 @@ export class RatelimitManager {
                 });
             }
 
-            // Check burst protection
             if (this.isBurstAttack(key, now)) {
                 return res.status(429).json({
                     error: 'Request burst detected, please slow down'
                 });
             }
 
-            // Token bucket algorithm
             const bucket = tokenBucket.get(key) || this.initTokenBucket(key, config);
             const tokens = this.getAvailableTokens(bucket, now, config);
 
@@ -96,7 +71,6 @@ export class RatelimitManager {
                 });
             }
 
-            // Sliding window counter
             const windowStart = now - config.windowMs;
             let requests = store.get(key) || { count: 0, timestamps: [] };
             requests.timestamps = requests.timestamps.filter(time => time > windowStart);
@@ -111,21 +85,19 @@ export class RatelimitManager {
                 });
             }
 
-            // Update counters
             bucket.tokens--;
             tokenBucket.set(key, bucket);
             requests.timestamps.push(now);
             requests.count++;
             store.set(key, requests);
 
-            // Update burst protection
             this.updateBurstProtection(key, now);
 
             next();
         };
     }
 
-    static createLoginLimiter() {
+    static createLoginLimiter(): (req: Request, res: Response, next: NextFunction) => Promise<Response | void> {
         return this.create({
             windowMs: 15 * 60 * 1000,
             max: 5,
@@ -139,7 +111,7 @@ export class RatelimitManager {
         });
     }
 
-    static createRegistrationLimiter() {
+    static createRegistrationLimiter(): (req: Request, res: Response, next: NextFunction) => Promise<Response | void> {
         return this.create({
             windowMs: 60 * 60 * 1000,
             max: 3,
@@ -152,7 +124,7 @@ export class RatelimitManager {
         });
     }
 
-    static createPasswordResetLimiter() {
+    static createPasswordResetLimiter(): (req: Request, res: Response, next: NextFunction) => Promise<Response | void> {
         return this.create({
             windowMs: 60 * 60 * 1000,
             max: 3,
@@ -165,10 +137,10 @@ export class RatelimitManager {
         });
     }
 
-    static createApiLimiter(options: Partial<RateLimitConfig> = {}) {
+    static createApiLimiter(options: Partial<RateLimitConfig> = {}): (req: Request, res: Response, next: NextFunction) => Promise<Response | void> {
         return this.create({
-            windowMs: 60 * 1000, // 1 minute
-            max: 60, // 60 requests per minute
+            windowMs: 60 * 1000,
+            max: 60,
             message: { error: 'Too many API requests' },
             ...options,
             onLimitReached: (req) => {
@@ -182,10 +154,10 @@ export class RatelimitManager {
         });
     }
 
-    static createAuthLimiter(options: Partial<RateLimitConfig> = {}) {
+    static createAuthLimiter(options: Partial<RateLimitConfig> = {}): (req: Request, res: Response, next: NextFunction) => Promise<Response | void> {
         return this.create({
-            windowMs: 60 * 60 * 1000, // 1 hour
-            max: 5, // 5 attempts per hour
+            windowMs: 60 * 60 * 1000,
+            max: 5,
             message: { error: 'Too many authentication attempts' },
             ...options,
             onLimitReached: (req) => {
@@ -201,7 +173,7 @@ export class RatelimitManager {
 
     static isDDoSAttack(ip: string, now: number): boolean {
         const stats = this.burstProtection.get(ip) || { count: 0, firstRequest: now };
-        return stats.count > 1000 && (now - stats.firstRequest) < 1000; // More than 1000 requests per second
+        return stats.count > 1000 && (now - stats.firstRequest) < 1000;
     }
 
     static isBurstAttack(ip: string, now: number): boolean {
@@ -216,10 +188,10 @@ export class RatelimitManager {
         }
 
         this.burstProtection.set(ip, stats);
-        return stats.count > 100; // More than 100 requests per second
+        return stats.count > 100;
     }
 
-    static initTokenBucket(key: string, config: RateLimitConfig): TokenBucket {
+    static initTokenBucket(_key: string, config: RateLimitConfig): TokenBucket {
         return {
             tokens: config.max,
             lastRefill: Date.now(),
@@ -246,10 +218,10 @@ export class RatelimitManager {
 
     static shouldSkipRateLimit(req: Request): boolean {
         const ip = req.ip;
-        return this.whitelist.has(ip);
+        return this.whitelist.has(ip as string);
     }
 
-    static handleLimitReached(req: Request, res: Response): void {
+    static handleLimitReached(req: Request, _res: Response): void {
         const ip = req.ip;
         LogManager.warning('Rate limit exceeded', {
             ip,
@@ -258,27 +230,25 @@ export class RatelimitManager {
         });
 
         const offenderKey = `${ip}:offenses`;
-        const offenses = this.customStores.get('offenders') || new Map();
-        const currentOffenses = (offenses.get(offenderKey) || 0) + 1;
-        offenses.set(offenderKey, currentOffenses);
+        const offenders = (this.customStores.get('offenders') as Map<string, number> | undefined) || new Map<string, number>();
+        const currentOffenses = (offenders.get(offenderKey) || 0) + 1;
+        offenders.set(offenderKey, currentOffenses);
 
-        // More aggressive blacklisting for potential attacks
-        if (currentOffenses >= 5 || this.isDDoSAttack(ip, Date.now())) {
-            this.blacklistIP(ip);
+        if (currentOffenses >= 5 || this.isDDoSAttack(ip as string, Date.now())) {
+            this.blacklistIP(ip as string);
             websocketManager.notifySecurityEvent('ip_blacklisted', { ip, offenses: currentOffenses });
             LogManager.warning('IP blacklisted due to repeated violations', { ip, offenses: currentOffenses });
         }
 
-        this.customStores.set('offenders', offenses);
+        this.customStores.set('offenders', offenders);
     }
 
     static generateKey(req: Request, customKeyGenerator?: (req: Request) => string): string {
         if (customKeyGenerator) {
             return customKeyGenerator(req);
         }
-        // Get real IP from headers set by NGINX
         return req.headers['x-real-ip'] as string ||
-            (req.headers['x-forwarded-for'] ? (req.headers['x-forwarded-for'] as string).split(',')[0].trim() : req.ip);
+            (req.headers['x-forwarded-for'] ? (req.headers['x-forwarded-for'] as string).split(',')[0].trim() : req.ip as string);
     }
 
     static getRemainingRequests(ip: string, limiterId: string): number | null {
@@ -326,26 +296,26 @@ export class RatelimitManager {
     }
 
     static resetOffenses(ip: string): void {
-        const offenders = this.customStores.get('offenders');
+        const offenders = this.customStores.get('offenders') as Map<string, number> | undefined;
         if (offenders) {
             offenders.delete(`${ip}:offenses`);
             LogManager.info('Rate limit offenses reset', { ip });
         }
     }
 
-    static setCustomStore(name: string, store: any): void {
+    static setCustomStore(name: string, store: unknown): void {
         this.customStores.set(name, store);
         LogManager.info('Custom rate limit store set', { name });
     }
 
-    static createSlidingWindowLimiter(options: Partial<RateLimitConfig>) {
+    static createSlidingWindowLimiter(options: Partial<RateLimitConfig>): (req: Request, res: Response, next: NextFunction) => Response | void {
         const windowSize = options.windowMs || 60000;
         const maxRequests = options.max || 30;
         const requests = new Map<string, number[]>();
 
-        return (req: Request, res: Response, next: NextFunction) => {
+        return (req: Request, res: Response, next: NextFunction): Response | void => {
             const now = Date.now();
-            const ip = req.ip;
+            const ip = req.ip as string;
 
             if (!requests.has(ip)) {
                 requests.set(ip, []);
@@ -370,8 +340,7 @@ export class RatelimitManager {
     static cleanup(): void {
         const now = Date.now();
 
-        // Cleanup limiters
-        for (const [limiterId, limiter] of this.limiters) {
+        for (const limiter of this.limiters.values()) {
             const { store, config } = limiter;
             const windowStart = now - config.windowMs;
 
@@ -385,15 +354,13 @@ export class RatelimitManager {
             }
         }
 
-        // Cleanup burst protection
         for (const [ip, stats] of this.burstProtection) {
-            if (now - stats.firstRequest > 60000) { // Clear after 1 minute of inactivity
+            if (now - stats.firstRequest > 60000) {
                 this.burstProtection.delete(ip);
             }
         }
 
-        // Cleanup token buckets older than 1 hour
-        for (const [limiterId, buckets] of this.tokenBuckets) {
+        for (const buckets of this.tokenBuckets.values()) {
             for (const [key, bucket] of buckets) {
                 if (now - bucket.lastRefill > 3600000) {
                     buckets.delete(key);
@@ -403,12 +370,8 @@ export class RatelimitManager {
     }
 }
 
-// Create singleton instance
 const ratelimitManager = new RatelimitManager();
 
-// Export both the class and instance
 export default ratelimitManager;
-export { RatelimitManager };
 
-// More frequent cleanup
-setInterval(() => RatelimitManager.cleanup(), 5 * 60 * 1000); // Every 5 minutes
+setInterval(() => RatelimitManager.cleanup(), 5 * 60 * 1000);

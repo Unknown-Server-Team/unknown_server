@@ -1,65 +1,72 @@
-import WebSocket from 'ws';
-import { LogManager } from './LogManager';
-import { permissionManager } from './PermissionManager';
-import { authMonitor } from './AuthMonitor';
-import { sessionMonitor } from './SessionMonitor';
-import crypto from 'crypto';
-import cluster from 'cluster';
-import { Server } from 'http';
-import { IncomingMessage } from 'http';
+import WebSocket = require('ws');
+import type { IncomingMessage, Server as HttpServer } from 'http';
+import type { PermissionRecord, RoleRecord, UserData } from '../types';
+import type {
+    ConnectedUser,
+    ExtendedWebSocket,
+    WebSocketInitOptions,
+    WebSocketMessage,
+    ClusterMessage,
+    RoleChangeData,
+    PermissionChangeData,
+    MonitoringPayload,
+    SecurityEventPayload,
+    RoomPayload,
+    ConnectionPayload,
+    ErrorPayload,
+    SystemNotificationPayload,
+    WebSocketEventHandler,
+    MiddlewareHandler,
+    PermissionManagerWsModule,
+    AuthMonitorWsModule,
+    SessionMonitorWsModule,
+    SessionMetadata,
+    CryptoModule,
+    AuthManagerWsModule
+} from '../types/websocket';
+import type { LogManagerModule } from '../types/modules';
 
-interface ExtendedWebSocket extends WebSocket {
-    id: string;
-    isAlive: boolean;
-    rooms: Set<string>;
-    user?: any;
-    permissions?: string[];
+const LogManager = require('./LogManager') as LogManagerModule;
+const PermissionManager = require('./PermissionManager') as PermissionManagerWsModule;
+const AuthMonitor = require('./AuthMonitor') as AuthMonitorWsModule;
+const SessionMonitor = require('./SessionMonitor') as SessionMonitorWsModule;
+const crypto = require('crypto') as CryptoModule;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null;
 }
 
-interface WebSocketMessage {
-    type: string;
-    event?: string;
-    data?: any;
-    room?: string;
-    token?: string;
+function isClusterMessage(value: unknown): value is ClusterMessage {
+    return isRecord(value) && typeof value.type === 'string' && typeof value.action === 'string';
 }
 
-interface ClusterMessage {
-    type: string;
-    action: string;
-    data?: any;
-    room?: string;
-    excludeId?: string;
-    sourceWorkerId?: string | number;
-}
+function parseWebSocketMessage(data: WebSocket.RawData): WebSocketMessage {
+    const parsed = JSON.parse(data.toString()) as unknown;
+    if (!isRecord(parsed) || typeof parsed.type !== 'string') {
+        throw new Error('Invalid message format');
+    }
 
-interface WebSocketInitOptions {
-    isClusterWorker?: boolean;
-    workerId?: string | number;
-}
-
-interface SystemNotification {
-    type: string;
-    data: {
-        title: string;
-        message: string;
-        level: string;
-        timestamp: Date;
+    return {
+        type: parsed.type,
+        event: typeof parsed.event === 'string' ? parsed.event : undefined,
+        data: parsed.data,
+        room: typeof parsed.room === 'string' ? parsed.room : undefined,
+        token: typeof parsed.token === 'string' ? parsed.token : undefined
     };
 }
 
 class WebsocketManager {
     private connections: Map<string, ExtendedWebSocket>;
-    private events: Map<string, (ws: ExtendedWebSocket, data: any) => Promise<void> | void>;
+    private events: Map<string, WebSocketEventHandler>;
     private rooms: Map<string, Set<string>>;
-    private middlewares: Array<(ws: ExtendedWebSocket, req: IncomingMessage) => boolean>;
+    private middlewares: MiddlewareHandler[];
     private isClusterMode: boolean;
     private workerId: string | number | null;
     private wss?: WebSocket.Server;
     private monitoringRoom?: string;
 
     constructor() {
-        this.connections = new Map(); // Change to Map for better lookup by ID
+        this.connections = new Map();
         this.events = new Map();
         this.rooms = new Map();
         this.middlewares = [];
@@ -67,115 +74,116 @@ class WebsocketManager {
         this.workerId = null;
     }
 
-    initialize(server: Server, options: WebSocketInitOptions = {}): void {
-        // Check if we're in cluster mode
+    initialize(server: HttpServer, options: WebSocketInitOptions = {}): void {
         this.isClusterMode = options.isClusterWorker || false;
         this.workerId = options.workerId || process.pid;
-        
-        this.wss = new WebSocket.Server({ 
+
+        this.wss = new WebSocket.Server({
             server,
-            // In cluster mode, use client tracking to help with managing connections
-            clientTracking: true 
-        });
-        
-        this.wss.on('connection', (ws: ExtendedWebSocket, req: IncomingMessage) => {
-            // Assign a unique ID to each connection that's consistent across the cluster
-            ws.id = crypto.randomBytes(16).toString('hex');
-            this.handleConnection(ws, req);
+            clientTracking: true
         });
 
-        // In cluster mode, listen for messages from master process
-        if (this.isClusterMode && process.on) {
-            process.on('message', (message: ClusterMessage) => {
-                if (message.type === 'websocket:broadcast') {
-                    // Handle broadcasts from other workers
+        this.wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
+            const socket = ws as ExtendedWebSocket;
+            socket.id = crypto.randomBytes(16).toString('hex');
+            this.handleConnection(socket, req);
+        });
+
+        if (this.isClusterMode) {
+            process.on('message', (message: unknown) => {
+                if (isClusterMessage(message) && message.type === 'websocket:broadcast') {
                     this.handleClusterBroadcast(message);
                 }
             });
         }
 
-        LogManager.info(`WebSocket server initialized${this.isClusterMode ? ` (worker ${this.workerId})` : ''}`);
+        LogManager.success(`WebSocket server initialized${this.isClusterMode ? ` (worker ${this.workerId})` : ''}`);
     }
 
-    // Handle broadcasts from other worker processes
-    private handleClusterBroadcast(message: ClusterMessage): void {
+    handleClusterBroadcast(message: ClusterMessage): void {
         switch (message.action) {
             case 'broadcast':
-                // Broadcast to all local connections
                 this.localBroadcast(message.data);
                 break;
             case 'room':
-                // Broadcast to specific room
-                if (message.room) {
-                    this.localRoomBroadcast(message.room, message.data);
-                }
+                this.localRoomBroadcast(message.room || '', message.data);
                 break;
             default:
                 LogManager.warning('Unknown cluster websocket message type', { type: message.action });
         }
     }
 
-    // Add auth event handling methods
     initializeAuthEvents(): void {
-        // Auth events registration
-        this.registerEvent('auth:roleChange', async (ws: ExtendedWebSocket, data: any) => {
+        this.registerEvent('auth:roleChange', async (ws: ExtendedWebSocket, data: unknown) => {
             if (!this.verifyAuthority(ws, ['role:write'])) {
-                return this.sendError(ws, 'Insufficient permissions');
+                this.sendError(ws, 'Insufficient permissions');
+                return;
             }
-            
-            this.broadcast({
+
+            if (!isRecord(data) || typeof data.userId !== 'number' || !Array.isArray(data.roles)) {
+                this.sendError(ws, 'Invalid message format');
+                return;
+            }
+
+            const payload: RoomPayload = {
                 type: 'auth:roleUpdated',
                 data: {
                     userId: data.userId,
-                    roles: data.roles
-                }
-            });
+                    roles: data.roles as RoleRecord[]
+                } as RoleChangeData
+            };
+            this.broadcast(payload);
         });
 
-        this.registerEvent('auth:permissionChange', async (ws: ExtendedWebSocket, data: any) => {
+        this.registerEvent('auth:permissionChange', async (ws: ExtendedWebSocket, data: unknown) => {
             if (!this.verifyAuthority(ws, ['permission:write'])) {
-                return this.sendError(ws, 'Insufficient permissions');
+                this.sendError(ws, 'Insufficient permissions');
+                return;
             }
-            
-            this.broadcast({
+
+            if (!isRecord(data) || typeof data.roleId !== 'number' || !Array.isArray(data.permissions)) {
+                this.sendError(ws, 'Invalid message format');
+                return;
+            }
+
+            const payload: RoomPayload = {
                 type: 'auth:permissionUpdated',
                 data: {
                     roleId: data.roleId,
-                    permissions: data.permissions
-                }
-            });
+                    permissions: data.permissions as PermissionRecord[]
+                } as PermissionChangeData
+            };
+            this.broadcast(payload);
         });
     }
 
     initializeMonitoringEvents(): void {
-        // Create monitoring room
         this.monitoringRoom = 'system:monitoring';
 
-        // Register monitoring events
-        this.registerEvent('monitoring:subscribe', async (ws: ExtendedWebSocket, data: any) => {
-            if (!ws.user || !await permissionManager.hasPermission(ws.user.id, 'system:admin')) {
-                return this.sendError(ws, 'Insufficient permissions for monitoring');
+        this.registerEvent('monitoring:subscribe', async (ws: ExtendedWebSocket) => {
+            if (!ws.user || !await PermissionManager.hasPermission(ws.user.id, 'system:admin')) {
+                this.sendError(ws, 'Insufficient permissions for monitoring');
+                return;
             }
-            this.joinRoom(ws, this.monitoringRoom!);
-            this.sendMonitoringData(ws);
+            this.joinRoom(ws, this.monitoringRoom);
+            await this.sendMonitoringData(ws);
         });
 
         this.registerEvent('monitoring:unsubscribe', (ws: ExtendedWebSocket) => {
-            this.leaveRoom(ws, this.monitoringRoom!);
+            this.leaveRoom(ws, this.monitoringRoom || '');
         });
 
-        // Set up periodic monitoring updates
         setInterval(() => {
-            this.broadcastMonitoringData();
-        }, 5000); // Every 5 seconds
+            void this.broadcastMonitoringData();
+        }, 5000);
     }
 
-    private async sendMonitoringData(ws: ExtendedWebSocket): Promise<void> {
-        const monitoringData = {
+    async sendMonitoringData(ws: ExtendedWebSocket): Promise<void> {
+        const monitoringData: MonitoringPayload = {
             type: 'monitoring:update',
             data: {
-                auth: authMonitor.getMetrics(),
-                sessions: sessionMonitor.getSessionStats(),
+                auth: AuthMonitor.getMetrics(),
+                sessions: SessionMonitor.getSessionStats(),
                 connections: this.getConnections(),
                 rooms: this.getRooms()
             }
@@ -183,140 +191,133 @@ class WebsocketManager {
         ws.send(JSON.stringify(monitoringData));
     }
 
-    private async broadcastMonitoringData(): Promise<void> {
-        if (!this.monitoringRoom) return;
-        
-        const monitoringData = {
+    async broadcastMonitoringData(): Promise<void> {
+        const monitoringData: MonitoringPayload = {
             type: 'monitoring:update',
             data: {
-                auth: authMonitor.getMetrics(),
-                sessions: sessionMonitor.getSessionStats(),
+                auth: AuthMonitor.getMetrics(),
+                sessions: SessionMonitor.getSessionStats(),
                 connections: this.getConnections(),
                 rooms: this.getRooms()
             }
         };
-        this.broadcastToRoom(this.monitoringRoom, monitoringData);
+        this.broadcastToRoom(this.monitoringRoom || '', monitoringData);
     }
 
-    notifySecurityEvent(eventType: string, data: any): void {
-        if (!this.monitoringRoom) return;
-        
-        const securityEvent = {
+    notifySecurityEvent(eventType: string, data: unknown): void {
+        const securityEvent: SecurityEventPayload = {
             type: 'security:alert',
             eventType,
             data,
             timestamp: new Date()
         };
-        this.broadcastToRoom(this.monitoringRoom, securityEvent);
+        this.broadcastToRoom(this.monitoringRoom || '', securityEvent);
     }
 
-    private verifyAuthority(ws: ExtendedWebSocket, requiredPermissions: string[]): boolean {
-        return !!(ws.user && ws.permissions && 
-            requiredPermissions.some(perm => ws.permissions!.includes(perm)));
+    verifyAuthority(ws: ExtendedWebSocket, requiredPermissions: string[]): boolean {
+        return Boolean(
+            ws.user
+            && ws.permissions
+            && requiredPermissions.some((permission) => ws.permissions?.includes(permission))
+        );
     }
 
-    private sendError(ws: ExtendedWebSocket, message: string): void {
-        ws.send(JSON.stringify({
+    sendError(ws: ExtendedWebSocket, message: string): void {
+        const payload: ErrorPayload = {
             type: 'error',
             message
-        }));
+        };
+        ws.send(JSON.stringify(payload));
     }
 
-    attachUserData(ws: ExtendedWebSocket, user: any, permissions: string[]): void {
+    attachUserData(ws: ExtendedWebSocket, user: ConnectedUser, permissions: string[]): void {
         ws.user = user;
         ws.permissions = permissions;
-        
-        // Join user-specific room
         this.joinRoom(ws, `user:${user.id}`);
-        
-        // Join role-based rooms
+
         if (user.roles) {
-            user.roles.forEach((role: any) => {
+            user.roles.forEach((role) => {
                 this.joinRoom(ws, `role:${role.name}`);
             });
         }
     }
 
-    notifyRoleUpdate(userId: number, roles: any[]): void {
+    notifyRoleUpdate(userId: number, roles: RoleRecord[]): void {
         this.broadcastToRoom(`user:${userId}`, {
             type: 'auth:userRolesUpdated',
             data: { roles }
         });
     }
 
-    notifyPermissionUpdate(roleId: number, permissions: any[]): void {
-        // Notify all users with this role
+    notifyPermissionUpdate(roleId: number, permissions: PermissionRecord[]): void {
         this.broadcast({
             type: 'auth:rolePermissionsUpdated',
             data: { roleId, permissions }
         });
     }
 
-    private handleConnection(ws: ExtendedWebSocket, req: IncomingMessage): void {
-        // Run through middlewares
+    handleConnection(ws: ExtendedWebSocket, req: IncomingMessage): void {
         if (!this.runMiddlewares(ws, req)) {
             ws.close();
             return;
         }
 
-        // Store connection in map using the unique ID as key
         this.connections.set(ws.id, ws);
-        
-        LogManager.info('New WebSocket connection', { 
+
+        LogManager.info('New WebSocket connection', {
             id: ws.id,
-            ip: req.socket?.remoteAddress,
+            ip: req.socket.remoteAddress,
             totalConnections: this.connections.size,
             worker: this.workerId
         });
 
         ws.isAlive = true;
-        ws.rooms = new Set();
+        ws.rooms = new Set<string>();
 
         ws.on('pong', () => {
             ws.isAlive = true;
         });
 
-        ws.on('message', async (data: WebSocket.Data) => {
+        ws.on('message', async (data: WebSocket.RawData) => {
             try {
-                const message: WebSocketMessage = JSON.parse(data.toString());
-                
-                // Handle authentication on connection
+                const message = parseWebSocketMessage(data);
+
                 if (message.type === 'auth:authenticate') {
-                    const { token } = message;
-                    
-                    // Need to dynamically require here to avoid circular dependency
-                    const { authManager } = await import('./AuthManager');
-                    const user = await authManager.verifyToken(token!);
-                    
-                    if (user) {
-                        const permissions = await permissionManager.getUserPermissions(user.id);
-                        this.attachUserData(ws, user, permissions.map(p => p.name));
-                        ws.send(JSON.stringify({
-                            type: 'auth:authenticated',
-                            data: { user, permissions }
-                        }));
+                    const token = message.token;
+                    if (token) {
+                        const AuthManager = require('./AuthManager') as AuthManagerWsModule;
+                        const user = await AuthManager.verifyToken(token);
+
+                        if (user) {
+                            const permissions = await PermissionManager.getUserPermissions(user.id);
+                            this.attachUserData(ws, user as ConnectedUser, permissions.map((permission) => permission.name));
+                            ws.send(JSON.stringify({
+                                type: 'auth:authenticated',
+                                data: { user, permissions }
+                            }));
+                        }
                     }
                 }
 
                 await this.handleMessage(ws, message);
-            } catch (error) {
+            } catch (error: unknown) {
                 LogManager.error('Error handling WebSocket message', error);
                 this.sendError(ws, 'Invalid message format');
             }
         });
 
-        // Track connection in SessionMonitor
         if (ws.user) {
-            sessionMonitor.trackSession(ws.user.id, ws.id, {
-                ip: req.socket?.remoteAddress,
+            const metadata: SessionMetadata = {
+                ip: req.socket.remoteAddress,
                 userAgent: req.headers['user-agent'],
                 workerId: this.workerId
-            });
+            };
+            SessionMonitor.trackSession(ws.user.id, ws.id, metadata);
         }
 
         ws.on('close', () => {
             if (ws.user) {
-                sessionMonitor.removeSession(ws.user.id, ws.id);
+                SessionMonitor.removeSession(ws.user.id, ws.id);
             }
             this.handleDisconnection(ws);
         });
@@ -326,18 +327,17 @@ class WebsocketManager {
             this.handleDisconnection(ws);
         });
 
-        // Send welcome message
-        ws.send(JSON.stringify({ 
-            type: 'connection', 
+        const payload: ConnectionPayload = {
+            type: 'connection',
             message: 'Connected to WebSocket server',
             workerId: this.workerId,
             connectionId: ws.id
-        }));
+        };
+        ws.send(JSON.stringify(payload));
     }
 
-    private handleDisconnection(ws: ExtendedWebSocket): void {
-        // Remove from all rooms
-        ws.rooms.forEach(room => {
+    handleDisconnection(ws: ExtendedWebSocket): void {
+        ws.rooms.forEach((room) => {
             this.leaveRoom(ws, room);
         });
 
@@ -349,20 +349,24 @@ class WebsocketManager {
         });
     }
 
-    private async handleMessage(ws: ExtendedWebSocket, message: WebSocketMessage): Promise<void> {
+    async handleMessage(ws: ExtendedWebSocket, message: WebSocketMessage): Promise<void> {
         const { type, event, data, room } = message;
 
         switch (type) {
             case 'event':
                 if (event && this.events.has(event)) {
-                    await this.events.get(event)!(ws, data);
+                    await this.events.get(event)?.(ws, data);
                 }
                 break;
             case 'join':
-                if (room) this.joinRoom(ws, room);
+                if (room) {
+                    this.joinRoom(ws, room);
+                }
                 break;
             case 'leave':
-                if (room) this.leaveRoom(ws, room);
+                if (room) {
+                    this.leaveRoom(ws, room);
+                }
                 break;
             case 'broadcast':
                 if (room) {
@@ -376,44 +380,40 @@ class WebsocketManager {
         }
     }
 
-    use(middleware: (ws: ExtendedWebSocket, req: IncomingMessage) => boolean): void {
+    use(middleware: MiddlewareHandler): void {
         this.middlewares.push(middleware);
         LogManager.info('Added new WebSocket middleware', {
             totalMiddlewares: this.middlewares.length
         });
     }
 
-    private runMiddlewares(ws: ExtendedWebSocket, req: IncomingMessage): boolean {
-        return this.middlewares.every(middleware => middleware(ws, req));
+    runMiddlewares(ws: ExtendedWebSocket, req: IncomingMessage): boolean {
+        return this.middlewares.every((middleware) => middleware(ws, req));
     }
 
-    registerEvent(event: string, callback: (ws: ExtendedWebSocket, data: any) => Promise<void> | void): void {
+    registerEvent(event: string, callback: WebSocketEventHandler): void {
         this.events.set(event, callback);
         LogManager.info('Registered WebSocket event', { event });
     }
 
-    // Modified broadcast method to support cluster mode
-    broadcast(data: any, exclude: ExtendedWebSocket | null = null): void {
-        // Local broadcast
+    broadcast(data: unknown, exclude: ExtendedWebSocket | null = null): void {
         this.localBroadcast(data, exclude);
-        
-        // In cluster mode, notify other workers
+
         if (this.isClusterMode && process.send) {
             process.send({
                 type: 'websocket:broadcast',
                 action: 'broadcast',
-                data: data,
+                data,
                 excludeId: exclude ? exclude.id : null,
                 sourceWorkerId: this.workerId
             });
         }
     }
-    
-    // Broadcast only to connections on this worker
-    private localBroadcast(data: any, exclude: ExtendedWebSocket | null = null): void {
+
+    localBroadcast(data: unknown, exclude: ExtendedWebSocket | null = null): void {
         const message = JSON.stringify(data);
         const excludeId = exclude ? exclude.id : null;
-        
+
         for (const [id, client] of this.connections.entries()) {
             if (id !== excludeId && client.readyState === WebSocket.OPEN) {
                 client.send(message);
@@ -421,64 +421,65 @@ class WebsocketManager {
         }
     }
 
-    joinRoom(ws: ExtendedWebSocket, room: string): void {
+    joinRoom(ws: ExtendedWebSocket, room: string | undefined): void {
+        if (!room) return;
         if (!this.rooms.has(room)) {
-            this.rooms.set(room, new Set());
+            this.rooms.set(room, new Set<string>());
         }
-        this.rooms.get(room)!.add(ws.id); // Store connection ID instead of object
+        this.rooms.get(room)?.add(ws.id);
         ws.rooms.add(room);
-        LogManager.debug('Client joined room', { 
+        LogManager.debug('Client joined room', {
             connectionId: ws.id,
             room,
-            clients: this.rooms.get(room)!.size,
+            clients: this.rooms.get(room)?.size || 0,
             worker: this.workerId
         });
     }
 
     leaveRoom(ws: ExtendedWebSocket, room: string): void {
         if (this.rooms.has(room)) {
-            this.rooms.get(room)!.delete(ws.id); // Delete by ID
-            if (this.rooms.get(room)!.size === 0) {
+            this.rooms.get(room)?.delete(ws.id);
+            if ((this.rooms.get(room)?.size || 0) === 0) {
                 this.rooms.delete(room);
             }
         }
         ws.rooms.delete(room);
-        LogManager.debug('Client left room', { 
+        LogManager.debug('Client left room', {
             connectionId: ws.id,
             room,
-            remainingClients: this.rooms.has(room) ? this.rooms.get(room)!.size : 0,
+            remainingClients: this.rooms.has(room) ? this.rooms.get(room)?.size || 0 : 0,
             worker: this.workerId
         });
     }
 
-    broadcastToRoom(room: string, data: any, exclude: ExtendedWebSocket | null = null): void {
-        // Local room broadcast
+    broadcastToRoom(room: string, data: unknown, exclude: ExtendedWebSocket | null = null): void {
         this.localRoomBroadcast(room, data, exclude);
-        
-        // In cluster mode, notify other workers
+
         if (this.isClusterMode && process.send) {
             process.send({
                 type: 'websocket:broadcast',
                 action: 'room',
-                room: room,
-                data: data,
+                room,
+                data,
                 excludeId: exclude ? exclude.id : null,
                 sourceWorkerId: this.workerId
             });
         }
     }
-    
-    // Broadcast only to room members on this worker
-    private localRoomBroadcast(room: string, data: any, exclude: ExtendedWebSocket | null = null): void {
-        if (!this.rooms.has(room)) return;
+
+    localRoomBroadcast(room: string, data: unknown, exclude: ExtendedWebSocket | null = null): void {
+        if (!this.rooms.has(room)) {
+            return;
+        }
 
         const message = JSON.stringify(data);
         const excludeId = exclude ? exclude.id : null;
-        
-        // Get connection IDs in this room
-        const roomMembers = this.rooms.get(room)!;
-        
-        // Send to each connection
+        const roomMembers = this.rooms.get(room);
+
+        if (!roomMembers) {
+            return;
+        }
+
         for (const id of roomMembers) {
             if (id !== excludeId) {
                 const client = this.connections.get(id);
@@ -520,7 +521,7 @@ class WebsocketManager {
         this.wss?.on('close', () => {
             clearInterval(interval);
         });
-        
+
         LogManager.info('WebSocket heartbeat started', { worker: this.workerId });
     }
 
@@ -533,9 +534,8 @@ class WebsocketManager {
         });
     }
 
-    // Add method to broadcast system notifications
-    broadcastSystemNotification(title: string, message: string, level: string = 'info'): void {
-        const notification: SystemNotification = {
+    broadcastSystemNotification(title: string, message: string, level = 'info'): void {
+        const notification: SystemNotificationPayload = {
             type: 'system:notification',
             data: {
                 title,
@@ -548,5 +548,14 @@ class WebsocketManager {
     }
 }
 
-export const websocketManager = new WebsocketManager();
-export default websocketManager;
+type WebsocketManagerExport = WebsocketManager & {
+    websocketManager: WebsocketManager;
+    default: WebsocketManager;
+};
+
+const websocketManager = new WebsocketManager();
+const exportedWebsocketManager = websocketManager as WebsocketManagerExport;
+exportedWebsocketManager.websocketManager = websocketManager;
+exportedWebsocketManager.default = websocketManager;
+
+export = exportedWebsocketManager;

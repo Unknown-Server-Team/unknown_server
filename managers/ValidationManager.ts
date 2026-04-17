@@ -1,44 +1,16 @@
-interface ValidationResult {
-    isValid: boolean;
-    errors: string[];
-}
+import type {
+    ValidationResult,
+    RegistrationValidationResult,
+    ValidationRule,
+    ValidationSchema,
+    GenericValidationResult,
+    RegistrationData,
+    UserData,
+    SanitizedValue,
+    SanitizedObject
+} from '../types/validation';
 
-interface RegistrationValidationResult {
-    isValid: boolean;
-    errors: Record<string, string[]>;
-}
-
-interface ValidationRule {
-    required?: boolean;
-    type?: 'email' | 'password' | 'string';
-    minLength?: number;
-    maxLength?: number;
-    pattern?: RegExp;
-    message?: string;
-}
-
-interface ValidationSchema {
-    [field: string]: ValidationRule;
-}
-
-interface GenericValidationResult {
-    isValid: boolean;
-    errors: Record<string, string[]>;
-}
-
-interface RegistrationData {
-    email?: string;
-    password?: string;
-    name?: string;
-    roles?: string[];
-}
-
-interface UserData {
-    password?: string;
-    password_reset_token?: string;
-    email_verification_token?: string;
-    [key: string]: any;
-}
+type ValidatableData = Record<string, unknown>;
 
 class ValidationManager {
     static validateEmail(email: string): boolean {
@@ -94,33 +66,25 @@ class ValidationManager {
     static validateRegistration(data: RegistrationData): RegistrationValidationResult {
         const errors: Record<string, string[]> = {};
 
-        // Validate email
         if (!data.email || !this.validateEmail(data.email)) {
             errors.email = ['Invalid email address'];
         }
 
-        // Validate password
-        if (data.password) {
-            const passwordValidation = this.validatePassword(data.password);
-            if (!passwordValidation.isValid) {
-                errors.password = passwordValidation.errors;
-            }
+        const passwordValidation = this.validatePassword(data.password);
+        if (!passwordValidation.isValid) {
+            errors.password = passwordValidation.errors;
         }
 
-        // Validate name
-        if (data.name) {
-            const nameValidation = this.validateName(data.name);
-            if (!nameValidation.isValid) {
-                errors.name = nameValidation.errors;
-            }
+        const nameValidation = this.validateName(data.name);
+        if (!nameValidation.isValid) {
+            errors.name = nameValidation.errors;
         }
 
-        // Validate roles if provided (CLI only)
         if (data.roles !== undefined) {
             if (!Array.isArray(data.roles)) {
                 errors.roles = ['Roles must be an array'];
             } else {
-                const invalidRoles = data.roles.filter(role => typeof role !== 'string' || !role.trim());
+                const invalidRoles = data.roles.filter((role: unknown) => typeof role !== 'string' || !role.trim());
                 if (invalidRoles.length > 0) {
                     errors.roles = ['All roles must be non-empty strings'];
                 }
@@ -134,38 +98,42 @@ class ValidationManager {
     }
 
     static sanitizeUser(user: UserData | null): Omit<UserData, 'password' | 'password_reset_token' | 'email_verification_token'> | null {
-        if (!user) return null;
-        
+        if (!user) {
+            return null;
+        }
+
         const { password, password_reset_token, email_verification_token, ...safeUser } = user;
         return safeUser;
     }
 
-    static validate(schema: ValidationSchema, data: Record<string, any>): GenericValidationResult {
+    static validate(schema: ValidationSchema, data: ValidatableData): GenericValidationResult {
         const errors: Record<string, string[]> = {};
-        
-        Object.entries(schema).forEach(([field, rules]) => {
-            if (rules.required && !data[field]) {
+
+        Object.entries(schema).forEach(([field, rules]: [string, ValidationRule]) => {
+            const value = data[field];
+
+            if (rules.required && !value) {
                 errors[field] = [`${field} is required`];
                 return;
             }
 
-            if (data[field]) {
-                if (rules.type === 'email' && !this.validateEmail(data[field])) {
+            if (value) {
+                if (rules.type === 'email' && typeof value === 'string' && !this.validateEmail(value)) {
                     errors[field] = ['Invalid email format'];
                 }
-                if (rules.type === 'password') {
-                    const passwordValidation = this.validatePassword(data[field]);
+                if (rules.type === 'password' && typeof value === 'string') {
+                    const passwordValidation = this.validatePassword(value);
                     if (!passwordValidation.isValid) {
                         errors[field] = passwordValidation.errors;
                     }
                 }
-                if (rules.minLength && data[field].length < rules.minLength) {
+                if (rules.minLength && typeof value === 'string' && value.length < rules.minLength) {
                     errors[field] = [`Must be at least ${rules.minLength} characters`];
                 }
-                if (rules.maxLength && data[field].length > rules.maxLength) {
+                if (rules.maxLength && typeof value === 'string' && value.length > rules.maxLength) {
                     errors[field] = [`Must be no more than ${rules.maxLength} characters`];
                 }
-                if (rules.pattern && !rules.pattern.test(data[field])) {
+                if (rules.pattern && typeof value === 'string' && !rules.pattern.test(value)) {
                     errors[field] = [rules.message || 'Invalid format'];
                 }
             }
@@ -177,28 +145,36 @@ class ValidationManager {
         };
     }
 
-    static sanitizeInput(data: any): any {
-        if (!data) return data;
-        
-        const sanitized: any = {};
-        for (const [key, value] of Object.entries(data)) {
-            if (typeof value === 'string') {
-                // Remove any HTML tags and trim
-                sanitized[key] = value.replace(/<[^>]*>/g, '').trim();
-            } else if (Array.isArray(value)) {
-                // Recursively sanitize arrays
-                sanitized[key] = value.map(item => 
-                    typeof item === 'object' ? this.sanitizeInput(item) : item
-                );
-            } else if (typeof value === 'object' && value !== null) {
-                // Recursively sanitize nested objects
-                sanitized[key] = this.sanitizeInput(value);
-            } else {
-                // Keep other types as is
-                sanitized[key] = value;
-            }
+    static sanitizeInput<T extends SanitizedValue>(data: T): T {
+        if (!data) {
+            return data;
         }
-        return sanitized;
+
+        if (typeof data === 'string') {
+            return data.replace(/<[^>]*>/g, '').trim() as T;
+        }
+
+        if (Array.isArray(data)) {
+            return data.map((item) => (typeof item === 'object' ? this.sanitizeInput(item as SanitizedValue) : item)) as T;
+        }
+
+        if (typeof data === 'object') {
+            const sanitized: SanitizedObject = {};
+            for (const [key, value] of Object.entries(data)) {
+                if (typeof value === 'string') {
+                    sanitized[key] = value.replace(/<[^>]*>/g, '').trim();
+                } else if (Array.isArray(value)) {
+                    sanitized[key] = value.map((item) => (typeof item === 'object' ? this.sanitizeInput(item as SanitizedValue) : item)) as SanitizedValue[];
+                } else if (typeof value === 'object' && value !== null) {
+                    sanitized[key] = this.sanitizeInput(value as SanitizedValue);
+                } else {
+                    sanitized[key] = value as SanitizedValue;
+                }
+            }
+            return sanitized as T;
+        }
+
+        return data;
     }
 }
 

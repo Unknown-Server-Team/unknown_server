@@ -1,97 +1,34 @@
-import CircuitBreaker from 'opossum';
+const CircuitBreaker = require('opossum') as any;
 import { performance } from 'perf_hooks';
-import { LogManager } from './LogManager';
-import { CacheManager } from './CacheManager';
-import { PerformanceManager } from './PerformanceManager';
-import { ServiceMeshManager } from './ServiceMeshManager';
-import { Request, Response, NextFunction } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import crypto from 'crypto';
+import type {
+    GatewayResponse,
+    GatewayRequest,
+    GatewayHandler,
+    ServiceEndpoint,
+    ServiceRegistrationOptions,
+    ServiceEndpointState,
+    ServiceConfig,
+    CircuitBreakerOptions,
+    CircuitBreakerContext,
+    GatewayCircuitBreakerState,
+    ServiceHealth,
+    GatewayServiceMetrics,
+    ServiceMeshManagerModule,
+    PerformanceManagerModule
+} from '../types/gateway';
+import type { LogManagerModule, CacheManagerModule } from '../types/modules';
 
-interface ServiceEndpoint {
-    path: string;
-    handler: any;
-    weight?: number;
-    isHealthy: boolean;
-    failures: number;
-    lastCheck: number;
-    activeConnections: number;
-    healthCheck?: () => Promise<boolean>;
-}
-
-interface ServiceConfig {
-    name: string;
-    healthCheck?: () => Promise<boolean>;
-    timeout: number;
-    maxRetries: number;
-    endpoints: ServiceEndpoint[];
-    isActive: boolean;
-    cacheTTL: number;
-    middleware: Array<(req: any) => Promise<void>>;
-    loadBalancingStrategy: 'round-robin' | 'least-connections' | 'weighted';
-    tags: string[];
-    version: string;
-    _lastEndpointIndex?: number;
-}
-
-interface ServiceRegistrationOptions {
-    healthCheck?: () => Promise<boolean>;
-    timeout?: number;
-    maxRetries?: number;
-    endpoints?: ServiceEndpoint[];
-    cacheTTL?: number;
-    middleware?: Array<(req: any) => Promise<void>>;
-    loadBalancingStrategy?: 'round-robin' | 'least-connections' | 'weighted';
-    tags?: string[];
-    version?: string;
-    circuitBreaker?: any;
-    registerWithMesh?: boolean;
-    meshUrl?: string;
-}
-
-interface CircuitBreakerOptions {
-    timeout?: number;
-    errorThresholdPercentage?: number;
-    resetTimeout?: number;
-    volumeThreshold?: number;
-}
-
-interface ServiceHealth {
-    isActive: boolean;
-    healthPercentage: number;
-    circuitBreakerState: {
-        state: string;
-        stats: {
-            successful: number;
-            failed: number;
-            rejected: number;
-            timeout: number;
-        };
-    } | null;
-    endpoints: Array<{
-        path: string;
-        isHealthy: boolean;
-        failures: number;
-        lastCheck: number;
-        activeConnections: number;
-    }>;
-}
-
-interface ServiceMetrics {
-    success: number;
-    failure: number;
-    timeout: number;
-    rejected: number;
-    fallback: number;
-    circuitState: string;
-    healthyEndpoints: number;
-    totalEndpoints: number;
-}
+const LogManager = require('./LogManager') as LogManagerModule;
+const CacheManager = require('./CacheManager') as CacheManagerModule;
+const PerformanceManager = require('./PerformanceManager') as PerformanceManagerModule;
+const ServiceMeshManager = require('./ServiceMeshManager') as ServiceMeshManagerModule;
 
 class GatewayManager {
     private services: Map<string, ServiceConfig>;
-    private circuitBreakers: Map<string, CircuitBreaker>;
+    private circuitBreakers: Map<string, GatewayCircuitBreakerState>;
     private routeCache: Map<string, string>;
-    private healthStatus: Map<string, any>;
     private endpointWeights: Map<string, Map<string, number>>;
     private defaultCircuitBreakerOptions: CircuitBreakerOptions;
 
@@ -99,22 +36,15 @@ class GatewayManager {
         this.services = new Map();
         this.circuitBreakers = new Map();
         this.routeCache = new Map();
-        this.healthStatus = new Map();
         this.endpointWeights = new Map();
-        
-        // Default circuit breaker options
         this.defaultCircuitBreakerOptions = {
             timeout: 3000,
             errorThresholdPercentage: 50,
             resetTimeout: 30000,
             volumeThreshold: 10
         };
-        
-        // Start periodic health checks
         this._startHealthChecks();
-        
-        // Clean route cache periodically
-        setInterval(() => this.routeCache.clear(), 60000); // Clear every minute
+        setInterval(() => this.routeCache.clear(), 60000);
     }
 
     registerService(name: string, options: ServiceRegistrationOptions = {}): this {
@@ -123,28 +53,33 @@ class GatewayManager {
             healthCheck: options.healthCheck || (() => Promise.resolve(true)),
             timeout: options.timeout || 5000,
             maxRetries: options.maxRetries || 3,
-            endpoints: options.endpoints || [],
+            endpoints: (options.endpoints || []).map((endpoint: ServiceEndpoint) => ({
+                ...endpoint,
+                isHealthy: true,
+                failures: 0,
+                lastCheck: Date.now(),
+                activeConnections: 0
+            })),
             isActive: true,
             cacheTTL: options.cacheTTL || 300,
             middleware: options.middleware || [],
             loadBalancingStrategy: options.loadBalancingStrategy || 'round-robin',
             tags: options.tags || [],
-            version: options.version || '1.0.0'
-        };
+            version: options.version || '1.0.0',
+            ...options
+        } as ServiceConfig;
 
         this.services.set(name, serviceConfig);
-        
-        // Initialize endpoint weights for load balancing
+
         if (serviceConfig.loadBalancingStrategy === 'weighted') {
             const weights = new Map<string, number>();
-            serviceConfig.endpoints.forEach(endpoint => {
+            serviceConfig.endpoints.forEach((endpoint) => {
                 weights.set(endpoint.path, endpoint.weight || 1);
             });
             this.endpointWeights.set(name, weights);
         }
-        
-        // Initialize health status for each endpoint
-        serviceConfig.endpoints.forEach(endpoint => {
+
+        serviceConfig.endpoints.forEach((endpoint) => {
             endpoint.isHealthy = true;
             endpoint.failures = 0;
             endpoint.lastCheck = Date.now();
@@ -153,7 +88,6 @@ class GatewayManager {
 
         this.createCircuitBreaker(name, options.circuitBreaker);
 
-        // Register with service mesh if enabled
         if (options.registerWithMesh) {
             try {
                 ServiceMeshManager.registerService({
@@ -164,7 +98,7 @@ class GatewayManager {
                     discoverable: true
                 });
                 LogManager.info(`Service ${name} registered with service mesh`);
-            } catch (error) {
+            } catch (error: unknown) {
                 LogManager.warning(`Failed to register ${name} with service mesh`, error);
             }
         }
@@ -179,43 +113,41 @@ class GatewayManager {
             throw new Error(`Service ${serviceName} not found`);
         }
 
-        const breaker = new CircuitBreaker(async (req: any) => {
+        const breaker = new CircuitBreaker(async (req: GatewayRequest) => {
             const startTime = performance.now();
             try {
-                // Route the request through the service
                 const result = await this.routeRequest(service, req);
-                
-                // Track performance metrics
                 const duration = performance.now() - startTime;
                 PerformanceManager.trackRequest(duration, 200, req.path);
-                
                 return result;
-            } catch (error) {
+            } catch (error: unknown) {
                 const duration = performance.now() - startTime;
+                void duration;
                 PerformanceManager.trackError(error, req.path);
                 throw error;
             }
         }, {
             ...this.defaultCircuitBreakerOptions,
             ...options
-        });
+        }) as GatewayCircuitBreakerState & {
+            on(event: 'timeout', listener: (_error: unknown, context: CircuitBreakerContext | undefined) => void): void;
+            on(event: 'failure', listener: (_error: unknown, context: CircuitBreakerContext | undefined) => void): void;
+            on(event: string, listener: (...args: any[]) => void): void;
+        };
 
-        // Circuit breaker event handlers
         breaker.on('success', () => {
             LogManager.debug(`Circuit breaker success: ${serviceName}`);
         });
 
-        breaker.on('timeout', (err: any, context: any) => {
+        breaker.on('timeout', (_error: unknown, context: CircuitBreakerContext | undefined) => {
             LogManager.warning(`Circuit breaker timeout: ${serviceName}`);
-            // Only mark endpoint unhealthy if we have path context
             if (context && context.path) {
                 this._markServiceEndpoint(serviceName, context.path, false);
             }
         });
 
-        breaker.on('failure', (err: any, context: any) => {
+        breaker.on('failure', (_error: unknown, context: CircuitBreakerContext | undefined) => {
             LogManager.error(`Circuit breaker failure: ${serviceName}`);
-            // Only mark endpoint unhealthy if we have path context
             if (context && context.path) {
                 this._markServiceEndpoint(serviceName, context.path, false);
             }
@@ -242,10 +174,9 @@ class GatewayManager {
         this.circuitBreakers.set(serviceName, breaker);
     }
 
-    async routeRequest(service: ServiceConfig, req: any): Promise<any> {
+    async routeRequest(service: ServiceConfig, req: GatewayRequest): Promise<GatewayResponse> {
         const cacheKey = `${service.name}:${req.method}:${req.path}`;
-        
-        // Check cache for GET requests
+
         if (req.method === 'GET') {
             const cachedResponse = await CacheManager.get(cacheKey);
             if (cachedResponse) {
@@ -253,21 +184,17 @@ class GatewayManager {
             }
         }
 
-        // Apply service-specific middleware
         for (const middleware of service.middleware) {
             await middleware(req);
         }
 
-        // Route the request with timeout
         const timeoutPromise = new Promise<never>((_, reject) => {
-            setTimeout(() => reject(new Error(`Request timed out for ${service.name}`)), 
-                service.timeout);
+            setTimeout(() => reject(new Error(`Request timed out for ${service.name}`)), service.timeout);
         });
-        
-        const requestPromise = this.executeRequest(service, req);
-        const response = await Promise.race([requestPromise, timeoutPromise]);
 
-        // Cache successful GET responses
+        const requestPromise = this.executeRequest(service, req);
+        const response = await Promise.race<GatewayResponse | never>([requestPromise, timeoutPromise]);
+
         if (req.method === 'GET' && response) {
             await CacheManager.set(cacheKey, response, service.cacheTTL);
         }
@@ -275,151 +202,129 @@ class GatewayManager {
         return response;
     }
 
-    async executeRequest(service: ServiceConfig, req: any): Promise<any> {
-        let lastError: Error;
+    async executeRequest(service: ServiceConfig, req: GatewayRequest): Promise<GatewayResponse> {
+        let lastError: unknown = new Error(`No healthy endpoints available for ${service.name}`);
         const startAttempt = Date.now();
-        
+
         for (let attempt = 1; attempt <= service.maxRetries; attempt++) {
             try {
                 const endpoint = await this.getHealthyEndpoint(service);
                 if (!endpoint) {
                     throw new Error(`No healthy endpoints available for ${service.name}`);
                 }
-                
-                // Track active connections for least-connections load balancing
+
                 endpoint.activeConnections++;
-                
+
                 try {
                     const result = await endpoint.handler(req);
-                    
-                    // Mark endpoint as healthy on success
                     this._markServiceEndpoint(service.name, endpoint.path, true);
-                    
-                    // Decrease active connections counter
                     endpoint.activeConnections = Math.max(0, endpoint.activeConnections - 1);
-                    
                     return result;
-                } catch (error) {
-                    // Decrease active connections counter even on error
+                } catch (error: unknown) {
                     endpoint.activeConnections = Math.max(0, endpoint.activeConnections - 1);
-                    
-                    // Mark endpoint as potentially unhealthy
                     this._markServiceEndpoint(service.name, endpoint.path, false);
                     throw error;
                 }
-            } catch (error: any) {
+            } catch (error: unknown) {
                 lastError = error;
                 LogManager.error(`Request failed for ${service.name}, attempt ${attempt}/${service.maxRetries}`, error);
-                
-                // Wait before retry using exponential backoff with jitter
+
                 if (attempt < service.maxRetries) {
                     const backoff = Math.pow(2, attempt) * 100;
                     const jitter = Math.random() * 100;
-                    await new Promise(resolve => setTimeout(resolve, backoff + jitter));
+                    await new Promise<void>((resolve) => setTimeout(resolve, backoff + jitter));
                 }
             }
         }
-        
+
         const totalTime = Date.now() - startAttempt;
         LogManager.warning(`All ${service.maxRetries} retry attempts failed for ${service.name} after ${totalTime}ms`);
-        throw lastError!;
+        throw lastError;
     }
 
-    async getHealthyEndpoint(service: ServiceConfig): Promise<ServiceEndpoint | null> {
-        // Filter healthy endpoints
-        const endpoints = service.endpoints.filter(e => e.isHealthy);
-        
+    async getHealthyEndpoint(service: ServiceConfig): Promise<ServiceEndpointState | null> {
+        const endpoints = service.endpoints.filter((endpoint) => endpoint.isHealthy);
+
         if (endpoints.length === 0) {
-            // If no healthy endpoints, try all endpoints as a fallback
             LogManager.warning(`No healthy endpoints for ${service.name}, trying all endpoints`);
-            if (service.endpoints.length === 0) return null;
+            if (service.endpoints.length === 0) {
+                return null;
+            }
             return service.endpoints[Math.floor(Math.random() * service.endpoints.length)];
         }
-        
-        // Apply load balancing strategy
+
         switch (service.loadBalancingStrategy) {
-            case 'round-robin': {
-                // Simple round-robin selection
+            case 'round-robin':
                 service._lastEndpointIndex = (service._lastEndpointIndex || 0) + 1;
                 return endpoints[service._lastEndpointIndex % endpoints.length];
-            }
-            
-            case 'least-connections': {
-                // Select endpoint with fewest active connections
-                return endpoints.reduce((min, endpoint) => 
-                    (endpoint.activeConnections < min.activeConnections) ? endpoint : min, 
-                    { activeConnections: Infinity } as ServiceEndpoint);
-            }
-            
+            case 'least-connections':
+                return endpoints.reduce((min, endpoint) => (
+                    endpoint.activeConnections < min.activeConnections ? endpoint : min
+                ), endpoints[0]);
             case 'weighted': {
-                // Weighted random selection
-                const weights = this.endpointWeights.get(service.name) || new Map();
-                const totalWeight = endpoints.reduce((sum, endpoint) => 
-                    sum + (weights.get(endpoint.path) || 1), 0);
-                
+                const weights = this.endpointWeights.get(service.name) || new Map<string, number>();
+                const totalWeight = endpoints.reduce((sum, endpoint) => sum + (weights.get(endpoint.path) || 1), 0);
                 let random = Math.random() * totalWeight;
                 for (const endpoint of endpoints) {
                     const weight = weights.get(endpoint.path) || 1;
                     random -= weight;
-                    if (random <= 0) return endpoint;
+                    if (random <= 0) {
+                        return endpoint;
+                    }
                 }
-                return endpoints[0]; // Fallback
+                return endpoints[0];
             }
-            
-            default: {
-                // Default to random selection
+            default:
                 return endpoints[Math.floor(Math.random() * endpoints.length)];
-            }
         }
     }
 
-    createGatewayMiddleware() {
-        return async (req: Request, res: Response, next: NextFunction) => {
-            const serviceName = this.resolveService(req);
+    createGatewayMiddleware(): (req: Request, res: Response, next: NextFunction) => Promise<void> {
+        return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+            const gatewayReq = req as GatewayRequest;
+            const serviceName = this.resolveService(gatewayReq);
             if (!serviceName) {
-                return next();
+                next();
+                return;
             }
 
             const breaker = this.circuitBreakers.get(serviceName);
             if (!breaker) {
-                return next();
+                next();
+                return;
             }
 
             try {
-                // Add tracking headers
-                req.headers = req.headers || {};
-                req.headers['x-gateway-request-id'] = crypto.randomBytes(8).toString('hex');
-                req.headers['x-gateway-timestamp'] = Date.now().toString();
-                
-                const result = await breaker.fire(req);
+                gatewayReq.headers = gatewayReq.headers || {};
+                gatewayReq.headers['x-gateway-request-id'] = crypto.randomBytes(8).toString('hex');
+                gatewayReq.headers['x-gateway-timestamp'] = Date.now().toString();
+
+                const result = await breaker.fire(gatewayReq);
                 res.json(result);
-            } catch (error: any) {
+            } catch (error: unknown) {
                 LogManager.error('Gateway error', error);
-                
-                // Send appropriate error response
-                if (error.message.includes('timeout')) {
-                    res.status(504).json({ error: 'Gateway Timeout', message: error.message });
-                } else if (error.message.includes('circuit breaker')) {
+                const message = error instanceof Error ? error.message : String(error);
+                if (message.includes('timeout')) {
+                    res.status(504).json({ error: 'Gateway Timeout', message });
+                } else if (message.includes('circuit breaker')) {
                     res.status(503).json({ error: 'Service Unavailable', message: 'Circuit breaker is open' });
-                } else if (error.message.includes('No healthy endpoints')) {
+                } else if (message.includes('No healthy endpoints')) {
                     res.status(503).json({ error: 'Service Unavailable', message: 'No healthy endpoints available' });
                 } else {
-                    res.status(502).json({ error: 'Bad Gateway', message: error.message });
+                    res.status(502).json({ error: 'Bad Gateway', message });
                 }
             }
         };
     }
 
-    resolveService(req: Request): string | null {
-        // Cache route resolution
+    resolveService(req: Pick<GatewayRequest, 'path'>): string | null {
         const cacheKey = `route:${req.path}`;
         if (this.routeCache.has(cacheKey)) {
-            return this.routeCache.get(cacheKey)!;
+            return this.routeCache.get(cacheKey) || null;
         }
 
-        // Find matching service based on path
         for (const [name, service] of this.services) {
-            if (service.endpoints.some(e => req.path.startsWith(e.path))) {
+            if (service.endpoints.some((endpoint) => req.path.startsWith(endpoint.path))) {
                 this.routeCache.set(cacheKey, name);
                 return name;
             }
@@ -432,13 +337,11 @@ class GatewayManager {
         const health: Record<string, ServiceHealth> = {};
         for (const [name, service] of this.services) {
             const breaker = this.circuitBreakers.get(name);
-            
-            // Calculate total health percentage
-            const healthyEndpoints = service.endpoints.filter(e => e.isHealthy).length;
+            const healthyEndpoints = service.endpoints.filter((endpoint) => endpoint.isHealthy).length;
             const healthPercentage = service.endpoints.length > 0
                 ? (healthyEndpoints / service.endpoints.length) * 100
                 : 0;
-                
+
             health[name] = {
                 isActive: service.isActive,
                 healthPercentage,
@@ -451,72 +354,69 @@ class GatewayManager {
                         timeout: breaker.stats.timeouts
                     }
                 } : null,
-                endpoints: service.endpoints.map(e => ({
-                    path: e.path,
-                    isHealthy: e.isHealthy,
-                    failures: e.failures,
-                    lastCheck: e.lastCheck,
-                    activeConnections: e.activeConnections
+                endpoints: service.endpoints.map((endpoint) => ({
+                    path: endpoint.path,
+                    isHealthy: endpoint.isHealthy,
+                    failures: endpoint.failures,
+                    lastCheck: endpoint.lastCheck,
+                    activeConnections: endpoint.activeConnections
                 }))
             };
         }
         return health;
     }
-    
-    // Helper method to mark endpoint health status
+
     private _markServiceEndpoint(serviceName: string, path: string, isHealthy: boolean): void {
         const service = this.services.get(serviceName);
-        if (!service) return;
-        
-        const endpoint = service.endpoints.find(e => path.startsWith(e.path));
-        if (!endpoint) return;
-        
+        if (!service) {
+            return;
+        }
+
+        const endpoint = service.endpoints.find((candidate) => path.startsWith(candidate.path));
+        if (!endpoint) {
+            return;
+        }
+
         endpoint.lastCheck = Date.now();
-        
+
         if (isHealthy) {
             endpoint.failures = 0;
             endpoint.isHealthy = true;
         } else {
             endpoint.failures++;
-            // Mark as unhealthy after consecutive failures
             if (endpoint.failures >= 3) {
                 endpoint.isHealthy = false;
             }
         }
     }
-    
-    // Start periodic health checks for all service endpoints
+
     private _startHealthChecks(): void {
         setInterval(async () => {
             for (const [serviceName, service] of this.services) {
                 for (const endpoint of service.endpoints) {
                     try {
-                        // Skip if endpoint was recently checked
-                        if (Date.now() - endpoint.lastCheck < 10000) continue;
-                        
-                        // Basic health check
+                        if (Date.now() - endpoint.lastCheck < 10000) {
+                            continue;
+                        }
+
                         if (typeof service.healthCheck === 'function') {
-                            // Use service-level health check if defined
                             const isHealthy = await service.healthCheck();
                             endpoint.isHealthy = isHealthy;
                             LogManager.debug(`Service-level health check for ${serviceName} endpoint ${endpoint.path}: ${isHealthy ? 'healthy' : 'unhealthy'}`);
                         } else if (typeof endpoint.healthCheck === 'function') {
-                            // Use endpoint-specific health check if defined
                             const isHealthy = await endpoint.healthCheck();
                             endpoint.isHealthy = isHealthy;
                             LogManager.debug(`Endpoint-specific health check for ${serviceName} endpoint ${endpoint.path}: ${isHealthy ? 'healthy' : 'unhealthy'}`);
-                        } else if (endpoint.handler && typeof endpoint.handler.get === 'function') {
-                            // Try a simple probe - but only if handler is a router with a get method
+                        } else if (endpoint.handler && typeof (endpoint.handler as GatewayHandler).get === 'function') {
                             LogManager.debug(`Using handler GET method for health check on ${serviceName} endpoint ${endpoint.path}`);
                             endpoint.isHealthy = true;
                         } else {
-                            // Default to marking as healthy if no check method available
                             endpoint.isHealthy = true;
                             LogManager.debug(`No health check method available for ${serviceName} endpoint ${endpoint.path}, marking as healthy by default`);
                         }
                         endpoint.failures = 0;
                         endpoint.lastCheck = Date.now();
-                    } catch (error) {
+                    } catch (error: unknown) {
                         LogManager.debug(`Health check failed for ${serviceName} endpoint ${endpoint.path}`, error);
                         endpoint.failures++;
                         if (endpoint.failures >= 3) {
@@ -524,11 +424,10 @@ class GatewayManager {
                         }
                     }
                 }
-                
-                // Update circuit breaker if all endpoints are unhealthy
-                const allUnhealthy = service.endpoints.length > 0 && 
-                    service.endpoints.every(e => !e.isHealthy);
-                    
+
+                const allUnhealthy = service.endpoints.length > 0
+                    && service.endpoints.every((endpoint) => !endpoint.isHealthy);
+
                 if (allUnhealthy && service.isActive) {
                     service.isActive = false;
                     LogManager.warning(`All endpoints for ${serviceName} are unhealthy, marking service as inactive`);
@@ -537,42 +436,41 @@ class GatewayManager {
                     LogManager.info(`Service ${serviceName} recovered, marking as active`);
                 }
             }
-        }, 30000); // Check every 30 seconds
+        }, 30000);
     }
-    
-    // Reset endpoint weights for weighted load balancing
+
     updateEndpointWeights(serviceName: string, weights: Record<string, number>): void {
         if (!this.services.has(serviceName)) {
             throw new Error(`Service ${serviceName} not found`);
         }
-        
+
         const weightMap = new Map<string, number>();
         for (const [path, weight] of Object.entries(weights)) {
             weightMap.set(path, weight);
         }
-        
+
         this.endpointWeights.set(serviceName, weightMap);
         LogManager.info(`Updated weights for ${serviceName}`, weights);
     }
-    
-    // Manually reset circuit breaker
+
     resetCircuitBreaker(serviceName: string): void {
         const breaker = this.circuitBreakers.get(serviceName);
         if (!breaker) {
             throw new Error(`Circuit breaker for ${serviceName} not found`);
         }
-        
+
         breaker.close();
         LogManager.info(`Circuit breaker for ${serviceName} manually reset`);
     }
-    
-    // Get metrics for all services
-    getMetrics(): Record<string, ServiceMetrics> {
-        const metrics: Record<string, ServiceMetrics> = {};
+
+    getMetrics(): Record<string, GatewayServiceMetrics> {
+        const metrics: Record<string, GatewayServiceMetrics> = {};
         for (const [name, service] of this.services) {
             const breaker = this.circuitBreakers.get(name);
-            if (!breaker) continue;
-            
+            if (!breaker) {
+                continue;
+            }
+
             metrics[name] = {
                 success: breaker.stats.successes,
                 failure: breaker.stats.failures,
@@ -580,7 +478,7 @@ class GatewayManager {
                 rejected: breaker.stats.rejects,
                 fallback: breaker.stats.fallbacks,
                 circuitState: breaker.status.state,
-                healthyEndpoints: service.endpoints.filter(e => e.isHealthy).length,
+                healthyEndpoints: service.endpoints.filter((endpoint) => endpoint.isHealthy).length,
                 totalEndpoints: service.endpoints.length
             };
         }
@@ -588,5 +486,14 @@ class GatewayManager {
     }
 }
 
-export const gatewayManager = new GatewayManager();
-export default gatewayManager;
+type GatewayManagerExport = GatewayManager & {
+    gatewayManager: GatewayManager;
+    default: GatewayManager;
+};
+
+const gatewayManager = new GatewayManager();
+const exportedGatewayManager = gatewayManager as GatewayManagerExport;
+exportedGatewayManager.gatewayManager = gatewayManager;
+exportedGatewayManager.default = gatewayManager;
+
+export = exportedGatewayManager;

@@ -1,35 +1,27 @@
-import { ValidationManager } from './ValidationManager';
-import { VersionManager } from './VersionManager';
-import { LogManager } from './LogManager';
-import { Request, Response, NextFunction } from 'express';
+import type { NextFunction, Response } from 'express';
+import type {
+    ValidationSchema,
+    GenericValidationResult,
+    TypedRequest,
+    ErrorResponseBody,
+    FileValidationOptions,
+    UploadedFile,
+    QueryRule
+} from '../types/validation';
+import type {
+    VersionManagerModule,
+    LogManagerModule
+} from '../types/modules';
+import type { ValidationManagerModule } from '../types/validation';
 
-interface ValidationRule {
-    required?: boolean;
-    type: 'number' | 'string' | 'boolean';
-    min?: number;
-    max?: number;
-    enum?: string[];
-}
+const ValidationManager = require('./ValidationManager') as ValidationManagerModule;
+const VersionManager = require('./VersionManager') as VersionManagerModule;
+const LogManager = require('./LogManager') as LogManagerModule;
 
-interface ValidationRules {
-    [key: string]: ValidationRule;
-}
-
-interface FileValidationOptions {
-    maxSize?: number;
-    allowedTypes?: string[];
-}
-
-interface ExtendedRequest extends Request {
-    sanitizedBody?: any;
-    apiVersion?: string;
-    files?: any;
-}
-
-export class ValidationMiddleware {
-    static validate(schema: any) {
-        return (req: ExtendedRequest, res: Response, next: NextFunction) => {
-            const { isValid, errors } = ValidationManager.validate(schema, req.body);
+class ValidationMiddleware {
+    static validate(schema: ValidationSchema): (req: TypedRequest, res: Response<ErrorResponseBody>, next: NextFunction) => Response<ErrorResponseBody> | void {
+        return (req: TypedRequest, res: Response<ErrorResponseBody>, next: NextFunction): Response<ErrorResponseBody> | void => {
+            const { isValid, errors } = ValidationManager.validate(schema, req.body) as GenericValidationResult;
             if (!isValid) {
                 LogManager.debug('Validation failed', { errors, path: req.path });
                 return res.status(400).json({
@@ -41,8 +33,8 @@ export class ValidationMiddleware {
         };
     }
 
-    static validateRegistration(req: ExtendedRequest, res: Response, next: NextFunction) {
-        const validation = ValidationManager.validateRegistration(req.body);
+    static validateRegistration(req: TypedRequest, res: Response<ErrorResponseBody>, next: NextFunction): Response<ErrorResponseBody> | void {
+        const validation = ValidationManager.validateRegistration(req.body) as GenericValidationResult;
         if (!validation.isValid) {
             return res.status(400).json({
                 error: 'Validation failed',
@@ -52,14 +44,16 @@ export class ValidationMiddleware {
         next();
     }
 
-    static validateLogin(req: ExtendedRequest, res: Response, next: NextFunction) {
+    static validateLogin(req: TypedRequest, res: Response<ErrorResponseBody>, next: NextFunction): Response<ErrorResponseBody> | void {
         const errors: Record<string, string[]> = {};
-        
-        if (!req.body.email || !ValidationManager.validateEmail(req.body.email)) {
+        const email = req.body.email;
+        const password = req.body.password;
+
+        if (typeof email !== 'string' || !ValidationManager.validateEmail(email)) {
             errors.email = ['Invalid email address'];
         }
-        
-        if (!req.body.password || req.body.password.length < 1) {
+
+        if (typeof password !== 'string' || password.length < 1) {
             errors.password = ['Password is required'];
         }
 
@@ -69,11 +63,12 @@ export class ValidationMiddleware {
                 details: errors
             });
         }
+
         next();
     }
 
-    static sanitize() {
-        return (req: ExtendedRequest, res: Response, next: NextFunction) => {
+    static sanitize(): (req: TypedRequest, res: Response<ErrorResponseBody>, next: NextFunction) => void {
+        return (req: TypedRequest, _res: Response<ErrorResponseBody>, next: NextFunction): void => {
             if (req.body) {
                 req.sanitizedBody = ValidationManager.sanitizeInput(req.body);
             }
@@ -81,31 +76,35 @@ export class ValidationMiddleware {
         };
     }
 
-    static validateId(paramName: string = 'id') {
-        return (req: ExtendedRequest, res: Response, next: NextFunction) => {
-            const id = parseInt(req.params[paramName]);
-            if (isNaN(id) || id <= 0) {
+    static validateId(paramName: string = 'id'): (req: TypedRequest, res: Response<ErrorResponseBody>, next: NextFunction) => Response<ErrorResponseBody> | void {
+        return (req: TypedRequest, res: Response<ErrorResponseBody>, next: NextFunction): Response<ErrorResponseBody> | void => {
+            const rawId = req.params[paramName];
+            const id = parseInt(String(rawId), 10);
+            if (Number.isNaN(id) || id <= 0) {
                 return res.status(400).json({
                     error: 'Invalid ID format',
                     details: { [paramName]: ['Must be a positive integer'] }
                 });
             }
-            req.params[paramName] = id.toString();
+            req.params[paramName] = String(id);
             next();
         };
     }
 
-    static validateQuery(rules: ValidationRules) {
-        return (req: ExtendedRequest, res: Response, next: NextFunction) => {
+    static validateQuery(rules: Record<string, QueryRule>): (req: TypedRequest, res: Response<ErrorResponseBody>, next: NextFunction) => Response<ErrorResponseBody> | void {
+        return (req: TypedRequest, res: Response<ErrorResponseBody>, next: NextFunction): Response<ErrorResponseBody> | void => {
             const errors: Record<string, string[]> = {};
-            Object.entries(rules).forEach(([key, rule]) => {
-                if (rule.required && !req.query[key]) {
+
+            Object.entries(rules).forEach(([key, rule]: [string, QueryRule]): void => {
+                const value = req.query[key];
+
+                if (rule.required && !value) {
                     errors[key] = [`${key} is required`];
-                } else if (req.query[key]) {
+                } else if (value) {
                     switch (rule.type) {
-                        case 'number':
-                            const num = Number(req.query[key]);
-                            if (isNaN(num)) {
+                        case 'number': {
+                            const num = Number(value);
+                            if (Number.isNaN(num)) {
                                 errors[key] = [`${key} must be a number`];
                             } else if (rule.min !== undefined && num < rule.min) {
                                 errors[key] = [`${key} must be at least ${rule.min}`];
@@ -113,15 +112,18 @@ export class ValidationMiddleware {
                                 errors[key] = [`${key} must be at most ${rule.max}`];
                             }
                             break;
+                        }
                         case 'string':
-                            if (rule.enum && !rule.enum.includes(req.query[key] as string)) {
+                            if (rule.enum && !rule.enum.includes(value)) {
                                 errors[key] = [`${key} must be one of: ${rule.enum.join(', ')}`];
                             }
                             break;
                         case 'boolean':
-                            if (!/^(true|false)$/i.test(req.query[key] as string)) {
+                            if (!/^(true|false)$/i.test(value)) {
                                 errors[key] = [`${key} must be true or false`];
                             }
+                            break;
+                        default:
                             break;
                     }
                 }
@@ -133,12 +135,13 @@ export class ValidationMiddleware {
                     details: errors
                 });
             }
+
             next();
         };
     }
 
-    static validateFile(options: FileValidationOptions = {}) {
-        return (req: ExtendedRequest, res: Response, next: NextFunction) => {
+    static validateFile(options: FileValidationOptions = {}): (req: TypedRequest, res: Response<ErrorResponseBody>, next: NextFunction) => Response<ErrorResponseBody> | void {
+        return (req: TypedRequest, res: Response<ErrorResponseBody>, next: NextFunction): Response<ErrorResponseBody> | void => {
             if (!req.files || Object.keys(req.files).length === 0) {
                 return res.status(400).json({
                     error: 'No files were uploaded',
@@ -146,7 +149,7 @@ export class ValidationMiddleware {
                 });
             }
 
-            const file = req.files.file;
+            const file: UploadedFile = req.files.file;
             const errors: string[] = [];
 
             if (options.maxSize && file.size > options.maxSize) {
@@ -168,22 +171,21 @@ export class ValidationMiddleware {
         };
     }
 
-    static validateApiVersion() {
-        return (req: ExtendedRequest, res: Response, next: NextFunction) => {
-            const version = req.headers['accept-version'] as string;
+    static validateApiVersion(): (req: TypedRequest, res: Response<ErrorResponseBody>, next: NextFunction) => Response<ErrorResponseBody> | void {
+        return (req: TypedRequest, res: Response<ErrorResponseBody>, next: NextFunction): Response<ErrorResponseBody> | void => {
+            const headerVersion = req.headers['accept-version'];
+            const version = typeof headerVersion === 'string' ? headerVersion : undefined;
             const supportedVersions = VersionManager.getSupportedVersions();
 
-            // If no version specified, use latest non-deprecated version
             if (!version) {
                 const latestVersion = supportedVersions
-                    .filter(v => !VersionManager.isDeprecated(v))
+                    .filter((supportedVersion: string): boolean => !VersionManager.isDeprecated(supportedVersion))
                     .sort()
                     .pop();
                 req.apiVersion = latestVersion;
                 return next();
             }
 
-            // Check if version exists
             if (!supportedVersions.includes(version)) {
                 return res.status(400).json({
                     error: 'Unsupported API version',
@@ -193,7 +195,6 @@ export class ValidationMiddleware {
                 });
             }
 
-            // Warning for deprecated versions
             if (VersionManager.isDeprecated(version)) {
                 res.set('Warning', '299 - "This API version is deprecated"');
                 LogManager.warning(`Deprecated API version ${version} accessed`, {
@@ -208,4 +209,5 @@ export class ValidationMiddleware {
     }
 }
 
-export default ValidationMiddleware;
+module.exports = ValidationMiddleware;
+module.exports.ValidationMiddleware = ValidationMiddleware;

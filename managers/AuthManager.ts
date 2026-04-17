@@ -1,34 +1,25 @@
-import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
-import { Request, Response, NextFunction } from 'express';
-import { 
-    UserData, 
-    RegistrationData, 
-    AuthResult, 
-    TokenVerificationResult, 
-    EncryptionSettings, 
-    AuthManagerConfig,
-    AuthenticatedRequest 
-} from '../types';
+import jwt from 'jsonwebtoken';
+import type { SignOptions } from 'jsonwebtoken';
+import type { NextFunction, Response } from 'express';
+import type {
+    VerificationEmailUser,
+    WorkerThreadManagerModule,
+    EncryptionSettings,
+    JwtPayload,
+    AuthenticatedRequest,
+    AuthMiddlewareOptions,
+    CreateUserInput,
+    UserQueriesModule
+} from '../types/authManager';
+import type { LogManagerModule, RoleManagerModule, EmailManagerModule, DatabaseModule } from '../types/modules';
 
-const LogManager = require('./LogManager');
-const EmailManager = require('./EmailManager');
-const RoleManager = require('./RoleManager');
-const { userQueries } = require('../database/mainQueries');
-const db = require('../database/db');
-const WorkerThreadManager = require('./WorkerThreadManager');
-
-interface JwtPayload {
-    userId: number;
-    email: string;
-    iat?: number;
-    exp?: number;
-}
-
-interface EncryptionResult {
-    result: string;
-    iv: string;
-}
+const LogManager = require('./LogManager') as LogManagerModule;
+const EmailManager = require('./EmailManager') as EmailManagerModule;
+const RoleManager = require('./RoleManager') as RoleManagerModule;
+const { userQueries } = require('../database/mainQueries') as { userQueries: UserQueriesModule };
+const db = require('../database/db') as DatabaseModule;
+const WorkerThreadManager = require('./WorkerThreadManager') as WorkerThreadManagerModule;
 
 class AuthManager {
     private secret: string;
@@ -46,16 +37,11 @@ class AuthManager {
         };
     }
 
-    /**
-     * Hash password using worker threads instead of bcrypt
-     */
     async hashPassword(password: string): Promise<string> {
         try {
-            // Generate a random salt
             const salt = crypto.randomBytes(this.encryptionSettings.saltLength).toString('hex');
-            
-            // Use worker thread to perform CPU-intensive encryption
-            const result: EncryptionResult = await WorkerThreadManager.executeTask('encryption', 
+            const result = await WorkerThreadManager.executeTask(
+                'encryption',
                 {
                     text: password,
                     key: salt
@@ -64,32 +50,28 @@ class AuthManager {
                     operation: 'encrypt'
                 }
             );
-            
-            // Format the hash with the salt for storage
-            // Format: salt:iv:encrypted
             return `${salt}:${result.iv}:${result.result}`;
-        } catch (error) {
+        } catch (error: unknown) {
             LogManager.error('Password hashing failed', error);
             throw new Error('Password hashing failed');
         }
     }
 
-    /**
-     * Compare password with hashed password using worker threads
-     */
     async comparePassword(password: string, hashedPassword: string): Promise<boolean> {
         try {
-            const [salt, iv, encrypted] = hashedPassword.split(':');
-            if (!salt || !iv || !encrypted) {
+            const [salt, iv, hash] = hashedPassword.split(':');
+
+            if (!salt || !iv || !hash) {
+                LogManager.error('Invalid password hash format');
                 return false;
             }
 
-            // Use worker thread for decryption
-            const result = await WorkerThreadManager.executeTask('encryption',
+            const result = await WorkerThreadManager.executeTask(
+                'encryption',
                 {
-                    encryptedText: encrypted,
+                    text: hash,
                     key: salt,
-                    iv: iv
+                    iv
                 },
                 {
                     operation: 'decrypt'
@@ -97,250 +79,182 @@ class AuthManager {
             );
 
             return result.result === password;
-        } catch (error) {
+        } catch (error: unknown) {
             LogManager.error('Password comparison failed', error);
             return false;
         }
     }
 
-    /**
-     * Generate JWT token for user
-     */
-    async generateToken(user: UserData): Promise<string> {
-        try {
-            const payload: JwtPayload = {
-                userId: user.id,
-                email: user.email
-            };
+    async generateToken(user: VerificationEmailUser): Promise<string> {
+        if (!user || !user.id) {
+            LogManager.error('Invalid user object passed to generateToken', { user });
+            throw new Error('Invalid user object');
+        }
 
-            return jwt.sign(payload, this.secret, { 
-                expiresIn: this.tokenExpiration 
-            });
-        } catch (error) {
-            LogManager.error('Token generation failed', error);
-            throw new Error('Token generation failed');
+        const roles = await RoleManager.getUserRoles(user.id);
+        const roleArray = Array.isArray(roles) ? roles as Array<{ name: string }> : [];
+        const roleNames = roleArray.map((role): string => role.name);
+
+        return jwt.sign(
+            {
+                id: user.id,
+                email: user.email,
+                roles: roleNames
+            },
+            this.secret,
+            { expiresIn: this.tokenExpiration as SignOptions['expiresIn'] }
+        );
+    }
+
+    verifyToken(token: string): string | JwtPayload | null {
+        try {
+            return jwt.verify(token, this.secret) as JwtPayload;
+        } catch (error: unknown) {
+            LogManager.error('Token verification failed', error);
+            return null;
         }
     }
 
-    /**
-     * Verify JWT token
-     */
-    async verifyToken(token: string): Promise<TokenVerificationResult> {
-        try {
-            const decoded = jwt.verify(token, this.secret) as JwtPayload;
-            const user = await userQueries.getUserById(decoded.userId);
-            
-            if (!user) {
-                return { success: false };
-            }
-
-            return { success: true, user };
-        } catch (error) {
-            if (error.name === 'TokenExpiredError') {
-                return { success: false, expired: true };
-            }
-            return { success: false };
-        }
-    }
-
-    /**
-     * Generate email verification token
-     */
     async generateVerificationToken(): Promise<string> {
         return crypto.randomBytes(32).toString('hex');
     }
 
-    /**
-     * Initiate email verification process
-     */
-    async initiateEmailVerification(user: UserData): Promise<void> {
+    async initiateEmailVerification(user: VerificationEmailUser): Promise<void> {
         const token = await this.generateVerificationToken();
-        const expires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-
-        await userQueries.setEmailVerificationToken(user.id, token, expires);
-        await EmailManager.sendVerificationEmail(user.email, token);
+        const expires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        await userQueries.setVerificationToken(user.id, token, expires);
+        await EmailManager.sendVerificationEmail(user, token);
     }
 
-    /**
-     * Generate password reset token
-     */
     async generatePasswordResetToken(): Promise<string> {
         return crypto.randomBytes(32).toString('hex');
     }
 
-    /**
-     * Initiate password reset process
-     */
-    async initiatePasswordReset(email: string): Promise<AuthResult> {
-        try {
-            const user = await userQueries.getUserByEmail(email);
-            if (!user) {
-                return { success: false, message: 'User not found' };
-            }
-
-            const token = await this.generatePasswordResetToken();
-            const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
-
-            await userQueries.setPasswordResetToken(user.id, token, expires);
-            await EmailManager.sendPasswordResetEmail(user.email, token);
-
-            return { success: true };
-        } catch (error) {
-            LogManager.error('Password reset initiation failed', error);
-            return { success: false, message: 'Password reset failed' };
+    async initiatePasswordReset(email: string): Promise<boolean> {
+        const user = await userQueries.getUserByEmail(email);
+        if (!user) {
+            return false;
         }
+
+        const token = await this.generatePasswordResetToken();
+        const expires = new Date(Date.now() + 60 * 60 * 1000);
+        await userQueries.setPasswordResetToken(user.id, token, expires);
+        await EmailManager.sendPasswordResetEmail(user, token);
+        return true;
     }
 
-    /**
-     * Reset password using reset token
-     */
-    async resetPassword(token: string, newPassword: string): Promise<AuthResult> {
-        try {
-            const user = await userQueries.getUserByPasswordResetToken(token);
-            if (!user) {
-                return { success: false, message: 'Invalid or expired token' };
-            }
-
-            const hashedPassword = await this.hashPassword(newPassword);
-            await userQueries.updatePassword(user.id, hashedPassword);
-
-            return { success: true, user };
-        } catch (error) {
-            LogManager.error('Password reset failed', error);
-            return { success: false, message: 'Password reset failed' };
+    async resetPassword(token: string, newPassword: string): Promise<boolean> {
+        const user = await userQueries.getUserByResetToken(token);
+        if (!user) {
+            return false;
         }
+
+        const hashedPassword = await this.hashPassword(newPassword);
+        await userQueries.updatePassword(user.id, hashedPassword);
+        return true;
     }
 
-    /**
-     * Verify email using verification token
-     */
-    async verifyEmail(token: string): Promise<AuthResult> {
-        try {
-            const user = await userQueries.getUserByEmailVerificationToken(token);
-            if (!user) {
-                return { success: false, message: 'Invalid or expired token' };
-            }
-
-            await userQueries.verifyEmail(user.id);
-            return { success: true, user };
-        } catch (error) {
-            LogManager.error('Email verification failed', error);
-            return { success: false, message: 'Email verification failed' };
-        }
+    async verifyEmail(token: string): Promise<boolean> {
+        const user = await userQueries.verifyEmail(token);
+        return !!user;
     }
 
-    /**
-     * Authentication middleware
-     */
-    getAuthMiddleware(options: { roles?: string[] } = {}) {
-        return async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-            try {
-                const token = req.headers.authorization?.split(' ')[1];
-                
-                if (!token) {
-                    return res.status(401).json({ error: 'No token provided' });
-                }
-
-                const verificationResult = await this.verifyToken(token);
-                if (!verificationResult.success) {
-                    if (verificationResult.expired) {
-                        return res.status(401).json({ error: 'Token expired' });
-                    }
-                    return res.status(401).json({ error: 'Invalid token' });
-                }
-
-                req.user = verificationResult.user;
-
-                // Check role requirements if specified
-                if (options.roles && options.roles.length > 0) {
-                    const hasRequiredRole = await RoleManager.hasAnyRole(req.user!.id, options.roles);
-                    if (!hasRequiredRole) {
-                        return res.status(403).json({ error: 'Insufficient permissions' });
-                    }
-                }
-
-                next();
-            } catch (error) {
-                LogManager.error('Authentication middleware error', error);
-                res.status(500).json({ error: 'Authentication failed' });
+    getAuthMiddleware(options: AuthMiddlewareOptions = { requireVerified: true, roles: [] }): (req: AuthenticatedRequest, res: Response, next: NextFunction) => Promise<Response | void> {
+        return async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<Response | void> => {
+            const token = this.extractToken(req);
+            if (!token) {
+                return res.status(401).json({ error: 'No token provided' });
             }
+
+            const decoded = this.verifyToken(token);
+            if (!decoded || typeof decoded === 'string') {
+                return res.status(401).json({ error: 'Invalid token' });
+            }
+
+            const user = await userQueries.getUserById(decoded.id);
+            if (!user) {
+                return res.status(401).json({ error: 'User not found' });
+            }
+
+            if (options.requireVerified && !user.email_verified) {
+                return res.status(403).json({
+                    error: 'Email not verified',
+                    verificationRequired: true
+                });
+            }
+
+            if (options.roles && options.roles.length > 0) {
+                const hasRequiredRole = await RoleManager.hasAnyRole(user.id, options.roles);
+                if (!hasRequiredRole) {
+                    return res.status(403).json({ error: 'Insufficient permissions' });
+                }
+            }
+
+            req.user = user;
+            req.userRoles = await RoleManager.getUserRoles(user.id);
+            next();
         };
     }
 
-    /**
-     * Register new user
-     */
-    async register(userData: RegistrationData): Promise<AuthResult> {
-        try {
-            const existingUser = await userQueries.getUserByEmail(userData.email);
-            if (existingUser) {
-                return { success: false, message: 'Email already exists' };
-            }
+    extractToken(req: AuthenticatedRequest): string | null {
+        const authorization = req.headers.authorization;
+        if (authorization && authorization.startsWith('Bearer ')) {
+            return authorization.substring(7);
+        }
+        return null;
+    }
 
+    async createUser(userData: CreateUserInput, _initialRole: string = 'user'): Promise<number> {
+        try {
             const hashedPassword = await this.hashPassword(userData.password);
-            const userDataWithHashedPassword = {
-                ...userData,
-                password: hashedPassword
-            };
+            const result = await userQueries.createUser({
+                email: userData.email,
+                password: hashedPassword,
+                name: userData.name
+            });
 
-            const result = await userQueries.createUser(userDataWithHashedPassword);
-            const user = await userQueries.getUserById(result.insertId);
+            if (!result || !result.insertId) {
+                throw new Error('Failed to create user record');
+            }
 
-            // Assign default role
-            await RoleManager.assignUserRole(user.id, 'user');
+            const userId = result.insertId;
 
-            // Initiate email verification
-            await this.initiateEmailVerification(user);
+            try {
+                const defaultRole = await RoleManager.getDefaultRole();
+                if (!defaultRole) {
+                    LogManager.error('Default role not found');
+                    throw new Error('Default role not found');
+                }
 
-            const token = await this.generateToken(user);
+                await RoleManager.assignRole(userId, defaultRole.id);
+                LogManager.info('User created with default role', { userId, roleId: defaultRole.id });
 
-            return { success: true, user, token };
-        } catch (error) {
-            LogManager.error('User registration failed', error);
-            return { success: false, message: 'Registration failed' };
+                if (userData.roles && Array.isArray(userData.roles)) {
+                    for (const roleName of userData.roles) {
+                        const [role] = await db.query<Array<{ id: number }>>('SELECT id FROM roles WHERE name = ?', [roleName]);
+                        if (role) {
+                            await RoleManager.assignRole(userId, role.id);
+                        }
+                    }
+                }
+            } catch (roleError: unknown) {
+                await userQueries.deleteUser(userId);
+                throw roleError;
+            }
+
+            return userId;
+        } catch (error: unknown) {
+            LogManager.error('Failed to create user', error);
+            throw error;
         }
     }
 
-    /**
-     * Login user
-     */
-    async login(email: string, password: string): Promise<AuthResult> {
-        try {
-            const user = await userQueries.getUserByEmail(email);
-            if (!user) {
-                return { success: false, message: 'Invalid credentials' };
-            }
-
-            const passwordMatch = await this.comparePassword(password, user.password);
-            if (!passwordMatch) {
-                return { success: false, message: 'Invalid credentials' };
-            }
-
-            const token = await this.generateToken(user);
-
-            // Remove password from user object before returning
-            const { password: _, ...safeUser } = user;
-
-            return { success: true, user: safeUser, token };
-        } catch (error) {
-            LogManager.error('User login failed', error);
-            return { success: false, message: 'Login failed' };
-        }
-    }
-
-    /**
-     * Forgot password
-     */
-    async forgotPassword(email: string): Promise<AuthResult> {
-        return this.initiatePasswordReset(email);
-    }
-
-    /**
-     * Role middleware (delegates to RoleManager)
-     */
-    createRoleMiddleware(roles: string[]) {
+    requireRoles(roles: string[]): (...args: unknown[]) => unknown {
         return RoleManager.createRoleMiddleware(roles);
     }
 }
 
-export = new AuthManager();
+const authManager = new AuthManager();
+
+module.exports = authManager;
+module.exports.AuthManager = authManager;

@@ -1,8 +1,5 @@
-// Shared TypeScript types for the Unknown Server project
-
 import { Request, Response, NextFunction } from 'express';
 
-// Extend Express Request interface globally
 declare global {
     namespace Express {
         interface Request {
@@ -12,7 +9,6 @@ declare global {
     }
 }
 
-// Auth related types
 export interface UserData {
     id: number;
     name: string;
@@ -22,7 +18,7 @@ export interface UserData {
     email_verified?: boolean;
     roles?: RoleRecord[];
     permissions?: PermissionRecord[];
-    [key: string]: any;
+    [key: string]: unknown;
 }
 
 export interface LoginData {
@@ -37,7 +33,6 @@ export interface RegistrationData {
     roles?: string[];
 }
 
-// Auth API Response types
 export interface AuthResponse {
     token: string;
     user: UserData;
@@ -48,7 +43,6 @@ export interface LoginResponse extends AuthResponse {}
 
 export interface RegistrationResponse extends AuthResponse {}
 
-// Role and Permission types
 export interface RoleData {
     id: number;
     name: string;
@@ -64,7 +58,6 @@ export interface PermissionData {
     description?: string;
 }
 
-// Auth management interfaces
 export interface AuthResult {
     success: boolean;
     message?: string;
@@ -85,22 +78,16 @@ export interface EncryptionSettings {
     keyLength: number;
 }
 
-// Request extensions
-export interface AuthenticatedRequest extends Request {
+export interface AuthenticatedRequest extends Omit<Request, 'user'> {
     user?: UserData;
     apiVersion?: string;
     isCliRequest?: boolean;
 }
 
 export interface CliRequest extends AuthenticatedRequest {
-    isCliRequest: true;
+    isCliRequest: boolean;
 }
 
-export interface CliRequest extends AuthenticatedRequest {
-    isCliRequest: true;
-}
-
-// Rate limiter interfaces
 export interface RateLimiterConfig {
     windowMs: number;
     max: number;
@@ -109,15 +96,14 @@ export interface RateLimiterConfig {
     onLimitReached?: (req: Request) => void;
 }
 
-// API Response types
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
     success: boolean;
     data?: T;
     message?: string;
     errors?: string[] | Record<string, string[]>;
 }
 
-export interface PaginatedResponse<T = any> extends ApiResponse<T[]> {
+export interface PaginatedResponse<T = unknown> extends ApiResponse<T[]> {
     pagination: {
         page: number;
         limit: number;
@@ -126,7 +112,6 @@ export interface PaginatedResponse<T = any> extends ApiResponse<T[]> {
     };
 }
 
-// Validation types
 export interface ValidationResult {
     isValid: boolean;
     errors: string[];
@@ -143,28 +128,30 @@ export interface ValidationSchema {
     };
 }
 
-// Middleware types
 export type MiddlewareFunction = (req: Request, res: Response, next: NextFunction) => void | Promise<void>;
 
-// Log types
 export interface LogMetadata {
-    [key: string]: any;
+    [key: string]: unknown;
 }
 
-// Version Management types
+export interface LogInfo extends LogMetadata {
+    level: string;
+    message: string;
+    timestamp: string;
+    metadata: LogMetadata;
+}
+
 export interface ApiVersion {
     version: string;
     deprecated: boolean;
     deprecationDate?: Date;
 }
 
-// Database types
 export interface DatabaseConnection {
-    query(sql: string, params?: any[]): Promise<any>;
-    escape(value: any): string;
+    query(sql: string, params?: unknown[]): Promise<unknown>;
+    escape(value: unknown): string;
 }
 
-// Database query result types
 export interface UserRecord {
     id: number;
     email: string;
@@ -206,17 +193,16 @@ export interface SessionRecord {
     updated_at: Date;
 }
 
-// Query interfaces
 export interface UserQueries {
-    createUser(userData: RegistrationData): Promise<any>;
+    createUser(userData: RegistrationData): Promise<unknown>;
     getUserByEmail(email: string): Promise<UserRecord | undefined>;
     getUserById(id: number): Promise<UserRecord | undefined>;
     getUserByEmailVerificationToken(token: string): Promise<UserRecord | undefined>;
     getUserByPasswordResetToken(token: string): Promise<UserRecord | undefined>;
-    setEmailVerificationToken(userId: number, token: string, expires: Date): Promise<any>;
-    setPasswordResetToken(userId: number, token: string, expires: Date): Promise<any>;
-    verifyEmail(userId: number): Promise<any>;
-    updatePassword(userId: number, password: string): Promise<any>;
+    setEmailVerificationToken(userId: number, token: string, expires: Date): Promise<unknown>;
+    setPasswordResetToken(userId: number, token: string, expires: Date): Promise<unknown>;
+    verifyEmail(userId: number): Promise<unknown>;
+    updatePassword(userId: number, password: string): Promise<unknown>;
     getUsers(offset?: number, limit?: number): Promise<UserRecord[]>;
     getUserCount(): Promise<number>;
     countUsersByRole(roleName: string): Promise<number>;
@@ -226,8 +212,8 @@ export interface UserQueries {
 export interface RoleHierarchyQueries {
     getChildRoles(roleId: number): Promise<RoleRecord[]>;
     getParentRoles(roleId: number): Promise<RoleRecord[]>;
-    addChildRole(parentRoleId: number, childRoleId: number): Promise<any>;
-    removeChildRole(parentRoleId: number, childRoleId: number): Promise<any>;
+    addChildRole(parentRoleId: number, childRoleId: number): Promise<unknown>;
+    removeChildRole(parentRoleId: number, childRoleId: number): Promise<unknown>;
     wouldCreateCircularReference(parentRoleId: number, childRoleId: number): Promise<boolean>;
 }
 
@@ -237,20 +223,18 @@ export interface DatabaseQueries {
     roleHierarchyQueries: RoleHierarchyQueries;
 }
 
-// Worker Thread types
 export interface WorkerTask {
     operation: string;
-    data: any;
-    options?: any;
+    data: unknown;
+    options?: unknown;
 }
 
 export interface WorkerResult {
     success: boolean;
-    result?: any;
+    result?: unknown;
     error?: string;
 }
 
-// Server Configuration types
 export interface ServerConfig {
     port: number;
     maxWorkerThreads?: number;
@@ -261,7 +245,7 @@ export interface ServerConfig {
 export interface ServiceConfig {
     endpoints: Array<{
         path: string;
-        handler: any;
+        handler: unknown;
     }>;
     healthCheck?: () => Promise<boolean>;
     circuitBreaker?: {
@@ -283,17 +267,16 @@ export interface ServiceProxyConfig {
     target: string;
     routes: string[];
     loadBalancingStrategy?: 'round-robin' | 'least-connections' | 'random';
-    middleware?: Array<(req: any) => void>;
+    middleware?: Array<(req: unknown) => void>;
 }
 
-// Additional interfaces for new managers
 export interface AuditEventData {
     action_type: string;
     admin_id?: number;
     target_id?: number;
     role_id?: number;
     permission_id?: number;
-    metadata?: any;
+    metadata?: unknown;
     ip_address?: string;
 }
 
@@ -325,13 +308,12 @@ export interface AnalyticsReport {
         from: string;
         to: string;
     };
-    roles: any[];
-    permissions: any[];
-    auditActivity: any[];
+    roles: unknown[];
+    permissions: unknown[];
+    auditActivity: unknown[];
     generatedAt: Date;
 }
 
-// Environment Variables type
 export interface EnvironmentConfig {
     DB_HOST: string;
     DB_USER: string;

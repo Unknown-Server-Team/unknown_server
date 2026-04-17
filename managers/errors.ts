@@ -9,9 +9,9 @@ export class AuthError extends Error {
 }
 
 export class ValidationError extends Error {
-    public details: Record<string, any>;
+    public details: Record<string, unknown>;
 
-    constructor(message: string, details: Record<string, any> = {}) {
+    constructor(message: string, details: Record<string, unknown> = {}) {
         super(message);
         this.name = 'ValidationError';
         this.details = details;
@@ -29,19 +29,11 @@ export class PermissionError extends Error {
 }
 
 export class RoleError extends Error {
-    public roleDetails: Record<string, any>;
+    public roleDetails: Record<string, unknown>;
 
-    constructor(message: string, roleDetails: Record<string, any> = {}) {
+    constructor(message: string, roleDetails: Record<string, unknown> = {}) {
         super(message);
         this.name = 'RoleError';
         this.roleDetails = roleDetails;
     }
 }
-
-// For backward compatibility with CommonJS
-module.exports = {
-    AuthError,
-    ValidationError,
-    PermissionError,
-    RoleError
-};

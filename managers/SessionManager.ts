@@ -1,20 +1,11 @@
 import { v4 as uuidv4 } from 'uuid';
-import { CacheManager } from './CacheManager';
-import { LogManager } from './LogManager';
+import type { Response, NextFunction } from 'express';
 import { AuthError } from './errors';
-import { Request, Response, NextFunction } from 'express';
+import type { SessionData, SessionRequest } from '../types/session';
+import type { CacheManagerModule, LogManagerModule } from '../types/modules';
 
-interface SessionData {
-    id: string;
-    userId: number;
-    metadata: any;
-    createdAt: number;
-    lastActivity: number;
-}
-
-interface AuthenticatedRequest extends Request {
-    session?: SessionData;
-}
+const CacheManager = require('./CacheManager') as CacheManagerModule;
+const LogManager = require('./LogManager') as LogManagerModule;
 
 class SessionManager {
     private sessionPrefix: string;
@@ -23,12 +14,12 @@ class SessionManager {
 
     constructor() {
         this.sessionPrefix = 'session:';
-        this.defaultSessionDuration = 24 * 60 * 60; // 24 hours in seconds
-        this.cleanupInterval = 60 * 60; // Cleanup every hour
+        this.defaultSessionDuration = 24 * 60 * 60;
+        this.cleanupInterval = 60 * 60;
         this.startCleanup();
     }
 
-    async createSession(userId: number, metadata: any = {}): Promise<string> {
+    async createSession(userId: number, metadata: unknown = {}): Promise<string> {
         const sessionId = uuidv4();
         const session: SessionData = {
             id: sessionId,
@@ -44,7 +35,6 @@ class SessionManager {
             this.defaultSessionDuration
         );
 
-        // Track session for user
         const userSessions = await this.getUserSessions(userId);
         userSessions.push(sessionId);
         await CacheManager.set(
@@ -57,7 +47,7 @@ class SessionManager {
     }
 
     async getSession(sessionId: string): Promise<SessionData> {
-        const session = await CacheManager.get(`${this.sessionPrefix}${sessionId}`);
+        const session = await CacheManager.get<SessionData>(`${this.sessionPrefix}${sessionId}`);
         if (!session) {
             throw new AuthError('Session not found', 'SESSION_NOT_FOUND');
         }
@@ -82,15 +72,14 @@ class SessionManager {
     }
 
     async getUserSessions(userId: number): Promise<string[]> {
-        const sessions = await CacheManager.get(`${this.sessionPrefix}user:${userId}`) || [];
-        return sessions;
+        const sessions = await CacheManager.get<string[]>(`${this.sessionPrefix}user:${userId}`);
+        return sessions || [];
     }
 
     async invalidateSession(sessionId: string): Promise<void> {
         const session = await this.getSession(sessionId);
         await CacheManager.del(`${this.sessionPrefix}${sessionId}`);
 
-        // Remove from user sessions
         const userSessions = await this.getUserSessions(session.userId);
         const updatedSessions = userSessions.filter(id => id !== sessionId);
         await CacheManager.set(
@@ -109,14 +98,14 @@ class SessionManager {
         }
         await CacheManager.del(`${this.sessionPrefix}user:${userId}`);
 
-        LogManager.info('All user sessions invalidated', { 
-            userId, 
-            sessionCount: sessions.length 
+        LogManager.info('All user sessions invalidated', {
+            userId,
+            sessionCount: sessions.length
         });
     }
 
-    createSessionMiddleware() {
-        return async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    createSessionMiddleware(): (req: SessionRequest, res: Response, next: NextFunction) => Promise<void> {
+        return async (req: SessionRequest, res: Response, next: NextFunction): Promise<void> => {
             const sessionId = req.headers['x-session-id'] as string;
             if (!sessionId) {
                 return next();
@@ -125,12 +114,10 @@ class SessionManager {
             try {
                 const session = await this.getSession(sessionId);
                 req.session = session;
-                // Update last activity
                 await this.updateSession(sessionId, {});
                 next();
-            } catch (error: any) {
+            } catch (error: unknown) {
                 if (error instanceof AuthError && error.code === 'SESSION_NOT_FOUND') {
-                    // Clear invalid session header
                     res.setHeader('X-Session-Id', '');
                     next();
                 } else {
@@ -144,22 +131,24 @@ class SessionManager {
         setInterval(async () => {
             try {
                 const pattern = `${this.sessionPrefix}*`;
-                const keys = await CacheManager.keys(pattern);
+                const keys = CacheManager.keys(pattern);
                 const now = Date.now();
 
                 for (const key of keys) {
-                    const session = await CacheManager.get(key);
+                    const session = await CacheManager.get<SessionData>(key);
                     if (session && now - session.lastActivity > this.defaultSessionDuration * 1000) {
                         await CacheManager.del(key);
                         LogManager.debug('Cleaned up expired session', { sessionId: session.id });
                     }
                 }
-            } catch (error) {
+            } catch (error: unknown) {
                 LogManager.error('Session cleanup error', error);
             }
         }, this.cleanupInterval * 1000);
     }
 }
 
-export const sessionManager = new SessionManager();
-export default sessionManager;
+const sessionManager = new SessionManager();
+
+module.exports = sessionManager;
+module.exports.SessionManager = SessionManager;

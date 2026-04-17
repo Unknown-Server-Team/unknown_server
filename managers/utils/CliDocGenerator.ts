@@ -1,20 +1,9 @@
 import { promises as fs } from 'fs';
 import path from 'path';
-import { LogManager } from '../LogManager';
+import type { CliCommand, CliCommands, CliValidationResult } from '../../types/utils';
+import type { LogManagerModule } from '../../types/modules';
 
-interface CliCommand {
-    description: string;
-    subcommands: Record<string, string>;
-}
-
-interface CliCommands {
-    commands: Record<string, CliCommand>;
-}
-
-interface ValidationResult {
-    isValid: boolean;
-    errors: string[];
-}
+const LogManager = require('../LogManager') as LogManagerModule;
 
 export class CliDocGenerator {
     static async generateDocs(commands: CliCommands, outputPath: string): Promise<boolean> {
@@ -23,7 +12,7 @@ export class CliDocGenerator {
             await fs.writeFile(outputPath, content, 'utf8');
             LogManager.info(`CLI documentation generated at ${outputPath}`);
             return true;
-        } catch (error) {
+        } catch (error: unknown) {
             LogManager.error('Failed to generate CLI documentation', error);
             return false;
         }
@@ -39,7 +28,7 @@ export class CliDocGenerator {
         content += '```bash\nunknown <command> [options]\n```\n\n';
         content += '## Available Commands\n\n';
 
-        Object.entries(commands.commands).forEach(([command, details]) => {
+        Object.entries(commands.commands).forEach(([command, details]: [string, CliCommand]) => {
             content += `### ${command}\n\n`;
             content += `${details.description}\n\n`;
             content += '#### Subcommands\n\n';
@@ -107,23 +96,21 @@ unknown docs export --format yaml
 `;
     }
 
-    static async validateCommandImplementation(cliRoot: string): Promise<ValidationResult> {
+    static async validateCommandImplementation(cliRoot: string): Promise<CliValidationResult> {
         const errors: string[] = [];
         const commandFiles = await fs.readdir(path.join(cliRoot, 'commands'));
 
         for (const file of commandFiles) {
-            const commandModule = require(path.join(cliRoot, 'commands', file));
+            const commandModule = require(path.join(cliRoot, 'commands', file)) as Record<string, Record<string, unknown>>;
             const commandName = path.basename(file, '.js');
 
-            // Check if all commands have descriptions
-            Object.values(commandModule).forEach((command: any) => {
+            Object.values(commandModule).forEach((command) => {
                 if (!command.description) {
                     errors.push(`${commandName}: Missing command description`);
                 }
             });
 
-            // Check if help is properly configured
-            Object.values(commandModule).forEach((command: any) => {
+            Object.values(commandModule).forEach((command) => {
                 if (!command.helpInformation) {
                     errors.push(`${commandName}: Missing help configuration`);
                 }

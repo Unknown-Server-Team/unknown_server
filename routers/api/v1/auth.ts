@@ -2,10 +2,8 @@ import express, { Request, Response, Router, NextFunction } from 'express';
 import { 
     AuthenticatedRequest, 
     CliRequest, 
-    UserData, 
     LoginData, 
     RegistrationData, 
-    RoleData,
     RateLimiterConfig 
 } from '../../../types';
 
@@ -21,13 +19,12 @@ const AuthAnalytics = require('../../../managers/AuthAnalytics');
 const { RatelimitManager } = require('../../../managers/RatelimitManager');
 const SessionManager = require('../../../managers/SessionManager');
 const AuthMonitor = require('../../../managers/AuthMonitor');
-const { query } = require('../../../database/db');
 const WebsocketManager = require('../../../managers/WebsocketManager');
 
 const router: Router = express.Router();
 
 // CLI API key validation middleware
-const validateCliApiKey = (req: Request, res: Response, next: NextFunction) => {
+const validateCliApiKey = (req: Request, _res: Response, next: NextFunction) => {
     const apiKey = req.headers['x-cli-api-key'] as string;
     const validApiKey = process.env.CLI_API_KEY;
     
@@ -155,19 +152,21 @@ router.post('/register',
     registrationLimiter,
     validateCliApiKey,
     trackAnalytics('register'),
-    async (req: Request, res: Response) => {
+    async (req: Request, res: Response): Promise<void> => {
         try {
             const validation = ValidationManager.validateRegistration(req.body);
             if (!validation.isValid) {
-                return res.status(400).json({
+                res.status(400).json({
                     error: 'Validation failed',
                     details: validation.errors
                 });
+                return;
             }
             
             const foundUser = await userQueries.getUserByEmail(req.body.email);
             if (foundUser) {
-                return res.status(409).json({ error: 'Email already exists' });
+                res.status(409).json({ error: 'Email already exists' });
+                return;
             }
             
             // Extract roles from request if CLI API key is valid
@@ -230,14 +229,17 @@ router.post('/register',
                         email_verified: result.user.email_verified
                     }
                 });
+                return;
             } else {
                 AuthMonitor.trackRegistration(false, req.ip);
                 res.status(400).json({ error: result.message });
+                return;
             }
         } catch (error) {
             LogManager.error('Registration error', error);
             AuthMonitor.trackRegistration(false, req.ip);
             res.status(500).json({ error: 'Registration failed' });
+            return;
         }
     }
 );
@@ -277,7 +279,7 @@ router.post('/login',
     ValidationMiddleware.validateLogin, 
     loginLimiter, 
     trackAnalytics('login'),
-    async (req: Request, res: Response) => {
+    async (req: Request, res: Response): Promise<void> => {
         try {
             const { email, password }: LoginData = req.body;
             
@@ -315,14 +317,17 @@ router.post('/login',
                     user: result.user,
                     expiresIn: 24 * 60 * 60 // 24 hours in seconds
                 });
+                return;
             } else {
                 AuthMonitor.trackLoginAttempt(false, req.ip);
                 res.status(401).json({ error: result.message });
+                return;
             }
         } catch (error) {
             LogManager.error('Login error', error);
             AuthMonitor.trackLoginAttempt(false, req.ip);
             res.status(500).json({ error: 'Login failed' });
+            return;
         }
     }
 );
@@ -343,10 +348,11 @@ router.post('/login',
  *       401:
  *         description: Not authenticated
  */
-router.get('/me', AuthManager.getAuthMiddleware(), async (req: AuthenticatedRequest, res: Response) => {
+router.get('/me', AuthManager.getAuthMiddleware(), async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
         if (!req.user) {
-            return res.status(401).json({ error: 'Not authenticated' });
+            res.status(401).json({ error: 'Not authenticated' });
+            return;
         }
 
         // Get user roles
@@ -358,9 +364,11 @@ router.get('/me', AuthManager.getAuthMiddleware(), async (req: AuthenticatedRequ
             roles: userRoles.success ? userRoles.roles : [],
             permissions: userPermissions.success ? userPermissions.permissions : []
         });
+        return;
     } catch (error) {
         LogManager.error('Get user profile error', error);
         res.status(500).json({ error: 'Failed to get user profile' });
+        return;
     }
 });
 
@@ -384,12 +392,13 @@ router.get('/me', AuthManager.getAuthMiddleware(), async (req: AuthenticatedRequ
  *       400:
  *         description: Invalid or expired token
  */
-router.get('/verify-email/:token', async (req: Request, res: Response) => {
+router.get('/verify-email/:token', async (req: Request, res: Response): Promise<void> => {
     try {
         const { token } = req.params;
         
         if (!token) {
-            return res.status(400).json({ error: 'Token is required' });
+            res.status(400).json({ error: 'Token is required' });
+            return;
         }
         
         const result = await AuthManager.verifyEmail(token);
@@ -401,12 +410,15 @@ router.get('/verify-email/:token', async (req: Request, res: Response) => {
             });
             
             res.json({ message: 'Email verified successfully' });
+            return;
         } else {
             res.status(400).json({ error: result.message });
+            return;
         }
     } catch (error) {
         LogManager.error('Email verification error', error);
         res.status(500).json({ error: 'Email verification failed' });
+        return;
     }
 });
 
@@ -439,12 +451,13 @@ router.get('/verify-email/:token', async (req: Request, res: Response) => {
 router.post('/forgot-password', 
     passwordResetLimiter, 
     trackAnalytics('forgot_password'),
-    async (req: Request, res: Response) => {
+    async (req: Request, res: Response): Promise<void> => {
         try {
             const { email } = req.body;
             
             if (!email) {
-                return res.status(400).json({ error: 'Email is required' });
+                res.status(400).json({ error: 'Email is required' });
+                return;
             }
             
             const result = await AuthManager.forgotPassword(email);
@@ -458,9 +471,11 @@ router.post('/forgot-password',
                     ip: req.ip
                 });
             }
+            return;
         } catch (error) {
             LogManager.error('Forgot password error', error);
             res.json({ message: 'If the email exists, a password reset link has been sent' });
+            return;
         }
     }
 );
@@ -500,21 +515,23 @@ router.post('/forgot-password',
 router.post('/reset-password/:token', 
     passwordResetLimiter, 
     trackAnalytics('reset_password'),
-    async (req: Request, res: Response) => {
+    async (req: Request, res: Response): Promise<void> => {
         try {
             const { token } = req.params;
             const { password } = req.body;
             
             if (!token || !password) {
-                return res.status(400).json({ error: 'Token and password are required' });
+                res.status(400).json({ error: 'Token and password are required' });
+                return;
             }
             
             const passwordValidation = ValidationManager.validatePassword(password);
             if (!passwordValidation.isValid) {
-                return res.status(400).json({
+                res.status(400).json({
                     error: 'Password validation failed',
                     details: passwordValidation.errors
                 });
+                return;
             }
             
             const result = await AuthManager.resetPassword(token, password);
@@ -531,12 +548,15 @@ router.post('/reset-password/:token',
                 });
                 
                 res.json({ message: 'Password reset successfully' });
+                return;
             } else {
                 res.status(400).json({ error: result.message });
+                return;
             }
         } catch (error) {
             LogManager.error('Reset password error', error);
             res.status(500).json({ error: 'Password reset failed' });
+            return;
         }
     }
 );
