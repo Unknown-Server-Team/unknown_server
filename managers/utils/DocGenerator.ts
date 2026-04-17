@@ -146,7 +146,7 @@ For migration support, please contact [support@unknown-server.com](mailto:suppor
         LogManager.info(`Generated API reference in ${formatType} format`);
     }
 
-    private static async generateVersionReference(version: string, format: string): Promise<string> {
+    private static async generateVersionReference(version: string, _format: string): Promise<string> {
         return `# API Reference - ${version}
 
 ## Authentication

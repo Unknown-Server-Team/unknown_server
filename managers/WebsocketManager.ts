@@ -1,6 +1,6 @@
 import WebSocket = require('ws');
 import type { IncomingMessage, Server as HttpServer } from 'http';
-import type { PermissionRecord, RoleRecord, UserData } from '../types';
+import type { PermissionRecord, RoleRecord } from '../types';
 import type {
     ConnectedUser,
     ExtendedWebSocket,
