@@ -1,7 +1,6 @@
 import express, { Request, Response, Router } from 'express';
-
-const docsRouter = require('./docs');
-const { RatelimitManager } = require('../../managers/RatelimitManager');
+import docsRouter from './docs';
+import { RatelimitManager } from '../../managers/RatelimitManager';
 
 const router: Router = express.Router();
 

@@ -9,8 +9,7 @@ import type {
     MemoryStats,
     CacheMessage
 } from '../types/cache';
-
-const LogManager = require('./LogManager');
+import LogManager from './LogManager';
 
 function isCacheMessage(message: unknown): message is CacheMessage {
     if (typeof message !== 'object' || message === null) {
@@ -126,7 +125,9 @@ class CacheManager {
             return;
         }
 
-        LogManager.warning('Redis cache unavailable, falling back to memory cache', error);
+        LogManager.warning('Redis cache unavailable, falling back to memory cache', {
+            error: error instanceof Error ? error.message : String(error)
+        });
 
         if (this.redisClient) {
             this.redisClient.removeAllListeners();
@@ -416,7 +417,7 @@ class CacheManager {
             this.broadcastOperation('set', { key, value, ttl });
             return true;
         } catch (error: unknown) {
-            LogManager.error('Cache set error', error);
+            LogManager.error('Cache set error', error instanceof Error ? error : new Error(String(error)));
             return false;
         }
     }
@@ -433,7 +434,7 @@ class CacheManager {
             this.broadcastOperation('del', { key });
             return true;
         } catch (error: unknown) {
-            LogManager.error('Cache delete error', error);
+            LogManager.error('Cache delete error', error instanceof Error ? error : new Error(String(error)));
             return false;
         }
     }
@@ -451,7 +452,7 @@ class CacheManager {
             this.broadcastOperation('flush');
             return true;
         } catch (error: unknown) {
-            LogManager.error('Cache flush error', error);
+            LogManager.error('Cache flush error', error instanceof Error ? error : new Error(String(error)));
             return false;
         }
     }
@@ -512,4 +513,4 @@ class CacheManager {
     }
 }
 
-module.exports = new CacheManager();
+export = new CacheManager();

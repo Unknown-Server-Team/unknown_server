@@ -2,8 +2,9 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import type { CliCommand, CliCommands, CliValidationResult } from '../../types/utils';
 import type { LogManagerModule } from '../../types/modules';
+import LogManagerImport from '../LogManager';
 
-const LogManager = require('../LogManager') as LogManagerModule;
+const LogManager = LogManagerImport as unknown as LogManagerModule;
 
 export class CliDocGenerator {
     static async generateDocs(commands: CliCommands, outputPath: string): Promise<boolean> {

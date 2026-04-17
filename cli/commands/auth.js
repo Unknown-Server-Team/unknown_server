@@ -5,7 +5,6 @@ const figures = require('figures');
 const ora = require('ora');
 const API = require('../utils/api');
 
-// Login command
 const login = new Command('login')
     .description('Authenticate with the server')
     .action(async () => {
@@ -31,7 +30,6 @@ const login = new Command('login')
         }
     });
 
-// Login already has interactive capabilities, just making it consistent
 login.runInteractive = async function() {
     const credentials = await inquirer.prompt([
         {
@@ -60,7 +58,6 @@ login.runInteractive = async function() {
     }
 };
 
-// Token management command
 const token = new Command('token')
     .description('Token management')
     .option('-s, --show', 'Show current token')
@@ -81,7 +78,6 @@ const token = new Command('token')
         }
     });
 
-// Add interactive mode support
 token.runInteractive = async function() {
     const { action } = await inquirer.prompt([
         {
@@ -123,7 +119,6 @@ token.runInteractive = async function() {
     }
 };
 
-// Role management commands
 const roles = new Command('roles')
     .description('Role management commands')
     .option('-l, --list', 'List all roles')
@@ -152,7 +147,6 @@ const roles = new Command('roles')
         }
     });
 
-// Add interactive mode support
 roles.runInteractive = async function() {
     const { action } = await inquirer.prompt([
         {

@@ -11,9 +11,11 @@ import type {
     RouterLike,
     VersionManagerDocModule
 } from '../types/documentation';
+import swaggerJsdocImport from 'swagger-jsdoc';
+import VersionManagerImport from './VersionManager';
 
-const swaggerJsdoc = require('swagger-jsdoc') as SwaggerJsdocModule;
-const VersionManager = require('./VersionManager') as VersionManagerDocModule;
+const swaggerJsdoc = swaggerJsdocImport as unknown as SwaggerJsdocModule;
+const VersionManager = VersionManagerImport as unknown as VersionManagerDocModule;
 
 class DocumentationValidator {
     static validateVersionedDocs(specs: SwaggerSpec): ValidationSummary {
@@ -208,5 +210,4 @@ class DocumentationValidator {
     }
 }
 
-module.exports = DocumentationValidator;
-module.exports.DocumentationValidator = DocumentationValidator;
+export = DocumentationValidator;

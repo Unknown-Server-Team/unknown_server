@@ -13,8 +13,9 @@ import type {
     PerformanceSnapshot
 } from '../types/performance';
 import type { LogManagerModule } from '../types/modules';
+import LogManagerImport from './LogManager';
 
-const LogManager = require('./LogManager') as LogManagerModule;
+const LogManager = LogManagerImport as unknown as LogManagerModule;
 
 class PerformanceManager {
     private startTime: [number, number];
@@ -284,5 +285,4 @@ class PerformanceManager {
 
 const performanceManager = new PerformanceManager();
 
-module.exports = performanceManager;
-module.exports.PerformanceManager = performanceManager;
+export = performanceManager;

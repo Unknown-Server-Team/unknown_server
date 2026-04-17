@@ -5,10 +5,11 @@ import type {
     RoleChangeEntry,
     AuthMetricsSnapshot
 } from '../types/authMonitor';
-import type { LogManagerModule, CacheManagerModule } from '../types/modules';
+import type { CacheManagerModule } from '../types/modules';
+import LogManager from './LogManager';
+import CacheManagerImport from './CacheManager';
 
-const LogManager = require('./LogManager') as LogManagerModule;
-const CacheManager = require('./CacheManager') as CacheManagerModule;
+const CacheManager = CacheManagerImport as unknown as CacheManagerModule;
 
 class AuthMonitor {
     private metrics: AuthMetrics;
@@ -140,7 +141,7 @@ class AuthMonitor {
 
     recordSuspiciousActivity(activity: SuspiciousActivity): void {
         this.metrics.suspiciousActivities.push(activity);
-        LogManager.warning('Suspicious activity detected', activity);
+        LogManager.warning('Suspicious activity detected', { activity: activity as unknown });
 
         if (this.metrics.suspiciousActivities.length > 100) {
             this.metrics.suspiciousActivities.shift();
@@ -193,5 +194,4 @@ class AuthMonitor {
 
 const authMonitor = new AuthMonitor();
 
-module.exports = authMonitor;
-module.exports.AuthMonitor = authMonitor;
+export = authMonitor;

@@ -12,21 +12,34 @@ import cluster from 'cluster';
 import { createServer, Server } from 'http';
 import crypto from 'crypto';
 import os from 'os';
+import expressLayouts from 'express-ejs-layouts';
 
-import { ServiceConfig, ServiceMeshConfig, ServiceProxyConfig, EnvironmentConfig } from './types';
+import { ServiceMeshConfig, EnvironmentConfig } from './types';
+import type { GatewayHandler, ServiceRegistrationOptions } from './types/gateway';
+import type { RouteConfig } from './types/serviceMesh';
+import DocGenerator from './managers/utils/DocGenerator';
+import LogManager from './managers/LogManager';
+import PerformanceManager from './managers/PerformanceManager';
+import WebsocketManager from './managers/WebsocketManager';
+import AuthMonitor from './managers/AuthMonitor';
+import SessionManager from './managers/SessionManager';
+import GatewayManager from './managers/GatewayManager';
+import ServiceMeshManager from './managers/ServiceMeshManager';
+import WorkerThreadManager from './managers/WorkerThreadManager';
+import db from './database/db';
+import databaseQueries from './database/mainQueries';
+import mainRouter from './routers/main';
+import apiRouter from './routers/api';
 
-const LogManager = require('./managers/LogManager');
-const PerformanceManager = require('./managers/PerformanceManager');
-const WebsocketManager = require('./managers/WebsocketManager');
-const AuthMonitor = require('./managers/AuthMonitor');
-const SessionManager = require('./managers/SessionManager');
-const GatewayManager = require('./managers/GatewayManager');
-const ServiceMeshManager = require('./managers/ServiceMeshManager');
-const DocGenerator = require('./managers/utils/DocGenerator');
-const WorkerThreadManager = require('./managers/WorkerThreadManager');
+function hasMutableHeaders(value: unknown): value is { headers: Record<string, string> } {
+    if (typeof value !== 'object' || value === null) {
+        return false;
+    }
 
-const db = require('./database/db');
-const { initializeQueries } = require('./database/mainQueries');
+    const candidate = value as { headers?: unknown };
+    return typeof candidate.headers === 'object' && candidate.headers !== null;
+}
+const apiGatewayHandler = apiRouter as unknown as GatewayHandler;
 
 const isClusterWorker: boolean = cluster.isWorker;
 
@@ -80,9 +93,9 @@ app.use(fileUpload({
     tempFileDir: '/tmp/',
     debug: false
 }));
+app.use(express.static('public'));
 
 app.set('view engine', 'ejs');
-const expressLayouts = require('express-ejs-layouts');
 app.use(expressLayouts);
 app.set('layout', 'layouts/main');
 
@@ -97,9 +110,6 @@ app.use((req: Request, res: Response, next: NextFunction) => {
     });
     next();
 });
-
-const mainRouter = require('./routers/main');
-const apiRouter = require('./routers/api');
 
 app.use('/api-docs', swaggerUi.serve);
 app.get('/api-docs', swaggerUi.setup(swaggerSpecs, {
@@ -119,18 +129,20 @@ app.use((req: Request, res: Response) => {
     }
 });
 
-const errorHandler: ErrorRequestHandler = (err: any, req: Request, res: Response, _next: NextFunction) => {
-    LogManager.error('Server Error', err);
-    PerformanceManager.trackError(err, req.path);
+const errorHandler: ErrorRequestHandler = (err: unknown, req: Request, res: Response, _next: NextFunction) => {
+    const errorDetails = err instanceof Error ? err : new Error(String(err));
+    LogManager.error('Server Error', errorDetails);
+    PerformanceManager.trackError(errorDetails, req.path);
+    const errorWithCode = errorDetails as Error & { code?: string | number };
 
     if (req.path.startsWith('/api/')) {
         res.status(500).json({
             error: 'Internal Server Error',
-            code: err.code,
-            message: process.env.NODE_ENV === 'development' ? err.message : undefined
+            code: errorWithCode.code,
+            message: process.env.NODE_ENV === 'development' ? errorDetails.message : undefined
         });
     } else {
-        res.status(500).render('error', { error: err });
+        res.status(500).render('error', { error: errorDetails });
     }
 };
 
@@ -142,7 +154,7 @@ const startServer = async (): Promise<void> => {
         const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName] || process.env[varName]?.trim() === '');
         
         if (missingEnvVars.length > 0) {
-            LogManager.warning('Missing mandatory environment variables:', missingEnvVars);
+            LogManager.warning('Missing mandatory environment variables:', { missingEnvVars });
             LogManager.error('Please set the required environment variables before starting the server. Exiting with code 1.');
             process.exit(1);
         }
@@ -172,16 +184,16 @@ const startServer = async (): Promise<void> => {
             LogManager.info('Validating API documentation...');
             const docValidation = await DocGenerator.validateAllDocs();
             if (!docValidation.isValid) {
-                LogManager.warning('Documentation validation issues:', docValidation.errors);
+                LogManager.warning('Documentation validation issues:', { errors: docValidation.errors });
             }
 
             LogManager.info('Generating versioned API documentation...');
             await DocGenerator.generateVersionDocs();
         }
 
-        const authServiceConfig: ServiceConfig = {
+        const authServiceConfig: ServiceRegistrationOptions = {
             endpoints: [
-                { path: '/api/auth', handler: apiRouter },
+                { path: '/api/auth', handler: apiGatewayHandler },
             ],
             healthCheck: async (): Promise<boolean> => {
                 try {
@@ -200,9 +212,9 @@ const startServer = async (): Promise<void> => {
 
         GatewayManager.registerService('auth', authServiceConfig);
 
-        const usersServiceConfig: ServiceConfig = {
+        const usersServiceConfig: ServiceRegistrationOptions = {
             endpoints: [
-                { path: '/api/users', handler: apiRouter },
+                { path: '/api/users', handler: apiGatewayHandler },
             ],
             cacheTTL: 300,
             maxRetries: 3
@@ -218,12 +230,16 @@ const startServer = async (): Promise<void> => {
 
         ServiceMeshManager.registerService(authMeshConfig);
 
-        const proxyConfig: ServiceProxyConfig = {
+        const proxyConfig: RouteConfig = {
             target: '/api/auth',
             routes: ['/api/auth'],
             loadBalancingStrategy: 'round-robin',
             middleware: [
-                async (req: any) => {
+                async (req: unknown) => {
+                    if (!hasMutableHeaders(req)) {
+                        return;
+                    }
+
                     req.headers['x-request-id'] = crypto.randomBytes(16).toString('hex');
                     req.headers['x-service-version'] = '1.0.0';
                     if (isClusterWorker) {
@@ -236,7 +252,7 @@ const startServer = async (): Promise<void> => {
         ServiceMeshManager.setupServiceProxy('auth-service', proxyConfig);
 
         LogManager.info('Initializing database...');
-        await initializeQueries();
+        await databaseQueries.initializeQueries();
 
         if (!isClusterWorker || process.env.NODE_APP_INSTANCE === '0') {
             AuthMonitor.startMonitoring();
@@ -247,7 +263,7 @@ const startServer = async (): Promise<void> => {
             LogManager.success(`Server is running on port ${PORT}`);
             LogManager.info('Server running behind NGINX reverse proxy');
             
-            LogManager.info(`Worker threads available: ${WorkerThreadManager.maxWorkers}`);
+            LogManager.info(`Worker threads available: ${WorkerThreadManager.getStats().maxWorkers}`);
             if (process.env.pm_id) {
                 LogManager.info(`Running under PM2 process manager (ID: ${process.env.pm_id})`);
             }
@@ -309,8 +325,8 @@ const startServer = async (): Promise<void> => {
         process.on('SIGTERM', shutdown);
         process.on('SIGINT', shutdown);
 
-    } catch (error) {
-        LogManager.error('Failed to start server', error);
+    } catch (error: unknown) {
+        LogManager.error('Failed to start server', error instanceof Error ? error : new Error(String(error)));
         process.exit(1);
     }
 };

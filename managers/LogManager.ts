@@ -213,4 +213,4 @@ class LogManager {
 const logManagerInstance = new LogManager();
 Object.freeze(logManagerInstance);
 
-module.exports = logManagerInstance;
+export = logManagerInstance;

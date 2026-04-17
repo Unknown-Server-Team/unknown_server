@@ -1,5 +1,5 @@
 import type { Request } from 'express';
-import CircuitBreaker = require('opossum');
+import CircuitBreaker from 'opossum';
 
 export type LoadBalancingStrategy = 'round-robin' | 'least-connections' | 'weighted';
 export type GatewayResponse = unknown;
@@ -88,7 +88,8 @@ export interface CircuitBreakerStats {
 }
 
 export interface CircuitBreakerStatus {
-    state: string;
+    state?: string;
+    [key: string]: unknown;
 }
 
 export type GatewayCircuitBreaker = InstanceType<typeof CircuitBreaker>;

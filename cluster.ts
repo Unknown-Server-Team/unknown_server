@@ -13,8 +13,7 @@ dotenvConfig();
 
 import cluster, { Worker } from 'cluster';
 import os from 'os';
-
-const LogManager = require('./managers/LogManager');
+import LogManager from './managers/LogManager';
 
 import './server';
 
@@ -42,7 +41,7 @@ const checkRequiredEnvVars = (): void => {
     const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName] || process.env[varName]?.trim() === '');
 
     if (missingEnvVars.length > 0) {
-        LogManager.warning('Missing mandatory environment variables:', missingEnvVars);
+        LogManager.warning('Missing mandatory environment variables', { missingEnvVars });
         LogManager.error('Please set the required environment variables before starting the clustering. Exiting with code 1.');
         process.exit(1);
     }

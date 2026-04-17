@@ -9,9 +9,7 @@ import type {
     WorkerThreadStats,
     WorkerThreadOptions
 } from '../types/worker';
-import type { LogManagerModule } from '../types/modules';
-
-const LogManager = require('./LogManager') as LogManagerModule;
+import LogManager from './LogManager';
 
 class WorkerThreadManager {
     private workers: Map<string, Worker>;
@@ -91,7 +89,7 @@ class WorkerThreadManager {
 
                 LogManager.debug(`Started worker thread for task ${taskType} (${taskId})`);
             } catch (error: unknown) {
-                LogManager.error('Failed to create worker thread', error);
+                LogManager.error('Failed to create worker thread', error instanceof Error ? error : new Error(String(error)));
                 reject(error);
             }
         });
@@ -102,7 +100,7 @@ class WorkerThreadManager {
             const worker = this.workers.get(taskId);
             if (worker) {
                 void worker.terminate().catch((error: unknown): void => {
-                    LogManager.error(`Error terminating worker ${taskId}`, error);
+                    LogManager.error(`Error terminating worker ${taskId}`, error instanceof Error ? error : new Error(String(error)));
                 });
             }
 
@@ -147,7 +145,7 @@ class WorkerThreadManager {
         for (const [taskId, worker] of this.workers.entries()) {
             terminationPromises.push(
                 worker.terminate().catch((error: unknown): number => {
-                    LogManager.error(`Error terminating worker ${taskId}`, error);
+                    LogManager.error(`Error terminating worker ${taskId}`, error instanceof Error ? error : new Error(String(error)));
                     return 0;
                 })
             );
@@ -163,5 +161,4 @@ class WorkerThreadManager {
 
 const workerThreadManager = new WorkerThreadManager();
 
-module.exports = workerThreadManager;
-module.exports.WorkerThreadManager = workerThreadManager;
+export = workerThreadManager;

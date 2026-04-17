@@ -13,11 +13,10 @@ import type {
     AnalyticsReport,
     QueryValue
 } from '../types/analytics';
-import type { LogManagerModule, CacheManagerModule, DatabaseModule } from '../types/modules';
 
-const LogManager = require('./LogManager') as LogManagerModule;
-const db = require('../database/db') as DatabaseModule;
-const CacheManager = require('./CacheManager') as CacheManagerModule;
+import LogManager from './LogManager';
+import db from '../database/db';
+import CacheManager from './CacheManager';
 
 class AuthAnalytics {
     private analyticsCache: AnalyticsCache;
@@ -68,11 +67,14 @@ class AuthAnalytics {
                 ]
             );
         } catch (error: unknown) {
-            LogManager.error('Failed to log audit event', error);
+            LogManager.error('Failed to log audit event', error instanceof Error ? error : new Error(String(error)));
         }
     }
 
-    async getAuditLog<RowType extends Record<string, unknown>>(filters: AuditFilters = {}, pagination: PaginationOptions = { page: 1, limit: 20 }): Promise<AuditLogResult<RowType>> {
+    async getAuditLog<RowType extends Record<string, unknown>>(
+        filters: AuditFilters = {},
+        pagination: PaginationOptions = { page: 1, limit: 20 }
+    ): Promise<AuditLogResult<RowType>> {
         const conditions: string[] = [];
         const params: QueryValue[] = [];
 
@@ -104,7 +106,7 @@ class AuthAnalytics {
         const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
         const offset = (pagination.page - 1) * pagination.limit;
 
-        const [rows] = await db.query<[RowType[]]>(
+        const rows = await db.query(
             `
             SELECT * FROM auth_audit_log
             ${whereClause}
@@ -112,14 +114,16 @@ class AuthAnalytics {
             LIMIT ? OFFSET ?
         `,
             [...params, pagination.limit, offset]
-        );
+        ) as RowType[];
 
-        const [[{ total }]] = await db.query<[[{ total: number }]]>(
+        const countRows = await db.query(
             `
             SELECT COUNT(*) as total FROM auth_audit_log ${whereClause}
         `,
             params
-        );
+        ) as Array<{ total: number }>;
+
+        const total = countRows[0]?.total || 0;
 
         return {
             data: rows,
@@ -134,32 +138,32 @@ class AuthAnalytics {
 
     async getRoleAnalytics(roleId: number | null = null): Promise<RoleAnalyticsRow[]> {
         const cacheKey = `analytics:role:${roleId || 'all'}`;
-        const cached = await CacheManager.get<RoleAnalyticsRow[]>(cacheKey);
+        const cached = await CacheManager.get(cacheKey) as RoleAnalyticsRow[] | null;
         if (cached) {
             return cached;
         }
 
         const query = roleId ? 'SELECT * FROM role_analytics WHERE role_id = ?' : 'SELECT * FROM role_analytics';
-        const [data] = await db.query<[RoleAnalyticsRow[]]>(query, roleId ? [roleId] : []);
+        const data = await db.query(query, roleId ? [roleId] : []) as RoleAnalyticsRow[];
         await CacheManager.set(cacheKey, data, 300);
         return data;
     }
 
     async getPermissionAnalytics(permissionId: number | null = null): Promise<PermissionAnalyticsRow[]> {
         const cacheKey = `analytics:permission:${permissionId || 'all'}`;
-        const cached = await CacheManager.get<PermissionAnalyticsRow[]>(cacheKey);
+        const cached = await CacheManager.get(cacheKey) as PermissionAnalyticsRow[] | null;
         if (cached) {
             return cached;
         }
 
         const query = permissionId ? 'SELECT * FROM permission_analytics WHERE permission_id = ?' : 'SELECT * FROM permission_analytics';
-        const [data] = await db.query<[PermissionAnalyticsRow[]]>(query, permissionId ? [permissionId] : []);
+        const data = await db.query(query, permissionId ? [permissionId] : []) as PermissionAnalyticsRow[];
         await CacheManager.set(cacheKey, data, 300);
         return data;
     }
 
     async getMostUsedRoles(limit: number = 10): Promise<RoleUsageRow[]> {
-        const [roles] = await db.query<[RoleUsageRow[]]>(
+        const roles = await db.query(
             `
             SELECT r.name, ra.total_users, ra.total_actions, ra.last_used
             FROM role_analytics ra
@@ -168,12 +172,12 @@ class AuthAnalytics {
             LIMIT ?
         `,
             [limit]
-        );
+        ) as RoleUsageRow[];
         return roles;
     }
 
     async getMostUsedPermissions(limit: number = 10): Promise<PermissionUsageRow[]> {
-        const [permissions] = await db.query<[PermissionUsageRow[]]>(
+        const permissions = await db.query(
             `
             SELECT p.name, pa.total_uses, pa.last_used
             FROM permission_analytics pa
@@ -182,7 +186,7 @@ class AuthAnalytics {
             LIMIT ?
         `,
             [limit]
-        );
+        ) as PermissionUsageRow[];
         return permissions;
     }
 
@@ -231,7 +235,7 @@ class AuthAnalytics {
             this.analyticsCache.permissionUsage.clear();
             LogManager.info('Analytics flushed successfully');
         } catch (error: unknown) {
-            LogManager.error('Failed to flush analytics', error);
+            LogManager.error('Failed to flush analytics', error instanceof Error ? error : new Error(String(error)));
         }
     }
 
@@ -242,7 +246,7 @@ class AuthAnalytics {
     }
 
     async generateAnalyticsReport(from: string | Date, to: string | Date): Promise<AnalyticsReport> {
-        const [roleStats] = await db.query<[RoleUsageRow[]]>(
+        const roleStats = await db.query(
             `
             SELECT
                 r.name as role_name,
@@ -256,9 +260,9 @@ class AuthAnalytics {
             GROUP BY r.id
         `,
             [from as QueryValue, to as QueryValue]
-        );
+        ) as RoleUsageRow[];
 
-        const [permissionStats] = await db.query<[PermissionUsageRow[]]>(
+        const permissionStats = await db.query(
             `
             SELECT
                 p.name as permission_name,
@@ -269,9 +273,9 @@ class AuthAnalytics {
             WHERE pa.last_used BETWEEN ? AND ?
         `,
             [from as QueryValue, to as QueryValue]
-        );
+        ) as PermissionUsageRow[];
 
-        const [auditStats] = await db.query<[AuditActivityRow[]]>(
+        const auditStats = await db.query(
             `
             SELECT
                 action_type,
@@ -282,7 +286,7 @@ class AuthAnalytics {
             GROUP BY action_type
         `,
             [from as QueryValue, to as QueryValue]
-        );
+        ) as AuditActivityRow[];
 
         return {
             timeframe: { from, to },
@@ -296,5 +300,4 @@ class AuthAnalytics {
 
 const authAnalytics = new AuthAnalytics();
 
-module.exports = authAnalytics;
-module.exports.AuthAnalytics = authAnalytics;
+export = authAnalytics;

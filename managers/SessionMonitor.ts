@@ -6,9 +6,11 @@ import type {
     AdminNotification
 } from '../types/session';
 import type { CacheManagerModule, LogManagerModule } from '../types/modules';
+import LogManagerImport from './LogManager';
+import CacheManagerImport from './CacheManager';
 
-const LogManager = require('./LogManager') as LogManagerModule;
-const CacheManager = require('./CacheManager') as CacheManagerModule;
+const LogManager = LogManagerImport as unknown as LogManagerModule;
+const CacheManager = CacheManagerImport as unknown as CacheManagerModule;
 
 class SessionMonitor {
     private activeSessions: Map<number, Map<string, SessionInfo>>;
@@ -173,5 +175,4 @@ class SessionMonitor {
 
 const sessionMonitor = new SessionMonitor();
 
-module.exports = sessionMonitor;
-module.exports.SessionMonitor = SessionMonitor;
+export = sessionMonitor;

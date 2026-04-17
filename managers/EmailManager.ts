@@ -7,17 +7,20 @@ import type {
     EmailUser
 } from '../types/email';
 import type { LogManagerModule, VersionManagerModule } from '../types/modules';
+import nodemailer from 'nodemailer';
+import LogManagerImport from './LogManager';
+import VersionManagerImport from './VersionManager';
 
-const nodemailer = require('nodemailer') as NodemailerModule;
-const LogManager = require('./LogManager') as LogManagerModule;
-const VersionManager = require('./VersionManager') as VersionManagerModule;
+const typedNodemailer = nodemailer as unknown as NodemailerModule;
+const LogManager = LogManagerImport as unknown as LogManagerModule;
+const VersionManager = VersionManagerImport as unknown as VersionManagerModule;
 
 class EmailManager {
     private transporter: Transporter;
     private templates: EmailTemplates;
 
     constructor() {
-        this.transporter = nodemailer.createTransport({
+        this.transporter = typedNodemailer.createTransport({
             host: process.env.SMTP_HOST,
             port: process.env.SMTP_PORT,
             secure: process.env.SMTP_SECURE === 'true',
@@ -143,5 +146,4 @@ class EmailManager {
 
 const emailManager = new EmailManager();
 
-module.exports = emailManager;
-module.exports.EmailManager = emailManager;
+export = emailManager;

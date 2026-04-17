@@ -13,10 +13,13 @@ import type {
     LogManagerModule
 } from '../types/modules';
 import type { ValidationManagerModule } from '../types/validation';
+import ValidationManagerImport from './ValidationManager';
+import VersionManagerImport from './VersionManager';
+import LogManagerImport from './LogManager';
 
-const ValidationManager = require('./ValidationManager') as ValidationManagerModule;
-const VersionManager = require('./VersionManager') as VersionManagerModule;
-const LogManager = require('./LogManager') as LogManagerModule;
+const ValidationManager = ValidationManagerImport as unknown as ValidationManagerModule;
+const VersionManager = VersionManagerImport as unknown as VersionManagerModule;
+const LogManager = LogManagerImport as unknown as LogManagerModule;
 
 class ValidationMiddleware {
     static validate(schema: ValidationSchema): (req: TypedRequest, res: Response<ErrorResponseBody>, next: NextFunction) => Response<ErrorResponseBody> | void {
@@ -209,5 +212,4 @@ class ValidationMiddleware {
     }
 }
 
-module.exports = ValidationMiddleware;
-module.exports.ValidationMiddleware = ValidationMiddleware;
+export = ValidationMiddleware;

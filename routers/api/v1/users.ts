@@ -1,12 +1,18 @@
 import express, { Request, Response, Router } from 'express';
 import { AuthenticatedRequest, UserData, PaginatedResponse } from '../../../types';
+import type { LogManagerModule } from '../../../types/modules';
+import AuthManagerImport from '../../../managers/AuthManager';
+import RoleManagerImport from '../../../managers/RoleManager';
+import databaseQueries from '../../../database/mainQueries';
+import LogManagerImport from '../../../managers/LogManager';
+import ValidationMiddlewareImport from '../../../managers/ValidationMiddleware';
+import { RatelimitManager } from '../../../managers/RatelimitManager';
 
-const AuthManager = require('../../../managers/AuthManager');
-const RoleManager = require('../../../managers/RoleManager');
-const { userQueries } = require('../../../database/mainQueries');
-const LogManager = require('../../../managers/LogManager');
-const ValidationMiddleware = require('../../../managers/ValidationMiddleware');
-const { RatelimitManager } = require('../../../managers/RatelimitManager');
+const userQueries = databaseQueries.userQueries as Record<string, any>;
+const LogManager = LogManagerImport as unknown as LogManagerModule;
+const AuthManager = AuthManagerImport as unknown as Record<string, any>;
+const RoleManager = RoleManagerImport as unknown as Record<string, any>;
+const ValidationMiddleware = ValidationMiddlewareImport as unknown as Record<string, any>;
 
 const router: Router = express.Router();
 

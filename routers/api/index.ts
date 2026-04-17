@@ -1,9 +1,8 @@
 import express, { Request, Response, Router } from 'express';
 import swaggerUi from 'swagger-ui-express';
-
-const VersionManager = require('../../managers/VersionManager');
-const v1Router = require('./v1');
-const swaggerSpecs = require('../../config/swagger');
+import VersionManager from '../../managers/VersionManager';
+import v1Router from './v1';
+import swaggerSpecs from '../../config/swagger';
 
 const router: Router = express.Router();
 
@@ -26,10 +25,14 @@ router.use('/v1', v1Router);
  *         description: Available API versions
  */
 router.get('/versions', (_req: Request, res: Response) => {
+    const deprecated = VersionManager
+        .getSupportedVersions()
+        .filter((version: string): boolean => VersionManager.isDeprecated(version));
+
     res.json({
         versions: VersionManager.getSupportedVersions(),
         latest: 'v1',
-        deprecated: Array.from(VersionManager.deprecatedVersions) || []
+        deprecated
     });
 });
 
@@ -46,7 +49,11 @@ router.get('/versions', (_req: Request, res: Response) => {
  *         description: Health check information
  */
 router.get('/health', (req: Request, res: Response) => {
-    v1Router.handle(req, res);
+    v1Router(req, res, () => {
+        if (!res.headersSent) {
+            res.status(404).json({ error: 'Not Found' });
+        }
+    });
 });
 
 /**
@@ -69,7 +76,11 @@ router.get('/health', (req: Request, res: Response) => {
  *         description: Performance metrics
  */
 router.get('/metrics', (req: Request, res: Response) => {
-    v1Router.handle(req, res);
+    v1Router(req, res, () => {
+        if (!res.headersSent) {
+            res.status(404).json({ error: 'Not Found' });
+        }
+    });
 });
 
 router.use('/docs', swaggerUi.serve);

@@ -16,11 +16,15 @@ import type {
     AuditEventMetadata
 } from '../types/roleManager';
 import type { LogManagerModule, PermissionManagerModule, CacheManagerModule, DatabaseModule, AuthAnalyticsModule } from '../types/modules';
+import LogManagerImport from './LogManager';
+import PermissionManagerImport from './PermissionManager';
+import CacheManagerImport from './CacheManager';
+import dbImport from '../database/db';
 
-const LogManager = require('./LogManager') as LogManagerModule;
-const PermissionManager = require('./PermissionManager') as PermissionManagerModule;
-const CacheManager = require('./CacheManager') as CacheManagerModule;
-const db = require('../database/db') as DatabaseModule;
+const LogManager = LogManagerImport as unknown as LogManagerModule;
+const PermissionManager = PermissionManagerImport as unknown as PermissionManagerModule;
+const CacheManager = CacheManagerImport as unknown as CacheManagerModule;
+const db = dbImport as unknown as DatabaseModule;
 
 interface UserRoleData {
     roles: RoleRecord[];

@@ -12,14 +12,19 @@ import type {
     CreateUserInput,
     UserQueriesModule
 } from '../types/authManager';
-import type { LogManagerModule, RoleManagerModule, EmailManagerModule, DatabaseModule } from '../types/modules';
+import type { RoleManagerModule, EmailManagerModule, DatabaseModule } from '../types/modules';
+import LogManager from './LogManager';
+import EmailManagerImport from './EmailManager';
+import RoleManagerImport from './RoleManager';
+import databaseQueries from '../database/mainQueries';
+import dbImport from '../database/db';
+import WorkerThreadManagerImport from './WorkerThreadManager';
 
-const LogManager = require('./LogManager') as LogManagerModule;
-const EmailManager = require('./EmailManager') as EmailManagerModule;
-const RoleManager = require('./RoleManager') as RoleManagerModule;
-const { userQueries } = require('../database/mainQueries') as { userQueries: UserQueriesModule };
-const db = require('../database/db') as DatabaseModule;
-const WorkerThreadManager = require('./WorkerThreadManager') as WorkerThreadManagerModule;
+const EmailManager = EmailManagerImport as unknown as EmailManagerModule;
+const RoleManager = RoleManagerImport as unknown as RoleManagerModule;
+const { userQueries } = databaseQueries as unknown as { userQueries: UserQueriesModule };
+const db = dbImport as unknown as DatabaseModule;
+const WorkerThreadManager = WorkerThreadManagerImport as unknown as WorkerThreadManagerModule;
 
 class AuthManager {
     private secret: string;
@@ -52,7 +57,7 @@ class AuthManager {
             );
             return `${salt}:${result.iv}:${result.result}`;
         } catch (error: unknown) {
-            LogManager.error('Password hashing failed', error);
+            LogManager.error('Password hashing failed', error instanceof Error ? error : new Error(String(error)));
             throw new Error('Password hashing failed');
         }
     }
@@ -80,14 +85,14 @@ class AuthManager {
 
             return result.result === password;
         } catch (error: unknown) {
-            LogManager.error('Password comparison failed', error);
+            LogManager.error('Password comparison failed', error instanceof Error ? error : new Error(String(error)));
             return false;
         }
     }
 
     async generateToken(user: VerificationEmailUser): Promise<string> {
         if (!user || !user.id) {
-            LogManager.error('Invalid user object passed to generateToken', { user });
+            LogManager.error('Invalid user object passed to generateToken');
             throw new Error('Invalid user object');
         }
 
@@ -110,7 +115,7 @@ class AuthManager {
         try {
             return jwt.verify(token, this.secret) as JwtPayload;
         } catch (error: unknown) {
-            LogManager.error('Token verification failed', error);
+            LogManager.error('Token verification failed', error instanceof Error ? error : new Error(String(error)));
             return null;
         }
     }
@@ -244,7 +249,7 @@ class AuthManager {
 
             return userId;
         } catch (error: unknown) {
-            LogManager.error('Failed to create user', error);
+            LogManager.error('Failed to create user', error instanceof Error ? error : new Error(String(error)));
             throw error;
         }
     }
@@ -256,5 +261,4 @@ class AuthManager {
 
 const authManager = new AuthManager();
 
-module.exports = authManager;
-module.exports.AuthManager = authManager;
+export = authManager;

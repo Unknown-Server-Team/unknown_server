@@ -6,11 +6,13 @@ import type {
     PermissionMiddlewareOptions,
     PermissionRequest
 } from '../types/permission';
-import type { LogManagerModule, CacheManagerModule, DatabaseModule } from '../types/modules';
+import type { CacheManagerModule, DatabaseModule } from '../types/modules';
+import LogManager from './LogManager';
+import CacheManagerImport from './CacheManager';
+import dbImport from '../database/db';
 
-const LogManager = require('./LogManager') as LogManagerModule;
-const CacheManager = require('./CacheManager') as CacheManagerModule;
-const db = require('../database/db') as DatabaseModule;
+const CacheManager = CacheManagerImport as unknown as CacheManagerModule;
+const db = dbImport as unknown as DatabaseModule;
 
 class PermissionManager {
     private readonly CACHE_TTL: number;
@@ -31,7 +33,7 @@ class PermissionManager {
             await CacheManager.set(cacheKey, permissions, this.CACHE_TTL);
             return permissions;
         } catch (error: unknown) {
-            LogManager.error('Failed to get permissions', error);
+            LogManager.error('Failed to get permissions', error instanceof Error ? error : new Error(String(error)));
             throw error;
         }
     }
@@ -56,7 +58,7 @@ class PermissionManager {
             await CacheManager.set(cacheKey, permissions, this.CACHE_TTL);
             return permissions;
         } catch (error: unknown) {
-            LogManager.error('Failed to get role permissions', error);
+            LogManager.error('Failed to get role permissions', error instanceof Error ? error : new Error(String(error)));
             throw error;
         }
     }
@@ -82,7 +84,7 @@ class PermissionManager {
             await CacheManager.set(cacheKey, permissions, this.CACHE_TTL);
             return permissions;
         } catch (error: unknown) {
-            LogManager.error('Failed to get user permissions', error);
+            LogManager.error('Failed to get user permissions', error instanceof Error ? error : new Error(String(error)));
             throw error;
         }
     }
@@ -101,7 +103,7 @@ class PermissionManager {
             );
             return result[0].count > 0;
         } catch (error: unknown) {
-            LogManager.error('Failed to check permission', error);
+            LogManager.error('Failed to check permission', error instanceof Error ? error : new Error(String(error)));
             throw error;
         }
     }
@@ -120,7 +122,7 @@ class PermissionManager {
             );
             return result[0].count > 0;
         } catch (error: unknown) {
-            LogManager.error('Failed to check permissions', error);
+            LogManager.error('Failed to check permissions', error instanceof Error ? error : new Error(String(error)));
             throw error;
         }
     }
@@ -143,7 +145,7 @@ class PermissionManager {
 
             LogManager.info('Permission assigned to role', { roleId, permissionId });
         } catch (error: unknown) {
-            LogManager.error('Failed to assign permission to role', error);
+            LogManager.error('Failed to assign permission to role', error instanceof Error ? error : new Error(String(error)));
             throw error;
         }
     }
@@ -166,7 +168,7 @@ class PermissionManager {
 
             LogManager.info('Permission removed from role', { roleId, permissionId });
         } catch (error: unknown) {
-            LogManager.error('Failed to remove permission from role', error);
+            LogManager.error('Failed to remove permission from role', error instanceof Error ? error : new Error(String(error)));
             throw error;
         }
     }
@@ -194,7 +196,7 @@ class PermissionManager {
 
                 next();
             } catch (error: unknown) {
-                LogManager.error('Permission middleware error', error);
+                LogManager.error('Permission middleware error', error instanceof Error ? error : new Error(String(error)));
                 res.status(500).json({ error: 'Internal server error' });
             }
         };
@@ -204,7 +206,7 @@ class PermissionManager {
         try {
             return await this.getUserPermissions(userId);
         } catch (error: unknown) {
-            LogManager.error('Failed to cache user permissions', error);
+            LogManager.error('Failed to cache user permissions', error instanceof Error ? error : new Error(String(error)));
             throw error;
         }
     }
@@ -220,7 +222,7 @@ class PermissionManager {
 
             return requiredPermissions.some((permission: string): boolean => userPermissionNames.includes(permission));
         } catch (error: unknown) {
-            LogManager.error('Failed to check multiple permissions', error);
+            LogManager.error('Failed to check multiple permissions', error instanceof Error ? error : new Error(String(error)));
             throw error;
         }
     }
@@ -228,5 +230,4 @@ class PermissionManager {
 
 const permissionManager = new PermissionManager();
 
-module.exports = permissionManager;
-module.exports.PermissionManager = permissionManager;
+export = permissionManager;

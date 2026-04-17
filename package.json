@@ -93,6 +93,7 @@
     "@types/mysql": "^2.15.27",
     "@types/node": "^24.2.1",
     "@types/nodemailer": "^7.0.1",
+    "@types/opossum": "^8.1.9",
     "@types/swagger-jsdoc": "^6.0.4",
     "@types/swagger-ui-express": "^4.1.8",
     "@types/uuid": "^10.0.0",

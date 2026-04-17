@@ -1,8 +1,6 @@
 import type { NextFunction, Response, Router } from 'express';
 import type { VersionedRequest, UnsupportedVersionResponse } from '../types/version';
-import type { LogManagerModule } from '../types/modules';
-
-const LogManager = require('./LogManager') as LogManagerModule;
+import LogManager from './LogManager';
 
 class VersionManager {
     private versions: Map<string, Router>;
@@ -67,5 +65,4 @@ class VersionManager {
 
 const versionManager = new VersionManager();
 
-module.exports = versionManager;
-module.exports.VersionManager = versionManager;
+export = versionManager;

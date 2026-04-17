@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 require("dotenv").config();
-// Suppress punycode deprecation warnings which can break CLI UI
 process.env.NODE_NO_WARNINGS = 1;
 const { program } = require('commander');
 const chalk = require('chalk');
@@ -10,7 +9,6 @@ const figures = require('figures');
 const ora = require('ora');
 const { version } = require('../package.json');
 
-// Command modules
 const userCommands = require('./commands/user');
 const authCommands = require('./commands/auth');
 const serviceCommands = require('./commands/service');
@@ -95,7 +93,6 @@ async function showMainMenu() {
     process.exit(0);
   }
 
-  // Show the submenu for the selected category
   await showSubMenu(menuChoice);
 }
 
@@ -150,13 +147,11 @@ async function showSubMenu(category) {
       break;
   }
   
-  // Add icons to choices
   choices = choices.map(choice => {
     choice.name = `${icon} ${choice.name}`;
     return choice;
   });
   
-  // Add back and exit options to all submenus
   choices.push(new inquirer.Separator(chalk.dim('─'.repeat(50))));
   choices.push({ name: chalk.dim(`${figures.arrowLeft} Back to main menu`), value: 'back' });
   choices.push({ name: chalk.dim(`${figures.cross} Exit CLI`), value: 'exit' });
@@ -186,7 +181,6 @@ async function showSubMenu(category) {
     process.exit(0);
   }
   
-  // Execute the selected command
   await executeCommand(category, action);
 }
 
@@ -215,13 +209,11 @@ async function executeCommand(category, action) {
     if (cmd && cmd.runInteractive) {
       await cmd.runInteractive();
     } else if (cmd) {
-      // For backward compatibility with commands that don't have runInteractive
       await cmd.parseAsync([process.argv[0], process.argv[1]]);
     } else {
       console.error(chalk.red(`Command ${action} not found in ${category} category`));
     }
     
-    // Pause to see the results
     await inquirer.prompt([
       {
         type: 'input',
@@ -231,7 +223,6 @@ async function executeCommand(category, action) {
       }
     ]);
     
-    // Go back to the submenu
     await showSubMenu(category);
     
   } catch (error) {
@@ -253,7 +244,6 @@ async function executeCommand(category, action) {
   }
 }
 
-// Handle global errors
 process.on('unhandledRejection', (err) => {
   const spinner = ora.promise();
   if (spinner) spinner.stop();
@@ -263,15 +253,12 @@ process.on('unhandledRejection', (err) => {
     { padding: 1, borderColor: 'red' }
   ));
   
-  // Don't exit, let the user continue working with the CLI
 });
 
-// Traditional CLI setup (preserving compatibility with existing scripts)
 program
     .version(version)
     .description('CLI for Unknown Server management and operations');
 
-// User management commands
 program
     .command('user')
     .description('User management commands')
@@ -280,7 +267,6 @@ program
     .addCommand(userCommands.delete)
     .addCommand(userCommands.role);
 
-// Authentication commands
 program
     .command('auth')
     .description('Authentication and authorization commands')
@@ -288,7 +274,6 @@ program
     .addCommand(authCommands.token)
     .addCommand(authCommands.roles);
 
-// Service commands
 program
     .command('service')
     .description('Service management commands')
@@ -296,7 +281,6 @@ program
     .addCommand(serviceCommands.metrics)
     .addCommand(serviceCommands.routes);
 
-// Documentation commands
 program
     .command('docs')
     .description('Documentation management')
@@ -304,14 +288,10 @@ program
     .addCommand(docsCommands.generate)
     .addCommand(docsCommands.export);
 
-// Check if any command line arguments were provided
 if (process.argv.length > 2) {
-  // Traditional CLI mode
   program.parse(process.argv);
 } else {
-  // Interactive mode
   showMainMenu().catch(err => {
-    // Ensure any active spinner is stopped
     const spinner = ora.promise();
     if (spinner) spinner.stop();
     

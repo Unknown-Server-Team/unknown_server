@@ -125,16 +125,13 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/vanilla-tilt/1.7.0/vanilla-tilt.min.js"></script>
 <script src="/scripts/particles.js"></script>
 <script>
-    // Initialize particle system
     const canvas = document.getElementById('particles');
     if (canvas) {
         window.particleSystem = new ParticleSystem(canvas);
     }
 
-    // Add hover effect to list items
     document.querySelectorAll('.hover-effect').forEach(item => {
         if (item.tagName === 'A') {
-            // For links, only apply color change
             item.addEventListener('mouseover', function() {
                 this.style.color = getComputedStyle(document.documentElement).getPropertyValue('--primary-color');
             });
@@ -143,7 +140,6 @@
                 this.style.color = '';
             });
         } else {
-            // For non-links, apply full hover effect
             item.addEventListener('mouseover', function() {
                 this.style.transform = 'translateX(10px)';
                 this.style.color = getComputedStyle(document.documentElement).getPropertyValue('--primary-color');

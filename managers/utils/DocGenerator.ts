@@ -1,11 +1,13 @@
 import { promises as fs } from 'fs';
 import path from 'path';
-import type { DocGenerationOptions, MarkdownValidatorModule } from '../../types/utils';
+import type { DocGenerationOptions } from '../../types/utils';
 import type { VersionManagerModule, LogManagerModule } from '../../types/modules';
+import VersionManagerImport from '../VersionManager';
+import LogManagerImport from '../LogManager';
+import MarkdownValidator from './MarkdownValidator';
 
-const VersionManager = require('../VersionManager') as VersionManagerModule;
-const LogManager = require('../LogManager') as LogManagerModule;
-const MarkdownValidator = require('./MarkdownValidator') as MarkdownValidatorModule;
+const VersionManager = VersionManagerImport as unknown as VersionManagerModule;
+const LogManager = LogManagerImport as unknown as LogManagerModule;
 
 export class DocGenerator {
     static async initialize(): Promise<void> {

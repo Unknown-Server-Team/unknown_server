@@ -1,4 +1,4 @@
-import WebSocket = require('ws');
+import WebSocket, { WebSocketServer, RawData } from 'ws';
 import type { IncomingMessage, Server as HttpServer } from 'http';
 import type { PermissionRecord, RoleRecord } from '../types';
 import type {
@@ -25,12 +25,17 @@ import type {
     AuthManagerWsModule
 } from '../types/websocket';
 import type { LogManagerModule } from '../types/modules';
+import cryptoImport from 'crypto';
+import LogManagerImport from './LogManager';
+import PermissionManagerImport from './PermissionManager';
+import AuthMonitorImport from './AuthMonitor';
+import SessionMonitorImport from './SessionMonitor';
 
-const LogManager = require('./LogManager') as LogManagerModule;
-const PermissionManager = require('./PermissionManager') as PermissionManagerWsModule;
-const AuthMonitor = require('./AuthMonitor') as AuthMonitorWsModule;
-const SessionMonitor = require('./SessionMonitor') as SessionMonitorWsModule;
-const crypto = require('crypto') as CryptoModule;
+const LogManager = LogManagerImport as unknown as LogManagerModule;
+const PermissionManager = PermissionManagerImport as unknown as PermissionManagerWsModule;
+const AuthMonitor = AuthMonitorImport as unknown as AuthMonitorWsModule;
+const SessionMonitor = SessionMonitorImport as unknown as SessionMonitorWsModule;
+const crypto = cryptoImport as unknown as CryptoModule;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null;
@@ -40,7 +45,7 @@ function isClusterMessage(value: unknown): value is ClusterMessage {
     return isRecord(value) && typeof value.type === 'string' && typeof value.action === 'string';
 }
 
-function parseWebSocketMessage(data: WebSocket.RawData): WebSocketMessage {
+function parseWebSocketMessage(data: RawData): WebSocketMessage {
     const parsed = JSON.parse(data.toString()) as unknown;
     if (!isRecord(parsed) || typeof parsed.type !== 'string') {
         throw new Error('Invalid message format');
@@ -62,7 +67,7 @@ class WebsocketManager {
     private middlewares: MiddlewareHandler[];
     private isClusterMode: boolean;
     private workerId: string | number | null;
-    private wss?: WebSocket.Server;
+    private wss?: WebSocketServer;
     private monitoringRoom?: string;
 
     constructor() {
@@ -78,7 +83,7 @@ class WebsocketManager {
         this.isClusterMode = options.isClusterWorker || false;
         this.workerId = options.workerId || process.pid;
 
-        this.wss = new WebSocket.Server({
+        this.wss = new WebSocketServer({
             server,
             clientTracking: true
         });
@@ -278,7 +283,7 @@ class WebsocketManager {
             ws.isAlive = true;
         });
 
-        ws.on('message', async (data: WebSocket.RawData) => {
+        ws.on('message', async (data: RawData) => {
             try {
                 const message = parseWebSocketMessage(data);
 

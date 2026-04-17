@@ -1,4 +1,4 @@
-const CircuitBreaker = require('opossum') as any;
+import CircuitBreaker from 'opossum';
 import { performance } from 'perf_hooks';
 import type { NextFunction, Request, Response } from 'express';
 import crypto from 'crypto';
@@ -19,11 +19,15 @@ import type {
     PerformanceManagerModule
 } from '../types/gateway';
 import type { LogManagerModule, CacheManagerModule } from '../types/modules';
+import LogManagerImport from './LogManager';
+import CacheManagerImport from './CacheManager';
+import PerformanceManagerImport from './PerformanceManager';
+import ServiceMeshManagerImport from './ServiceMeshManager';
 
-const LogManager = require('./LogManager') as LogManagerModule;
-const CacheManager = require('./CacheManager') as CacheManagerModule;
-const PerformanceManager = require('./PerformanceManager') as PerformanceManagerModule;
-const ServiceMeshManager = require('./ServiceMeshManager') as ServiceMeshManagerModule;
+const LogManager = LogManagerImport as unknown as LogManagerModule;
+const CacheManager = CacheManagerImport as unknown as CacheManagerModule;
+const PerformanceManager = PerformanceManagerImport as unknown as PerformanceManagerModule;
+const ServiceMeshManager = ServiceMeshManagerImport as unknown as ServiceMeshManagerModule;
 
 class GatewayManager {
     private services: Map<string, ServiceConfig>;
@@ -129,7 +133,7 @@ class GatewayManager {
         }, {
             ...this.defaultCircuitBreakerOptions,
             ...options
-        }) as GatewayCircuitBreakerState & {
+        }) as unknown as GatewayCircuitBreakerState & {
             on(event: 'timeout', listener: (_error: unknown, context: CircuitBreakerContext | undefined) => void): void;
             on(event: 'failure', listener: (_error: unknown, context: CircuitBreakerContext | undefined) => void): void;
             on(event: string, listener: (...args: any[]) => void): void;
@@ -294,6 +298,13 @@ class GatewayManager {
                 return;
             }
 
+            const service = this.services.get(serviceName);
+            const hasExpressStyleHandler = (service?.endpoints || []).some((endpoint) => typeof endpoint.handler === 'function' && endpoint.handler.length >= 2);
+            if (hasExpressStyleHandler) {
+                next();
+                return;
+            }
+
             try {
                 gatewayReq.headers = gatewayReq.headers || {};
                 gatewayReq.headers['x-gateway-request-id'] = crypto.randomBytes(8).toString('hex');
@@ -346,7 +357,7 @@ class GatewayManager {
                 isActive: service.isActive,
                 healthPercentage,
                 circuitBreakerState: breaker ? {
-                    state: breaker.status.state,
+                    state: breaker.status.state ?? 'unknown',
                     stats: {
                         successful: breaker.stats.successes,
                         failed: breaker.stats.failures,
@@ -477,7 +488,7 @@ class GatewayManager {
                 timeout: breaker.stats.timeouts,
                 rejected: breaker.stats.rejects,
                 fallback: breaker.stats.fallbacks,
-                circuitState: breaker.status.state,
+                circuitState: breaker.status.state ?? 'unknown',
                 healthyEndpoints: service.endpoints.filter((endpoint) => endpoint.isHealthy).length,
                 totalEndpoints: service.endpoints.length
             };

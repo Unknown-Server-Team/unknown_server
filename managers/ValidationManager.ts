@@ -178,4 +178,4 @@ class ValidationManager {
     }
 }
 
-module.exports = ValidationManager;
+export = ValidationManager;

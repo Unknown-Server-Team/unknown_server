@@ -12,9 +12,11 @@ import type {
     LoadBalancingEndpoint
 } from '../types/serviceMesh';
 import type { LogManagerModule, CacheManagerModule } from '../types/modules';
+import LogManagerImport from './LogManager';
+import CacheManagerImport from './CacheManager';
 
-const LogManager = require('./LogManager') as LogManagerModule;
-const CacheManager = require('./CacheManager') as CacheManagerModule;
+const LogManager = LogManagerImport as unknown as LogManagerModule;
+const CacheManager = CacheManagerImport as unknown as CacheManagerModule;
 
 class ServiceMeshManager extends EventEmitter {
     private services: Map<string, ServiceInfo>;
@@ -452,6 +454,4 @@ class ServiceMeshManager extends EventEmitter {
 
 const serviceMeshManager = new ServiceMeshManager();
 
-module.exports = serviceMeshManager;
-module.exports.ServiceMeshManager = ServiceMeshManager;
-module.exports.serviceMeshManager = serviceMeshManager;
+export = serviceMeshManager;

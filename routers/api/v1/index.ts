@@ -1,10 +1,9 @@
 import express, { Request, Response, Router } from 'express';
 import os from 'os';
-
-const { RatelimitManager } = require('../../../managers/RatelimitManager');
-const authRouter = require('./auth');
-const usersRouter = require('./users');
-const PerformanceManager = require('../../../managers/PerformanceManager');
+import { RatelimitManager } from '../../../managers/RatelimitManager';
+import authRouter from './auth';
+import usersRouter from './users';
+import PerformanceManager from '../../../managers/PerformanceManager';
 
 interface ApiRoute {
     path: string;
@@ -22,9 +21,9 @@ interface EndpointStats {
 
 interface MetricsResponse {
     period: string;
-    uptime: number;
+    uptime: string;
     cpu: {
-        usage: number;
+        usage: string;
         cores: number;
         loadAverage: number[];
     };
@@ -140,7 +139,7 @@ router.get('/metrics', (req: Request, res: Response) => {
             };
         });
 
-    const slowestEndpoints = Array.from(metrics.slowestEndpoints.entries() as Array<[string, { responseTime: number; timestamp: number }]>)
+    const slowestEndpoints = Array.from(metrics.slowestEndpoints.entries())
         .filter(([_endpoint, data]) => data.timestamp >= periodStart)
         .sort((a: any, b: any) => b[1].responseTime - a[1].responseTime)
         .slice(0, 5)

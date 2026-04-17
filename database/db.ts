@@ -1,6 +1,5 @@
 import mysql from 'mysql';
-
-const LogManager = require('../managers/LogManager');
+import LogManager from '../managers/LogManager';
 
 // Database configuration interface
 interface DatabaseConfig {

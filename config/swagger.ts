@@ -1,26 +1,16 @@
 import swaggerJsdoc from 'swagger-jsdoc';
 import path from 'path';
+import DocumentationValidator from '../managers/DocumentationValidator';
+import VersionManager from '../managers/VersionManager';
+import LogManager from '../managers/LogManager';
+import type { SwaggerSpec, ValidationSummary } from '../types/documentation';
 
-const DocumentationValidator = require('../managers/DocumentationValidator');
-const VersionManager = require('../managers/VersionManager');
-const LogManager = require('../managers/LogManager');
-
-// Interface for swagger specifications
-interface SwaggerSpecs {
+type SwaggerUiSpec = SwaggerSpec & {
     customCss?: string;
-    [key: string]: any;
-}
+};
 
-// Interface for validation result
-interface ValidationResult {
-    isValid: boolean;
-    errors: string[];
-}
-
-// Get the supported API versions
 const supportedVersions: string[] = VersionManager.getSupportedVersions();
 
-// Define the OpenAPI options directly here rather than using DocumentationValidator
 const options: swaggerJsdoc.Options = {
     definition: {
         openapi: '3.0.0',
@@ -72,32 +62,25 @@ const options: swaggerJsdoc.Options = {
             { sessionAuth: [] }
         ]
     },
-    // Search for API routes in all version folders
     apis: [
-        // Include base API routes
         path.join(process.cwd(), 'routers/api/*.js'),
         path.join(process.cwd(), 'routers/api/*.ts'),
-        // Include versioned API routes - dynamically include all supported versions
         ...supportedVersions.flatMap(version => [
             path.join(process.cwd(), `routers/api/${version}/**/*.js`),
             path.join(process.cwd(), `routers/api/${version}/**/*.ts`)
         ]),
-        // Include managers that might have API documentation
         path.join(process.cwd(), 'managers/*.js'),
         path.join(process.cwd(), 'managers/*.ts')
     ]
 };
 
-// Generate the OpenAPI specification
-const specs: SwaggerSpecs = swaggerJsdoc(options);
+const specs = swaggerJsdoc(options) as SwaggerUiSpec;
 
-// Validate the documentation
-const validation: ValidationResult = DocumentationValidator.validateVersionedDocs(specs);
+const validation: ValidationSummary = DocumentationValidator.validateVersionedDocs(specs);
 if (!validation.isValid) {
     LogManager.warning('API Documentation validation failed', { errors: validation.errors });
 }
 
-// Add custom CSS for dark theme
 specs.customCss = `
     .swagger-ui {
         background-color: #1a1a1a;

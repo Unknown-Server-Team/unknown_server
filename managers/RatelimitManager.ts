@@ -7,11 +7,13 @@ import type {
     TokenBucket,
     IPStatus
 } from '../types/rateLimit';
-import type { LogManagerModule, AuthMonitorModule, WebsocketManagerModule } from '../types/modules';
+import type { AuthMonitorModule, WebsocketManagerModule } from '../types/modules';
+import LogManager from './LogManager';
+import authMonitorImport from './AuthMonitor';
+import websocketManagerImport from './WebsocketManager';
 
-const LogManager = require('./LogManager') as LogManagerModule;
-const authMonitor = require('./AuthMonitor') as AuthMonitorModule;
-const websocketManager = require('./WebsocketManager') as WebsocketManagerModule;
+const authMonitor = authMonitorImport as unknown as AuthMonitorModule;
+const websocketManager = websocketManagerImport as unknown as WebsocketManagerModule;
 
 export class RatelimitManager {
     private static whitelist = new Set<string>();

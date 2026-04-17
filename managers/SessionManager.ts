@@ -2,10 +2,11 @@ import { v4 as uuidv4 } from 'uuid';
 import type { Response, NextFunction } from 'express';
 import { AuthError } from './errors';
 import type { SessionData, SessionRequest } from '../types/session';
-import type { CacheManagerModule, LogManagerModule } from '../types/modules';
+import type { CacheManagerModule } from '../types/modules';
+import CacheManagerImport from './CacheManager';
+import LogManager from './LogManager';
 
-const CacheManager = require('./CacheManager') as CacheManagerModule;
-const LogManager = require('./LogManager') as LogManagerModule;
+const CacheManager = CacheManagerImport as unknown as CacheManagerModule;
 
 class SessionManager {
     private sessionPrefix: string;
@@ -142,7 +143,7 @@ class SessionManager {
                     }
                 }
             } catch (error: unknown) {
-                LogManager.error('Session cleanup error', error);
+                LogManager.error('Session cleanup error', error instanceof Error ? error : new Error(String(error)));
             }
         }, this.cleanupInterval * 1000);
     }
@@ -150,5 +151,4 @@ class SessionManager {
 
 const sessionManager = new SessionManager();
 
-module.exports = sessionManager;
-module.exports.SessionManager = SessionManager;
+export = sessionManager;

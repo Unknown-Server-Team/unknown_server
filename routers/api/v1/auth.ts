@@ -6,24 +6,33 @@ import {
     RegistrationData, 
     RateLimiterConfig 
 } from '../../../types';
+import type { LogManagerModule } from '../../../types/modules';
+import AuthManagerImport from '../../../managers/AuthManager';
+import RoleManagerImport from '../../../managers/RoleManager';
+import PermissionManagerImport from '../../../managers/PermissionManager';
+import ValidationManagerImport from '../../../managers/ValidationManager';
+import databaseQueries from '../../../database/mainQueries';
+import LogManagerImport from '../../../managers/LogManager';
+import ValidationMiddlewareImport from '../../../managers/ValidationMiddleware';
+import AuthAnalyticsImport from '../../../managers/AuthAnalytics';
+import { RatelimitManager } from '../../../managers/RatelimitManager';
+import SessionManagerImport from '../../../managers/SessionManager';
+import AuthMonitorImport from '../../../managers/AuthMonitor';
+import WebsocketManagerImport from '../../../managers/WebsocketManager';
 
-// Import managers (keeping require for now as they haven't been converted yet)
-const AuthManager = require('../../../managers/AuthManager');
-const RoleManager = require('../../../managers/RoleManager');
-const PermissionManager = require('../../../managers/PermissionManager');
-const ValidationManager = require('../../../managers/ValidationManager');
-const { userQueries } = require('../../../database/mainQueries');
-const LogManager = require('../../../managers/LogManager');
-const ValidationMiddleware = require('../../../managers/ValidationMiddleware');
-const AuthAnalytics = require('../../../managers/AuthAnalytics');
-const { RatelimitManager } = require('../../../managers/RatelimitManager');
-const SessionManager = require('../../../managers/SessionManager');
-const AuthMonitor = require('../../../managers/AuthMonitor');
-const WebsocketManager = require('../../../managers/WebsocketManager');
+const { userQueries } = databaseQueries;
+const LogManager = LogManagerImport as unknown as LogManagerModule;
+const AuthManager = AuthManagerImport as unknown as Record<string, any>;
+const RoleManager = RoleManagerImport as unknown as Record<string, any>;
+const PermissionManager = PermissionManagerImport as unknown as Record<string, any>;
+const ValidationManager = ValidationManagerImport as unknown as Record<string, any>;
+const ValidationMiddleware = ValidationMiddlewareImport as unknown as Record<string, any>;
+const AuthAnalytics = AuthAnalyticsImport as unknown as Record<string, any>;
+const SessionManager = SessionManagerImport as unknown as Record<string, any>;
+const AuthMonitor = AuthMonitorImport as unknown as Record<string, any>;
+const WebsocketManager = WebsocketManagerImport as unknown as Record<string, any>;
 
 const router: Router = express.Router();
-
-// CLI API key validation middleware
 const validateCliApiKey = (req: Request, _res: Response, next: NextFunction) => {
     const apiKey = req.headers['x-cli-api-key'] as string;
     const validApiKey = process.env.CLI_API_KEY;
@@ -44,7 +53,6 @@ const validateCliApiKey = (req: Request, _res: Response, next: NextFunction) => 
     next();
 };
 
-// Define enhanced rate limiters with new features
 const loginLimiterConfig: RateLimiterConfig = {
     windowMs: 15 * 60 * 1000,
     max: 5,
@@ -86,10 +94,8 @@ const loginLimiter = RatelimitManager.create(loginLimiterConfig);
 const registrationLimiter = RatelimitManager.create(registrationLimiterConfig);
 const passwordResetLimiter = RatelimitManager.create(passwordResetLimiterConfig);
 
-// Analytics middleware
 const trackAnalytics = (action: string) => {
     return (req: Request, res: Response, next: NextFunction) => {
-        // Track after response
         res.on('finish', () => {
             const success = res.statusCode >= 200 && res.statusCode < 400;
             AuthAnalytics.track(action, {
@@ -104,49 +110,6 @@ const trackAnalytics = (action: string) => {
     };
 };
 
-/**
- * @swagger
- * /api/v1/auth/register:
- *   post:
- *     tags:
- *       - Authentication
- *     summary: Register a new user
- *     description: Register a new user account with email verification
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - email
- *               - password
- *               - name
- *             properties:
- *               email:
- *                 type: string
- *                 format: email
- *               password:
- *                 type: string
- *                 minLength: 8
- *               name:
- *                 type: string
- *                 minLength: 2
- *               roles:
- *                 type: array
- *                 items:
- *                   type: string
- *                 description: Only available with valid CLI API key
- *     responses:
- *       201:
- *         description: User registered successfully
- *       400:
- *         description: Validation error
- *       409:
- *         description: Email already exists
- *       500:
- *         description: Server error
- */
 router.post('/register',
     ValidationMiddleware.validateRegistration,
     registrationLimiter,
@@ -169,10 +132,8 @@ router.post('/register',
                 return;
             }
             
-            // Extract roles from request if CLI API key is valid
             const customRoles = (req as CliRequest).isCliRequest && req.body.roles ? req.body.roles : null;
             
-            // Log attempt to assign custom roles without CLI API key
             if (!(req as CliRequest).isCliRequest && req.body.roles) {
                 LogManager.warning('Attempt to assign custom roles without valid CLI API key', {
                     ip: req.ip,
@@ -180,14 +141,12 @@ router.post('/register',
                 });
             }
             
-            // Create user data object
             const userData: RegistrationData = { ...req.body };
             if (userData.roles) delete userData.roles;
             
             const result = await AuthManager.register(userData);
             
             if (result.success) {
-                // Assign custom roles if CLI request and roles specified
                 if (customRoles && customRoles.length > 0) {
                     for (const roleName of customRoles) {
                         try {
@@ -207,7 +166,6 @@ router.post('/register',
                     });
                 }
                 
-                // Track registration success
                 AuthMonitor.trackRegistration(true, req.ip);
                 AuthAnalytics.track('user_registered', {
                     userId: result.user.id,
@@ -244,37 +202,6 @@ router.post('/register',
     }
 );
 
-/**
- * @swagger
- * /api/v1/auth/login:
- *   post:
- *     tags:
- *       - Authentication
- *     summary: Login user
- *     description: Authenticate user and return JWT token
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - email
- *               - password
- *             properties:
- *               email:
- *                 type: string
- *                 format: email
- *               password:
- *                 type: string
- *     responses:
- *       200:
- *         description: Login successful
- *       401:
- *         description: Invalid credentials
- *       500:
- *         description: Server error
- */
 router.post('/login', 
     ValidationMiddleware.validateLogin, 
     loginLimiter, 
@@ -288,7 +215,6 @@ router.post('/login',
             if (result.success) {
                 AuthMonitor.trackLoginAttempt(true, req.ip);
                 
-                // Create session
                 const sessionResult = await SessionManager.createSession(result.user.id, {
                     ip: req.ip,
                     userAgent: req.get('User-Agent')
@@ -315,7 +241,7 @@ router.post('/login',
                 res.json({
                     token: result.token,
                     user: result.user,
-                    expiresIn: 24 * 60 * 60 // 24 hours in seconds
+                    expiresIn: 24 * 60 * 60
                 });
                 return;
             } else {
@@ -332,30 +258,12 @@ router.post('/login',
     }
 );
 
-/**
- * @swagger
- * /api/v1/auth/me:
- *   get:
- *     tags:
- *       - Authentication
- *     summary: Get current user
- *     description: Get current authenticated user information
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Current user information
- *       401:
- *         description: Not authenticated
- */
 router.get('/me', AuthManager.getAuthMiddleware(), async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
         if (!req.user) {
             res.status(401).json({ error: 'Not authenticated' });
             return;
         }
-
-        // Get user roles
         const userRoles = await RoleManager.getUserRoles(req.user.id);
         const userPermissions = await PermissionManager.getUserPermissions(req.user.id);
         
@@ -372,26 +280,6 @@ router.get('/me', AuthManager.getAuthMiddleware(), async (req: AuthenticatedRequ
     }
 });
 
-/**
- * @swagger
- * /api/v1/auth/verify-email/{token}:
- *   get:
- *     tags:
- *       - Authentication
- *     summary: Verify email address
- *     description: Verify user email address using verification token
- *     parameters:
- *       - in: path
- *         name: token
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Email verified successfully
- *       400:
- *         description: Invalid or expired token
- */
 router.get('/verify-email/:token', async (req: Request, res: Response): Promise<void> => {
     try {
         const { token } = req.params;
@@ -422,32 +310,6 @@ router.get('/verify-email/:token', async (req: Request, res: Response): Promise<
     }
 });
 
-/**
- * @swagger
- * /api/v1/auth/forgot-password:
- *   post:
- *     tags:
- *       - Authentication
- *     summary: Request password reset
- *     description: Send password reset email to user
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - email
- *             properties:
- *               email:
- *                 type: string
- *                 format: email
- *     responses:
- *       200:
- *         description: Password reset email sent
- *       400:
- *         description: Invalid email
- */
 router.post('/forgot-password', 
     passwordResetLimiter, 
     trackAnalytics('forgot_password'),
@@ -461,8 +323,6 @@ router.post('/forgot-password',
             }
             
             const result = await AuthManager.forgotPassword(email);
-            
-            // Always return success to prevent email enumeration
             res.json({ message: 'If the email exists, a password reset link has been sent' });
             
             if (result.success) {
@@ -480,38 +340,6 @@ router.post('/forgot-password',
     }
 );
 
-/**
- * @swagger
- * /api/v1/auth/reset-password/{token}:
- *   post:
- *     tags:
- *       - Authentication
- *     summary: Reset password
- *     description: Reset user password using reset token
- *     parameters:
- *       - in: path
- *         name: token
- *         required: true
- *         schema:
- *           type: string
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - password
- *             properties:
- *               password:
- *                 type: string
- *                 minLength: 8
- *     responses:
- *       200:
- *         description: Password reset successfully
- *       400:
- *         description: Invalid token or password
- */
 router.post('/reset-password/:token', 
     passwordResetLimiter, 
     trackAnalytics('reset_password'),
@@ -560,6 +388,4 @@ router.post('/reset-password/:token',
         }
     }
 );
-
-// Export router
 export = router;
