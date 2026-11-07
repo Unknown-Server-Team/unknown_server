@@ -1,44 +1,45 @@
 # Role and Permission System Documentation
 
 ## Overview
-The Unknown Server implements a robust Role-Based Access Control (RBAC) system with granular permissions. This system allows for flexible access control and security management across the application.
+The Unknown Server uses role-based access control (RBAC). Users hold one or more roles, roles carry permissions, and routes are protected by role checks in `AuthManager.getAuthMiddleware`.
 
 ## Roles
 
 ### Default Roles
-1. **Admin**
-   - Full system access
-   - All permissions granted by default
-   - Cannot remove the last admin user
+The roles below are created the first time the server starts against an empty database.
 
-2. **Moderator**
-   - Content moderation access
-   - Limited system management capabilities
-   - Read-only access to most system features
+1. **admin** - Administrator with full system access
+   - Holds every seeded permission
+   - Required for user listing, user deletion and all role management endpoints
+   - The last admin cannot lose the `admin` role
 
-3. **User**
-   - Standard user access
-   - Basic profile management
-   - Limited to user-specific operations
+2. **moderator** - Moderator with limited administrative privileges
+   - View, create and update users
+   - View system information and logs
+
+3. **user** - Regular user with basic access
+   - Assigned to every newly registered account
+   - View user and system information
+
+### Role Hierarchy
+The seeded hierarchy is `admin` > `moderator` > `user`. Role checks honour it, so a user holding `admin` also passes a `moderator` or `user` role check.
 
 ## Permissions
 
-### User Management
-- `user:read` - View user information
-- `user:write` - Create or modify user data
-- `user:delete` - Delete user accounts
+Each permission row has a `name`, `resource` and `action`. The seeded permissions and their default role assignments are:
 
-### Role Management
-- `role:read` - View roles and their assignments
-- `role:write` - Create or modify roles
-- `role:delete` - Delete existing roles
+| Name | Resource | Action | admin | moderator | user |
+|------|----------|--------|-------|-----------|------|
+| read | users | view | ✓ | ✓ | ✓ |
+| write | users | create | ✓ | ✓ | |
+| write | users | update | ✓ | ✓ | |
+| write | users | delete | ✓ | | |
+| read | system | view | ✓ | ✓ | ✓ |
+| write | system | configure | ✓ | | |
+| read | logs | view | ✓ | ✓ | |
+| write | roles | manage | ✓ | | |
 
-### Permission Management
-- `permission:read` - View permissions
-- `permission:write` - Assign or remove permissions
-
-### System Administration
-- `system:admin` - Full system administration capabilities
+Permission checks (`PermissionManager.hasPermission`, `checkPermissions` and `createPermissionMiddleware`) compare against the permission `name` column only.
 
 ## API Endpoints
 
@@ -52,62 +53,43 @@ All role management endpoints require a verified account with the `admin` role; 
 
 The CLI wraps these as `unknown auth roles --list`, `unknown auth roles --user <id>` and `unknown user role <id> <add|remove> <role>`.
 
-### Permission Management
-- GET `/api/auth/permissions` - List all permissions
-- GET `/api/auth/roles/{roleId}/permissions` - Get role's permissions
-- POST `/api/auth/roles/{roleId}/permissions/{permissionId}` - Assign permission to role
-- DELETE `/api/auth/roles/{roleId}/permissions/{permissionId}` - Remove permission from role
-- GET `/api/auth/my-permissions` - Get current user's permissions
+### Permissions
+There are no HTTP endpoints for listing or editing permissions. The current user's roles and permissions are returned by:
+
+- GET `/api/v1/auth/me` - Current user with `roles` and `permissions`
+
+Permissions are managed in code through `PermissionManager.assignPermissionToRole` and `PermissionManager.removePermissionFromRole`, or directly in the `permissions` and `role_permissions` tables.
 
 ## Security Considerations
 
 ### Role Assignment
-- Users must have appropriate permissions to assign roles
-- Cannot remove the last admin role from the system
-- Role changes are logged for security auditing
-
-### Permission Management
-- Only admins can manage permissions
-- Critical system permissions cannot be removed from admin role
-- Permission changes are tracked and monitored
+- Only verified admins can assign or remove roles
+- The `admin` role cannot be removed from the last admin
+- Role assignments and removals are logged with the acting admin's ID
 
 ### Best Practices
 1. Follow the principle of least privilege
 2. Regularly audit role assignments
-3. Monitor permission usage through analytics
-4. Use role combinations instead of creating new roles
-5. Document custom roles and their purposes
+3. Use role combinations instead of creating new roles
+4. Document custom roles and their purposes
 
 ## Implementation Example
 
 ```javascript
-// Protect route with role requirement
 router.get('/sensitive-data',
-    AuthManager.getAuthMiddleware({ roles: ['admin'] }),
+    AuthManager.getAuthMiddleware({ requireVerified: true, roles: ['admin'] }),
     async (req, res) => {
-        // Only admins can access this route
+        res.json({ ok: true });
     }
 );
 
-// Require both role and specific permissions
 router.post('/moderate-content',
-    RoleManager.createRoleAndPermissionMiddleware(
-        ['moderator', 'admin'],
-        ['content:write'],
-        true // requireAll flag
-    ),
+    AuthManager.getAuthMiddleware(),
+    RoleManager.createRoleAndPermissionMiddleware(['moderator', 'admin'], ['write']),
     async (req, res) => {
-        // Only moderators/admins with content:write permission can access
+        res.json({ ok: true });
     }
 );
 ```
 
-## Monitoring and Analytics
-
-The system provides built-in monitoring for:
-- Role usage patterns
-- Permission access frequency
-- Failed permission attempts
-- Role assignment changes
-
-This data can be accessed through the auth analytics system for security auditing and system optimization.
+`createRoleAndPermissionMiddleware` expects `req.user`, so it must run after `getAuthMiddleware`.
