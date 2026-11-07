@@ -10,7 +10,7 @@ class API {
     }
 
     loadConfig() {
-        const defaultUrl = process.env.API_URL || 'http://localhost:3000/api';
+        const defaultUrl = process.env.API_URL || 'http://localhost:3000';
         this.baseUrl = API.normalizeBaseUrl(defaultUrl);
         this.token = null;
 
@@ -26,7 +26,8 @@ class API {
     }
 
     static normalizeBaseUrl(url) {
-        return url.replace(/\/+$/, '').replace(/\/v\d+$/, '');
+        const trimmed = url.replace(/\/+$/, '').replace(/\/v\d+$/, '');
+        return trimmed.endsWith('/api') ? trimmed : `${trimmed}/api`;
     }
 
     saveConfig() {
