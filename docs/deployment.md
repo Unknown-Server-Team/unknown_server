@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Node.js 18.x or higher
+- Node.js 20.x or higher
 - NPM 8.x or higher
 - PostgreSQL 13.x or higher (or your preferred database)
 - Redis (optional, for caching)

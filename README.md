@@ -3,7 +3,7 @@
 <div align="center">
 
 [![Version](https://img.shields.io/badge/version-3.5.1-blue.svg)](https://github.com/santiadjmc/unknown/releases)
-[![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org/)
+[![Node.js Version](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen.svg)](https://nodejs.org/)
 [![Express.js](https://img.shields.io/badge/express.js-%5E4.18.0-lightgrey.svg)](https://expressjs.com/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
@@ -165,7 +165,7 @@ Unknown Server is a robust Express.js-based server solution that provides enterp
 
 ### Prerequisites
 
-- Node.js >= 18.0.0
+- Node.js >= 20.0.0
 - npm >= 8.0.0
 - MySQL >= 5.7
 - NGINX >= 1.18.0 (see NGINX [configuration for development](./config/nginx.conf))

@@ -4,7 +4,7 @@
 This guide will help you get started with the Unknown Server API.
 
 ## Prerequisites
-- Node.js 18.x or higher
+- Node.js 20.x or higher
 - NPM 8.x or higher
 - Basic knowledge of RESTful APIs
 
