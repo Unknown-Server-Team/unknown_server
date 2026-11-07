@@ -1,6 +1,7 @@
 import express, { Request, Response, Router } from 'express';
 import docsRouter from './docs';
 import { RatelimitManager } from '../../managers/RatelimitManager';
+import { APP_VERSION } from '../../config/version';
 
 const router: Router = express.Router();
 
@@ -15,7 +16,7 @@ router.get('/health', (_req: Request, res: Response) => {
         status: 'healthy',
         timestamp: new Date().toISOString(),
         name: process.env.SERVICE_NAME || 'unknown-server',
-        version: process.env.VERSION
+        version: APP_VERSION
     });
 });
 
