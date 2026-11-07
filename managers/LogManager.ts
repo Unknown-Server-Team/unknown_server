@@ -10,7 +10,7 @@ import winston from 'winston';
 import DailyRotateFile from 'winston-daily-rotate-file';
 import type { LogMetadata, LogInfo } from '../types/index';
 
-const LOG_DIR = path.join(__dirname, '..', 'logs');
+const LOG_DIR = path.join(process.cwd(), 'logs');
 
 if (!fs.existsSync(LOG_DIR)) {
     fs.mkdirSync(LOG_DIR, { recursive: true });
