@@ -71,13 +71,6 @@ export interface TokenVerificationResult {
     expired?: boolean;
 }
 
-export interface EncryptionSettings {
-    saltLength: number;
-    keyAlgorithm: string;
-    iterations: number;
-    keyLength: number;
-}
-
 export interface AuthenticatedRequest extends Omit<Request, 'user'> {
     user?: UserData;
     apiVersion?: string;

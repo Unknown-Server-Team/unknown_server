@@ -1,11 +1,11 @@
 import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import type { SignOptions } from 'jsonwebtoken';
 import type { NextFunction, Response } from 'express';
 import type {
     VerificationEmailUser,
     WorkerThreadManagerModule,
-    EncryptionSettings,
     JwtPayload,
     AuthenticatedRequest,
     AuthMiddlewareOptions,
@@ -26,36 +26,21 @@ const { userQueries } = databaseQueries as unknown as { userQueries: UserQueries
 const db = dbImport as unknown as DatabaseModule;
 const WorkerThreadManager = WorkerThreadManagerImport as unknown as WorkerThreadManagerModule;
 
+const BCRYPT_ROUNDS = 12;
+const BCRYPT_HASH_PATTERN = /^\$2[aby]\$\d{2}\$/;
+
 class AuthManager {
     private secret: string;
     private tokenExpiration: string;
-    private encryptionSettings: EncryptionSettings;
 
     constructor() {
         this.secret = process.env.JWT_SECRET || 'your-secret-key';
         this.tokenExpiration = process.env.JWT_EXPIRATION || '24h';
-        this.encryptionSettings = {
-            saltLength: 16,
-            keyAlgorithm: 'sha256',
-            iterations: 10000,
-            keyLength: 32
-        };
     }
 
     async hashPassword(password: string): Promise<string> {
         try {
-            const salt = crypto.randomBytes(this.encryptionSettings.saltLength).toString('hex');
-            const result = await WorkerThreadManager.executeTask(
-                'encryption',
-                {
-                    text: password,
-                    key: salt
-                },
-                {
-                    operation: 'encrypt'
-                }
-            );
-            return `${salt}:${result.iv}:${result.result}`;
+            return await bcrypt.hash(password, BCRYPT_ROUNDS);
         } catch (error: unknown) {
             LogManager.error('Password hashing failed', error instanceof Error ? error : new Error(String(error)));
             throw new Error('Password hashing failed');
@@ -64,6 +49,10 @@ class AuthManager {
 
     async comparePassword(password: string, hashedPassword: string): Promise<boolean> {
         try {
+            if (BCRYPT_HASH_PATTERN.test(hashedPassword)) {
+                return await bcrypt.compare(password, hashedPassword);
+            }
+
             const [salt, iv, hash] = hashedPassword.split(':');
 
             if (!salt || !iv || !hash) {

@@ -39,13 +39,6 @@ export interface UserQueriesModule {
     deleteUser(userId: number): Promise<unknown>;
 }
 
-export interface EncryptionSettings {
-    saltLength: number;
-    keyAlgorithm: string;
-    iterations: number;
-    keyLength: number;
-}
-
 export interface JwtPayload {
     id: number;
     email: string;
