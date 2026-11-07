@@ -10,20 +10,23 @@ class API {
     }
 
     loadConfig() {
+        const defaultUrl = process.env.API_URL || 'http://localhost:3000/api';
+        this.baseUrl = API.normalizeBaseUrl(defaultUrl);
+        this.token = null;
+
         try {
             if (fs.existsSync(this.configFile)) {
                 const config = JSON.parse(fs.readFileSync(this.configFile, 'utf8'));
-                this.baseUrl = config.apiUrl || 'http://localhost:3000/api';
-                this.token = config.token;
-            } else {
-                this.baseUrl = 'http://localhost:3000/api/v1';
-                this.token = null;
+                this.baseUrl = API.normalizeBaseUrl(config.apiUrl || defaultUrl);
+                this.token = config.token || null;
             }
         } catch (error) {
             console.error('Failed to load config:', error.message);
-            this.baseUrl = `http://localhost:3000/api/v1`;
-            this.token = null;
         }
+    }
+
+    static normalizeBaseUrl(url) {
+        return url.replace(/\/+$/, '').replace(/\/v\d+$/, '');
     }
 
     saveConfig() {

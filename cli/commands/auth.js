@@ -22,7 +22,7 @@ const login = new Command('login')
                 }
             ]);
 
-            const response = await API.post('/auth/login', credentials);
+            const response = await API.post('/v1/auth/login', credentials);
             API.setToken(response.token);
             console.log(chalk.green('Successfully logged in!'));
         } catch (error) {
@@ -49,7 +49,7 @@ login.runInteractive = async function() {
     const spinner = ora('Logging in...').start();
     
     try {
-        const response = await API.post('/auth/login', credentials);
+        const response = await API.post('/v1/auth/login', credentials);
         API.setToken(response.token);
         spinner.succeed('Successfully logged in!');
     } catch (error) {
@@ -126,14 +126,14 @@ const roles = new Command('roles')
     .action(async (options) => {
         try {
             if (options.list) {
-                const roles = await API.get('/auth/roles');
+                const roles = await API.get('/v1/auth/roles');
                 console.table(roles.map(r => ({
                     ID: r.id,
                     Name: r.name,
                     Description: r.description
                 })));
             } else if (options.user) {
-                const roles = await API.get(`/auth/user/${options.user}/roles`);
+                const roles = await API.get(`/v1/auth/user/${options.user}/roles`);
                 console.table(roles.map(r => ({
                     ID: r.id,
                     Name: r.name,
@@ -168,7 +168,7 @@ roles.runInteractive = async function() {
             spinner.text = 'Fetching all roles...';
             spinner.start();
             
-            const roles = await API.get('/auth/roles');
+            const roles = await API.get('/v1/auth/roles');
             spinner.succeed('Roles retrieved');
             
             if (roles.length === 0) {
@@ -194,7 +194,7 @@ roles.runInteractive = async function() {
             spinner.text = `Fetching roles for user ${userId}...`;
             spinner.start();
             
-            const roles = await API.get(`/auth/user/${userId}/roles`);
+            const roles = await API.get(`/v1/auth/user/${userId}/roles`);
             spinner.succeed('User roles retrieved');
             
             if (roles.length === 0) {

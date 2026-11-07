@@ -15,7 +15,7 @@ const list = new Command('list')
     .action(async (options) => {
         try {
             const spinner = ora('Fetching users...').start();
-            const users = await API.get(`/users?page=${options.page}&limit=${options.limit}`);
+            const users = await API.get(`/v1/users?page=${options.page}&limit=${options.limit}`);
             spinner.stop();
             
             if (users.length === 0) {
@@ -74,7 +74,7 @@ list.runInteractive = async () => {
         ]);
         
         const spinner = ora('Fetching users...').start();
-        const users = await API.get(`/users?page=${page}&limit=${limit}`);
+        const users = await API.get(`/v1/users?page=${page}&limit=${limit}`);
         spinner.succeed('Users fetched successfully');
         
         if (users.length === 0) {
@@ -129,7 +129,7 @@ list.runInteractive = async () => {
             ]);
             
             const spinner = ora('Fetching user details...').start();
-            const userDetails = await API.get(`/users/${userId}`);
+            const userDetails = await API.get(`/v1/users/${userId}`);
             spinner.stop();
             
             console.log('\n' + chalk.cyan.bold('User Details:'));
@@ -186,7 +186,7 @@ const create = new Command('create')
             ]);
 
             const spinner = ora('Creating user...').start();
-            const response = await API.post('/auth/register', answers);
+            const response = await API.post('/v1/auth/register', answers);
             spinner.succeed('User created successfully!');
             
             console.log('\n' + chalk.green.bold('User Details:'));
@@ -208,7 +208,7 @@ create.runInteractive = async () => {
         
         // Get available roles first
         const spinner = ora('Fetching available roles...').start();
-        const roles = await API.get('/auth/roles');
+        const roles = await API.get('/v1/auth/roles');
         spinner.stop();
 
         const answers = await inquirer.prompt([
@@ -243,7 +243,7 @@ create.runInteractive = async () => {
 
         const createSpinner = ora('Creating user...').start();
         try {
-            const response = await API.post('/auth/register', answers);
+            const response = await API.post('/v1/auth/register', answers);
             createSpinner.succeed('User created successfully!');
             
             console.log('\n' + chalk.green.bold('User Details:'));
@@ -280,7 +280,7 @@ const deleteUser = new Command('delete')
 
             if (confirm.sure) {
                 spinner = ora('Deleting user...').start();
-                await API.delete(`/users/${id}`);
+                await API.delete(`/v1/users/${id}`);
                 spinner.succeed('User deleted successfully!');
             }
         } catch (error) {
@@ -295,7 +295,7 @@ deleteUser.runInteractive = async () => {
     try {
         // Get list of users first
         spinner = ora('Fetching users...').start();
-        const users = await API.get('/users?limit=50');
+        const users = await API.get('/v1/users?limit=50');
         spinner.stop();
         
         if (users.length === 0) {
@@ -326,7 +326,7 @@ deleteUser.runInteractive = async () => {
         
         if (confirm) {
             spinner = ora('Deleting user...').start();
-            await API.delete(`/users/${userId}`);
+            await API.delete(`/v1/users/${userId}`);
             spinner.succeed(`User ${userId} deleted successfully!`);
         } else {
             console.log(chalk.cyan('User deletion cancelled.'));
@@ -349,10 +349,10 @@ const role = new Command('role')
             const spinner = ora('Managing user role...').start();
             
             if (action === 'add') {
-                await API.post(`/auth/user/${userId}/roles/${role}`);
+                await API.post(`/v1/auth/user/${userId}/roles/${role}`);
                 spinner.succeed(`Role '${role}' added to user ${userId}`);
             } else if (action === 'remove') {
-                await API.delete(`/auth/user/${userId}/roles/${role}`);
+                await API.delete(`/v1/auth/user/${userId}/roles/${role}`);
                 spinner.succeed(`Role '${role}' removed from user ${userId}`);
             } else {
                 spinner.fail('Invalid action');
@@ -368,7 +368,7 @@ role.runInteractive = async () => {
     try {
         // Get list of users first
         let spinner = ora('Fetching users...').start();
-        const users = await API.get('/users');
+        const users = await API.get('/v1/users');
         spinner.stop();
         
         if (users.length === 0) {
@@ -378,7 +378,7 @@ role.runInteractive = async () => {
         
         // Get list of available roles
         spinner = ora('Fetching available roles...').start();
-        const roles = await API.get('/roles');
+        const roles = await API.get('/v1/roles');
         spinner.stop();
         
         const { userId } = await inquirer.prompt([
@@ -395,7 +395,7 @@ role.runInteractive = async () => {
         
         // Get the current user to show their roles
         spinner = ora('Fetching user details...').start();
-        const user = await API.get(`/users/${userId}`);
+        const user = await API.get(`/v1/users/${userId}`);
         spinner.stop();
         
         // Show current roles
@@ -458,16 +458,16 @@ role.runInteractive = async () => {
         spinner = ora(`${action === 'add' ? 'Adding' : 'Removing'} role...`).start();
         
         if (action === 'add') {
-            await API.post(`/auth/user/${userId}/roles/${selectedRole}`);
+            await API.post(`/v1/auth/user/${userId}/roles/${selectedRole}`);
             spinner.succeed(`Role '${selectedRole}' added to user successfully`);
         } else {
-            await API.delete(`/auth/user/${userId}/roles/${selectedRole}`);
+            await API.delete(`/v1/auth/user/${userId}/roles/${selectedRole}`);
             spinner.succeed(`Role '${selectedRole}' removed from user successfully`);
         }
         
         // Show updated user roles
         spinner = ora('Fetching updated user details...').start();
-        const updatedUser = await API.get(`/users/${userId}`);
+        const updatedUser = await API.get(`/v1/users/${userId}`);
         spinner.stop();
         
         console.log('\nUpdated roles:');
