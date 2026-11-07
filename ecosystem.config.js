@@ -14,11 +14,11 @@
 module.exports = {
   apps: [{
     name: "unknown-server",
-    script: "./server.js",
+    script: "./dist/server.js",
     instances: "max",        // Use maximum number of CPU cores
     exec_mode: "cluster",    // Run in cluster mode for load balancing
     watch: true,            // Watch for file changes
-    ignore_watch: ["node_modules", "logs"], // Ignore certain directories
+    ignore_watch: ["node_modules", "logs", "tmp"], // Ignore certain directories
     watch_options: {
       followSymlinks: false
     },
