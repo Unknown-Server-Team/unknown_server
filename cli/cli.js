@@ -128,9 +128,8 @@ async function showSubMenu(category) {
       prefix = chalk.magenta('Docs') + ' ' + chalk.dim('>');
       icon = figures.bookmarkFilled;
       choices = [
-        { name: `Serve documentation`, value: 'serve' },
-        { name: `Generate documentation`, value: 'generate' },
-        { name: `Export documentation`, value: 'export' }
+        { name: `Open API documentation`, value: 'serve' },
+        { name: `Export OpenAPI specification`, value: 'export' }
       ];
       break;
   }
@@ -270,7 +269,6 @@ program
     .command('docs')
     .description('Documentation management')
     .addCommand(docsCommands.serve)
-    .addCommand(docsCommands.generate)
     .addCommand(docsCommands.export);
 
 if (process.argv.length > 2) {

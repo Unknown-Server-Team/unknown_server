@@ -286,7 +286,7 @@ Community guidelines
 | `npm run stop:pm2` | Stop PM2-managed server processes |
 | `npm run monitor` | Monitor PM2-managed server processes |
 | `npm run cli` | Access CLI management tools |
-| `npm run docs` | Documentation tools (serve, generate, export) |
+| `npm run docs` | Documentation tools (serve, export) |
 
 ## 🤝 Getting Involved
 
