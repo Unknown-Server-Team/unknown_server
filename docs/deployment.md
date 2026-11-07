@@ -230,6 +230,10 @@ For additional support:
 ## Service Mesh Configuration
 
 ### Service Registration
+The server registers the `auth` and `users` gateway services on `/api/v1/auth` and `/api/v1/users`, and an `auth-service` mesh entry whose health is checked at `AUTH_SERVICE_URL` + `/api/v1/health`.
+
+When `AUTH_SERVICE_URL` points at another server, requests to `/api/v1/auth` are proxied there with their method, path, query string, body and status code intact. When it is unset or points at this server, the mesh only tracks health and requests are handled locally.
+
 ```env
 # Service Mesh Configuration
 MESH_HEALTH_CHECK_INTERVAL=10000
