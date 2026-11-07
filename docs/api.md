@@ -11,19 +11,15 @@
 - Deprecated versions are supported for 6 months
 - Security fixes are backported to all supported versions
 
-## Migration Guides
+## Interactive Reference
 
-
-
-## SDK Support
-
-| Version | JavaScript | Python | Go | Ruby |
-|---------|------------|--------|----|----|
-| v1 | ✓ | ✓ | ✓ | ✓ |
+- Swagger UI: `/api/docs`
+- OpenAPI specification: `/api/docs.json` (also exportable with `npm run docs -- export`)
 
 ## Additional Resources
 
 - [Getting Started](./getting-started.md)
 - [Authentication Guide](./authentication.md)
 - [Error Handling](./errors.md)
+- [Roles and Permissions](./roles-and-permissions.md)
 - [Best Practices](./best-practices.md)

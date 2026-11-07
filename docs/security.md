@@ -2,152 +2,67 @@
 
 ## Supported Versions
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 2.2.x   | :white_check_mark: |
-| 2.1.x   | :white_check_mark: |
-| 2.0.x   | :x:                |
-| 1.x.x   | :x:                |
+See the version support table in the repository's [SECURITY.md](../SECURITY.md).
 
 ## Security Features
 
-Unknown Server implements comprehensive security features:
-
 ### Authentication & Authorization
-- Advanced Role Hierarchy System
-- Permission inheritance control
-- Role-Based Access Control (RBAC)
-- Permission-based access control
-- Session management with monitoring
-- Token blacklisting
-- Email verification system
-- Password reset functionality
-- Protection for critical admin roles
+- JWT authentication with configurable lifetime (`JWT_EXPIRATION`)
+- bcrypt password hashing and password complexity rules
+- Email verification and password reset flows
+- Role-based access control with a role hierarchy (`admin` > `moderator` > `user`)
+- Permission checks through `PermissionManager`
+- Protection against removing the `admin` role from the last admin
+- Session tracking and authentication analytics
 
-### Rate Limiting & DDoS Protection
-- Token bucket algorithm implementation
-- Smart burst protection system
-- IP whitelist/blacklist management
-- Automated threat response
-- Adaptive rate limiting rules
-- Request rate analysis
-- Traffic pattern monitoring
-- Real-time threat detection
+### Rate Limiting & Abuse Protection
+- Token bucket and sliding window rate limiting per IP
+- Strict limits on login, registration and password reset
+- Burst detection
+- In-memory IP whitelist and blacklist, with automatic blacklisting of flooding IPs
 
-### Monitoring & Protection
-- Real-time performance monitoring
-- CPU and memory analytics
-- Response time tracking
-- Automated system alerts
-- Real-time authentication monitoring
-- Brute force attack detection
-- Suspicious activity tracking
-- Session monitoring and analytics
-- Role change monitoring
+### Monitoring
+- Request, response time, CPU and memory metrics at `/api/metrics`
+- Login attempt tracking and authentication analytics
+- Log rotation with configurable retention
 
 ### Input & Data Security
-- Request validation middleware
-- Input sanitization
-- Schema validation
-- File upload protection
-- Secure password policies
-- Email validation
+- Request validation middleware for bodies, query strings and IDs
+- Parameterized SQL queries
+- Upload size limit of 50MB per file
+- Password hashes are never returned by the API
 
-### System Security
-- CORS configuration
-- Content Security Policy (CSP)
-- Secure WebSocket connections
-- Cache management
-- Logging rotation
-- Error handling security
-- NGINX reverse proxy protection
-  - DDoS mitigation through rate limiting (30 r/m with burst)
-  - SSL/TLS termination with TLS 1.2/1.3
-  - Request filtering and validation
-  - Modern cipher configuration
-  - Comprehensive security headers
-  - IP filtering (10 concurrent connections)
-  - Proxy caching with bypass rules
-  - Load balancing with keepalive
-  - Rate limiting at multiple levels
-  - Buffer overflow protection (16KB body, 1KB header)
+### HTTP Security
+- Helmet security headers, including a Content Security Policy, HSTS and `X-Content-Type-Options: nosniff`
+- Configurable CORS origins (`CORS_ORIGIN`)
+- NGINX reverse proxy with HTTP to HTTPS redirect and TLS 1.2/1.3 only (see the [NGINX guide](./nginx-deployment.md))
 
-### Proxy Security Features
-- Multi-layer request validation
-- Bad bot protection through rate limiting
-- Advanced DDoS mitigation with burst control
-- SSL/TLS with modern cipher suite
-- Comprehensive security headers:
-  - HSTS with long duration
-  - X-Frame-Options: DENY
-  - X-Content-Type-Options: nosniff
-  - X-XSS-Protection with block mode
-  - Strict CSP policy
-  - Strict Referrer Policy
-  - Restrictive Permissions Policy
-- IP connection limiting (10 per IP)
-- Smart caching with authentication bypass
-- Efficient load distribution
-- Connection and request limits
-- Buffer size restrictions
-- WebSocket protection
-
-### Service Mesh Security Features
-- Dynamic service authentication
-- Health monitoring and alerting
-- Multi-layer request validation
-- Traffic pattern analysis
-- Service metrics monitoring
-- Load balancer security
-- Request tracking headers
-- Version control and validation
-
-### Gateway Protection
-- Circuit breaker implementation
-- Service health monitoring
-- Request rate control
-- Cache security measures
-- Error threshold protection
-- Automatic service recovery
-- Request timeout management
-- Load distribution security
+### Gateway and Service Mesh
+- Circuit breakers around gateway services
+- Health checks with automatic recovery
+- Retries for idempotent proxied requests
 
 ## Best Practices
 
 ### Configuration
-- Use strong session secrets
+- Use a long, random `JWT_SECRET`
 - Enable HTTPS in production
-- Configure proper CORS settings
-- Set up appropriate rate limits
-- Use secure WebSocket connections
-- Implement proper error logging
-- Set up monitoring and analytics
+- Set `CORS_ORIGIN` to the exact origins you serve
+- Restrict `/api/metrics` at the proxy
+- Keep `CLI_API_KEY` unset unless you need CLI role assignment during registration
 
 ### Development
-- Keep dependencies updated
-- Follow secure coding guidelines
-- Implement input validation
+- Keep dependencies updated and `npm audit` clean
+- Validate all inputs
 - Use parameterized queries
-- Enable security headers
 - Validate file uploads
-- Implement proper session handling
 
 ### Deployment
-- Use environment variables
-- Set up proper logging
+- Use environment variables for secrets
+- Set up log retention
 - Monitor auth analytics
-- Regular security audits
+- Run regular security audits
 - Keep backups secure
-- Implement rate limiting
-- Configure error handling
-- NGINX Configuration
-  - Configure SSL/TLS properly
-  - Set up request filtering
-  - Enable security headers
-  - Configure rate limits
-  - Set up load balancing
-  - Enable proxy caching
-  - Configure DDoS protection
 
 ## Reporting a Vulnerability
 
@@ -174,7 +89,6 @@ Unknown Server implements comprehensive security features:
 ### Authentication
 - Password complexity requirements
 - Email verification
-- Session management
 - Token-based authentication
 - Rate limiting on auth endpoints
 
@@ -182,15 +96,13 @@ Unknown Server implements comprehensive security features:
 - Role-based access control
 - Permission-based access control
 - Protection of admin privileges
-- Session validation
 - Token validation
 
 ### Data Protection
-- Input sanitization
-- Output encoding
-- SQL injection prevention
-- XSS prevention
-- CSRF protection
+- Input validation
+- SQL injection prevention through parameterized queries
+- Content Security Policy against XSS
+- Bearer tokens instead of cookies for API authentication, which avoids CSRF on the API
 
 ### Monitoring
 - Auth analytics

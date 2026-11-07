@@ -1,67 +1,46 @@
 # Error Handling
 
 ## Error Response Format
-All API errors follow a consistent format:
+Every API error response contains an `error` field with a human-readable message. Some endpoints add more fields:
 
 ```json
 {
-  "error": true,
-  "code": "ERROR_CODE",
-  "message": "Human-readable error message",
+  "success": false,
+  "error": "Validation failed",
   "details": {
-    // Additional error details (optional)
+    "password": ["Password must contain at least one number"]
   }
 }
 ```
 
+- `success: false` is included by the users and role management endpoints
+- `details` maps field names to lists of messages on validation failures; the password reset endpoint returns a plain list instead
+- `retryAfter` (seconds) and a `Retry-After` header accompany rate limit responses
+- `verificationRequired: true` accompanies `403` responses for accounts whose email is not verified
+- `supportedVersions` accompanies `400` responses for an unsupported `Accept-Version` header
+
+Unknown `/api` paths return `{ "error": true, "message": "Not Found", "status": 404 }`, and unhandled server errors return `{ "error": "Internal Server Error" }` with the underlying message added in development.
+
+There are no machine-readable error codes; branch on the HTTP status code.
+
 ## HTTP Status Codes
-The API uses standard HTTP status codes:
 
 | Status Code | Description |
 |-------------|-------------|
 | 200 | OK - Request successful |
 | 201 | Created - Resource created successfully |
-| 400 | Bad Request - Invalid input parameters |
-| 401 | Unauthorized - Authentication required |
-| 403 | Forbidden - Permission denied |
+| 400 | Bad Request - Invalid input or unsupported API version |
+| 401 | Unauthorized - Missing or invalid token, or invalid credentials |
+| 403 | Forbidden - Missing role, unverified email, or blocked IP |
 | 404 | Not Found - Resource not found |
-| 409 | Conflict - Resource conflict |
-| 422 | Unprocessable Entity - Validation error |
-| 429 | Too Many Requests - Rate limit exceeded |
+| 409 | Conflict - Duplicate email, role already assigned, or last admin |
+| 429 | Too Many Requests - Rate limit or burst limit exceeded |
 | 500 | Internal Server Error - Server-side error |
-
-## Common Error Codes
-
-### Authentication Errors
-- `AUTH_INVALID_CREDENTIALS`: Invalid username or password
-- `AUTH_TOKEN_EXPIRED`: JWT token has expired
-- `AUTH_TOKEN_INVALID`: JWT token is invalid
-- `AUTH_SESSION_EXPIRED`: User session has expired
-
-### Validation Errors
-- `VALIDATION_ERROR`: Input validation failed
-- `INVALID_PARAMETER`: One or more parameters are invalid
-- `MISSING_PARAMETER`: Required parameter is missing
-
-### Permission Errors
-- `PERMISSION_DENIED`: User lacks required permission
-- `ROLE_REQUIRED`: Operation requires specific role
-- `INSUFFICIENT_SCOPE`: Token lacks required scope
-
-### Resource Errors
-- `RESOURCE_NOT_FOUND`: Requested resource not found
-- `RESOURCE_ALREADY_EXISTS`: Resource already exists
-- `RESOURCE_CONFLICT`: Resource conflict detected
-
-### Rate Limiting Errors
-- `RATE_LIMIT_EXCEEDED`: API rate limit exceeded
-- `TOO_MANY_REQUESTS`: Too many requests from IP address
 
 ## Handling Errors
 Best practices for handling API errors:
 
 1. Always check the HTTP status code
-2. Inspect the error code for specific handling
-3. Present user-friendly error messages based on the returned message
-4. Implement exponential backoff for rate limiting errors
-5. Refresh authentication tokens when receiving AUTH_TOKEN_EXPIRED
+2. Show the `error` message, and the `details` entries when present
+3. Honour `Retry-After` and back off exponentially on `429`
+4. Log in again when a request returns `401` because the token expired
