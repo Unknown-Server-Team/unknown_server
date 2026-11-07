@@ -9,7 +9,6 @@
     --card-hover: #2a2a2a;
     --gradient-start: #9B4BFF;
     --gradient-end: #E84BFF;
-    /* New variables for enhanced UX */
     --shadow-sm: 0 2px 4px rgba(0,0,0,0.2);
     --shadow-md: 0 4px 6px rgba(0,0,0,0.2);
     --shadow-lg: 0 8px 16px rgba(0,0,0,0.3);
@@ -275,7 +274,6 @@ li {
         rgba(155, 75, 255, 0.05) 100%);
 }
 
-/* Animations */
 @keyframes fadeIn {
     from {
         opacity: 0;
@@ -287,7 +285,6 @@ li {
     }
 }
 
-/* Custom scrollbar */
 ::-webkit-scrollbar {
     width: 10px;
 }
@@ -305,7 +302,6 @@ li {
     background: var(--secondary-color);
 }
 
-/* Feature cards animation */
 .instruction-card {
     animation: cardAppear 0.6s ease-out backwards;
 }
@@ -321,12 +317,10 @@ li {
     }
 }
 
-/* Add animation delay for cards */
 .instruction-card:nth-child(1) { animation-delay: 0.2s; }
 .instruction-card:nth-child(2) { animation-delay: 0.4s; }
 .instruction-card:nth-child(3) { animation-delay: 0.6s; }
 
-/* Responsive adjustments */
 @media (max-width: 768px) {
     .container {
         padding: 1rem;
@@ -417,7 +411,6 @@ li {
     }
 }
 
-/* Hero background effect */
 .hero-background {
     position: absolute;
     top: 0;
@@ -436,7 +429,6 @@ li {
     50% { transform: scale(1.1); }
 }
 
-/* Pulse circle effect */
 .pulse-circle {
     position: absolute;
     bottom: 20px;
@@ -474,14 +466,12 @@ li {
     }
 }
 
-/* Card icon styles */
 .card-icon {
     font-size: 2.5rem;
     margin-bottom: 1rem;
     filter: drop-shadow(0 0 10px rgba(155, 75, 255, 0.3));
 }
 
-/* Enhanced hover effects */
 .hover-effect {
     transition: all 0.3s ease;
     padding: 0.5rem;
@@ -506,7 +496,6 @@ li {
     list-style: none;
 }
 
-/* Particles background */
 .particles-bg {
     position: fixed;
     top: 0;
@@ -518,7 +507,6 @@ li {
     opacity: 0.6;
 }
 
-/* Loading overlay */
 .loading-overlay {
     position: fixed;
     top: 0;
@@ -583,19 +571,16 @@ li {
     }
 }
 
-/* Enhanced focus styles for accessibility */
 :focus {
     outline: 2px solid var(--primary-color);
     outline-offset: 2px;
 }
 
-/* Enhanced selection style */
 ::selection {
     background: var(--primary-color);
     color: white;
 }
 
-/* Mobile optimizations */
 @media (max-width: 480px) {
     .particles-bg {
         opacity: 0.3;
@@ -644,7 +629,6 @@ li {
     }
 }
 
-/* Performance optimizations */
 @media (prefers-reduced-motion: reduce) {
     *,
     *::before,
@@ -656,7 +640,6 @@ li {
     }
 }
 
-/* Print styles */
 @media print {
     .instruction-card {
         break-inside: avoid;
@@ -678,7 +661,6 @@ li {
     }
 }
 
-/* Mobile optimizations */
 @media (max-width: 480px) {
     .particles-bg {
         opacity: 0.3;
@@ -689,7 +671,6 @@ li {
     }
 }
 
-/* Scroll-driven animations */
 @keyframes fadeInUp {
     from {
         opacity: 0;
@@ -708,7 +689,6 @@ li {
     animation-range: entry 20% cover 50%;
 }
 
-/* Enhanced loading states */
 .loading {
     position: relative;
     overflow: hidden;
@@ -734,7 +714,6 @@ li {
     }
 }
 
-/* Enhance focus styles */
 :focus-visible {
     outline: none;
     box-shadow: var(--focus-ring);
@@ -756,7 +735,6 @@ li {
     }
 }
 
-/* Improved scroll behavior */
 @media (prefers-reduced-motion: no-preference) {
     html {
         scroll-behavior: smooth;
@@ -768,7 +746,6 @@ li {
     }
 }
 
-/* Enhanced form controls */
 .form-control {
     background: var(--card-background);
     border: 1px solid var(--border-color);
@@ -788,7 +765,6 @@ li {
     box-shadow: 0 0 0 3px var(--focus-visible-color);
 }
 
-/* Print optimization */
 @media print {
     @page {
         margin: 2cm;
@@ -809,13 +785,11 @@ li {
     }
 }
 
-/* Add smooth scrolling */
 html {
     scroll-behavior: smooth;
     scroll-padding-top: var(--spacing-lg);
 }
 
-/* Add these new utility classes */
 .flex-grow {
     flex: 1;
 }
