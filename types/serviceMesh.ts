@@ -2,6 +2,7 @@ export interface MeshServiceConfig {
     name: string;
     url: string;
     healthCheck?: (service: ServiceInfo) => Promise<boolean>;
+    healthCheckPath?: string;
     version: string;
     tags?: string[];
     discoverable?: boolean;
@@ -17,7 +18,14 @@ export interface ServiceInfo {
     tags: string[];
     discoverable: boolean;
     metrics: MeshServiceMetrics;
+    healthCheckPath: string;
     healthCheck: (service: ServiceInfo) => Promise<boolean>;
+}
+
+export interface MeshResponse {
+    status: number;
+    contentType: string | null;
+    body: string;
 }
 
 export interface MeshServiceMetrics {

@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events';
-import type { Request } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import type {
     MeshServiceConfig,
     ServiceInfo,
@@ -9,7 +9,8 @@ import type {
     ServiceProxy,
     MeshConfig,
     ServiceFilters,
-    LoadBalancingEndpoint
+    LoadBalancingEndpoint,
+    MeshResponse
 } from '../types/serviceMesh';
 import type { LogManagerModule, CacheManagerModule } from '../types/modules';
 import LogManagerImport from './LogManager';
@@ -17,6 +18,21 @@ import CacheManagerImport from './CacheManager';
 
 const LogManager = LogManagerImport as unknown as LogManagerModule;
 const CacheManager = CacheManagerImport as unknown as CacheManagerModule;
+
+const MESH_FORWARDED_HEADER = 'x-mesh-forwarded';
+const DEFAULT_HEALTH_CHECK_PATH = '/health';
+const HOP_BY_HOP_HEADERS = new Set([
+    'connection',
+    'keep-alive',
+    'proxy-connection',
+    'transfer-encoding',
+    'te',
+    'trailer',
+    'upgrade',
+    'host',
+    'content-length'
+]);
+const IDEMPOTENT_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
 class ServiceMeshManager extends EventEmitter {
     private services: Map<string, ServiceInfo>;
@@ -51,7 +67,7 @@ class ServiceMeshManager extends EventEmitter {
     }
 
     registerService(serviceConfig: MeshServiceConfig): ServiceInfo {
-        const { name, url, healthCheck, version, tags = [], discoverable = true } = serviceConfig;
+        const { name, url, healthCheck, healthCheckPath, version, tags = [], discoverable = true } = serviceConfig;
 
         const service: ServiceInfo = {
             name,
@@ -69,6 +85,7 @@ class ServiceMeshManager extends EventEmitter {
                 p95ResponseTime: 0,
                 availabilityPercentage: 100
             } as MeshServiceMetrics,
+            healthCheckPath: healthCheckPath || DEFAULT_HEALTH_CHECK_PATH,
             healthCheck: healthCheck || this.defaultHealthCheck.bind(this)
         };
 
@@ -87,14 +104,14 @@ class ServiceMeshManager extends EventEmitter {
         }
 
         this.emit('service:registered', { service });
-        LogManager.info('Service registered in mesh', { name, url, version, tags });
+        LogManager.info('Service registered in mesh', { name, url, healthCheckPath: service.healthCheckPath, version, tags });
 
         return service;
     }
 
     private async defaultHealthCheck(service: ServiceInfo): Promise<boolean> {
         try {
-            const response = await fetch(`${service.url}/health`);
+            const response = await fetch(new URL(service.healthCheckPath, service.url));
             return response.status === 200;
         } catch (error: unknown) {
             LogManager.debug(`Health check failed for ${service.name}`, error);
@@ -211,7 +228,7 @@ class ServiceMeshManager extends EventEmitter {
         return strategies[strategy] || strategies['round-robin'];
     }
 
-    async handleRequest(req: Request, serviceName: string): Promise<unknown> {
+    async handleRequest(req: Request, serviceName: string): Promise<MeshResponse> {
         const service = this.services.get(serviceName);
         if (!service) {
             throw new Error(`Service ${serviceName} not found`);
@@ -246,7 +263,7 @@ class ServiceMeshManager extends EventEmitter {
             const response = await Promise.race([requestPromise, timeoutPromise]);
 
             const responseTime = Date.now() - startTime;
-            this.updateMetrics(serviceName, responseTime, true);
+            this.updateMetrics(serviceName, responseTime, response.status < 500);
 
             return response;
         } catch (error: unknown) {
@@ -257,14 +274,15 @@ class ServiceMeshManager extends EventEmitter {
         }
     }
 
-    private async _executeRequestWithRetry(req: Request, proxy: ServiceProxy): Promise<unknown> {
+    private async _executeRequestWithRetry(req: Request, proxy: ServiceProxy): Promise<MeshResponse> {
+        const attempts = IDEMPOTENT_METHODS.has(req.method) ? proxy.retryAttempts : 1;
         let lastError!: Error;
-        for (let attempt = 0; attempt < proxy.retryAttempts; attempt++) {
+        for (let attempt = 0; attempt < attempts; attempt++) {
             try {
                 return await this.routeRequest(req, proxy);
             } catch (error: unknown) {
                 lastError = error instanceof Error ? error : new Error(String(error));
-                if (attempt < proxy.retryAttempts - 1) {
+                if (attempt < attempts - 1) {
                     await new Promise(resolve =>
                         setTimeout(resolve, Math.pow(2, attempt) * 100));
                 }
@@ -273,32 +291,64 @@ class ServiceMeshManager extends EventEmitter {
         throw lastError;
     }
 
-    private async routeRequest(req: Request, proxy: ServiceProxy): Promise<unknown> {
-        const endpoint = proxy.loadBalancer(proxy.routes);
-        const cacheKey = `mesh:${req.method}:${req.path}`;
+    private buildForwardHeaders(req: Request): Headers {
+        const headers = new Headers();
+        for (const [name, value] of Object.entries(req.headers)) {
+            if (value === undefined || HOP_BY_HOP_HEADERS.has(name.toLowerCase())) {
+                continue;
+            }
+            headers.set(name, Array.isArray(value) ? value.join(', ') : value);
+        }
 
-        if (req.method === 'GET') {
-            const cached = await CacheManager.get(cacheKey);
+        const remoteAddress = req.socket?.remoteAddress;
+        if (remoteAddress) {
+            const forwardedFor = headers.get('x-forwarded-for');
+            headers.set('x-forwarded-for', forwardedFor ? `${forwardedFor}, ${remoteAddress}` : remoteAddress);
+        }
+        headers.set(MESH_FORWARDED_HEADER, '1');
+        return headers;
+    }
+
+    private isCacheable(req: Request): boolean {
+        return req.method === 'GET' && !req.headers.authorization && !req.headers.cookie;
+    }
+
+    private async routeRequest(req: Request, proxy: ServiceProxy): Promise<MeshResponse> {
+        const targetUrl = new URL(req.originalUrl || req.url, proxy.target);
+        const cacheKey = `mesh:${targetUrl.origin}:${req.method}:${targetUrl.pathname}${targetUrl.search}`;
+        const cacheable = this.isCacheable(req);
+
+        if (cacheable) {
+            const cached = await CacheManager.get(cacheKey) as MeshResponse | null;
             if (cached) return cached;
         }
 
-        const response = await fetch(`${endpoint as string}${req.path}`, {
+        const hasBody = req.method !== 'GET' && req.method !== 'HEAD';
+        const requestInit: RequestInit & { duplex?: 'half' } = {
             method: req.method,
-            headers: req.headers as Record<string, string>,
-            body: req.method !== 'GET' ? JSON.stringify(req.body) : undefined
-        });
-
-        if (!response.ok) {
-            throw new Error(`Service returned ${response.status}: ${response.statusText}`);
+            headers: this.buildForwardHeaders(req),
+            redirect: 'manual'
+        };
+        if (hasBody) {
+            requestInit.body = req as unknown as ReadableStream;
+            requestInit.duplex = 'half';
         }
 
-        if (req.method === 'GET') {
-            const data = await response.json();
-            await CacheManager.set(cacheKey, data, 300);
-            return data;
+        const response = await fetch(targetUrl, requestInit);
+        const result: MeshResponse = {
+            status: response.status,
+            contentType: response.headers.get('content-type'),
+            body: await response.text()
+        };
+        if (response.status >= 500) {
+            throw Object.assign(new Error(`Service returned ${response.status}: ${response.statusText}`), { meshResponse: result });
         }
 
-        return response.json();
+        if (cacheable && response.status === 200) {
+            await CacheManager.set(cacheKey, result, 300);
+        }
+
+        return result;
     }
 
     private updateMetrics(serviceName: string, responseTime: number, success: boolean): void {
@@ -330,18 +380,26 @@ class ServiceMeshManager extends EventEmitter {
         }
     }
 
-    createMeshMiddleware(): (req: Request, res: { json: (data: unknown) => void; status: (code: number) => { json: (data: unknown) => void } }, next: () => void) => Promise<void> {
+    createMeshMiddleware(): (req: Request, res: Response, next: NextFunction) => Promise<void> {
         return async (req, res, next) => {
+            if (req.headers[MESH_FORWARDED_HEADER]) {
+                return next();
+            }
+
             const serviceName = this.resolveService(req.path);
             if (!serviceName) {
                 return next();
             }
 
             try {
-                const result = await this.handleRequest(req, serviceName);
-                res.json(result);
+                this.sendMeshResponse(res, await this.handleRequest(req, serviceName));
             } catch (error: unknown) {
                 LogManager.error('Service mesh error', error);
+                const upstream = (error as { meshResponse?: MeshResponse }).meshResponse;
+                if (upstream) {
+                    this.sendMeshResponse(res, upstream);
+                    return;
+                }
                 const message = error instanceof Error ? error.message : 'Unknown error';
                 res.status(503).json({
                     error: 'Service temporarily unavailable',
@@ -350,6 +408,14 @@ class ServiceMeshManager extends EventEmitter {
                 });
             }
         };
+    }
+
+    private sendMeshResponse(res: Response, result: MeshResponse): void {
+        res.status(result.status);
+        if (result.contentType) {
+            res.type(result.contentType);
+        }
+        res.send(result.body);
     }
 
     private resolveService(path: string): string | null {
