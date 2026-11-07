@@ -30,6 +30,18 @@ class API {
         return trimmed.endsWith('/api') ? trimmed : `${trimmed}/api`;
     }
 
+    static formatDetails(details) {
+        if (Array.isArray(details)) {
+            return details.join('\n');
+        }
+        if (typeof details !== 'object') {
+            return String(details);
+        }
+        return Object.entries(details)
+            .map(([field, errors]) => `${field}: ${Array.isArray(errors) ? errors.join(', ') : errors}`)
+            .join('\n');
+    }
+
     saveConfig() {
         try {
             fs.writeFileSync(this.configFile, JSON.stringify({
@@ -51,9 +63,12 @@ class API {
         const headers = {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
-            'Accept-Version': 'v1',
-            'x-cli-api-key': process.env.CLI_API_KEY
+            'Accept-Version': 'v1'
         };
+
+        if (process.env.CLI_API_KEY) {
+            headers['x-cli-api-key'] = process.env.CLI_API_KEY;
+        }
 
         if (this.token) {
             headers['Authorization'] = `Bearer ${this.token}`;
@@ -68,14 +83,17 @@ class API {
                 }
             });
 
-            const data = await response.json();
+            const text = await response.text();
+            let data;
+            try {
+                data = text ? JSON.parse(text) : {};
+            } catch (parseError) {
+                throw new Error(`Unexpected non-JSON response (HTTP ${response.status}) from ${url}`);
+            }
 
             if (!response.ok) {
                 if (response.status === 400 && data.details) {
-                    const errorMessage = Object.entries(data.details)
-                        .map(([field, errors]) => `${field}: ${errors.join(', ')}`)
-                        .join('\n');
-                    throw new Error(errorMessage);
+                    throw new Error(API.formatDetails(data.details));
                 }
                 throw new Error(data.error || data.message || 'Request failed');
             }
