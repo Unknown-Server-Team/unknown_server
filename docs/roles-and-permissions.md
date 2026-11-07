@@ -43,10 +43,14 @@ The Unknown Server implements a robust Role-Based Access Control (RBAC) system w
 ## API Endpoints
 
 ### Role Management
-- GET `/api/auth/roles` - List all roles
-- GET `/api/auth/user/{userId}/roles` - Get user's roles
-- POST `/api/auth/user/{userId}/roles/{roleId}` - Assign role to user
-- DELETE `/api/auth/user/{userId}/roles/{roleId}` - Remove role from user
+All role management endpoints require a verified account with the `admin` role; other authenticated users receive `403`.
+
+- GET `/api/v1/auth/roles` - List all roles
+- GET `/api/v1/auth/user/{userId}/roles` - Get a user's roles
+- POST `/api/v1/auth/user/{userId}/roles/{roleName}` - Assign a role to a user (`201`, `409` if already assigned)
+- DELETE `/api/v1/auth/user/{userId}/roles/{roleName}` - Remove a role from a user (`404` if not assigned, `409` when removing the last admin)
+
+The CLI wraps these as `unknown auth roles --list`, `unknown auth roles --user <id>` and `unknown user role <id> <add|remove> <role>`.
 
 ### Permission Management
 - GET `/api/auth/permissions` - List all permissions
