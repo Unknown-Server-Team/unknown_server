@@ -1,4 +1,5 @@
 import type { Request } from 'express';
+import type { FileArray } from 'express-fileupload';
 
 export interface ValidationResult {
     isValid: boolean;
@@ -70,10 +71,7 @@ export interface TypedRequest extends Omit<Request, 'params' | 'files' | 'body' 
     body: Record<string, unknown>;
     params: Record<string, string>;
     query: Record<string, string | undefined>;
-    files?: {
-        file: UploadedFile;
-        [key: string]: UploadedFile;
-    };
+    files?: FileArray | null;
     sanitizedBody?: unknown;
     apiVersion?: string;
     user?: { id: number };

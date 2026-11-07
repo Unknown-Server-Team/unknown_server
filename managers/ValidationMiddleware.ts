@@ -152,7 +152,14 @@ class ValidationMiddleware {
                 });
             }
 
-            const file: UploadedFile = req.files.file;
+            const uploaded = req.files.file;
+            const file: UploadedFile | undefined = Array.isArray(uploaded) ? uploaded[0] : uploaded;
+            if (!file) {
+                return res.status(400).json({
+                    error: 'No files were uploaded',
+                    details: { file: ['File is required'] }
+                });
+            }
             const errors: string[] = [];
 
             if (options.maxSize && file.size > options.maxSize) {
