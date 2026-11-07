@@ -41,7 +41,7 @@ Response (`201`, `409` if the email is taken):
     "id": 1,
     "email": "user@example.com",
     "name": "Jane Doe",
-    "email_verified": false
+    "email_verified": 0
   }
 }
 ```
@@ -70,7 +70,7 @@ Response (`401` on invalid credentials):
     "id": 1,
     "email": "user@example.com",
     "name": "Jane Doe",
-    "email_verified": true
+    "email_verified": 1
   },
   "expiresIn": 86400
 }
