@@ -11,7 +11,7 @@ import type {
     ServiceEndpointState,
     ServiceConfig,
     CircuitBreakerOptions,
-    CircuitBreakerContext,
+    CircuitState,
     GatewayCircuitBreakerState,
     ServiceHealth,
     GatewayServiceMetrics,
@@ -117,43 +117,34 @@ class GatewayManager {
             throw new Error(`Service ${serviceName} not found`);
         }
 
-        const breaker = new CircuitBreaker(async (req: GatewayRequest) => {
+        const breaker: GatewayCircuitBreakerState = new CircuitBreaker(async (req: GatewayRequest) => {
             const startTime = performance.now();
             try {
                 const result = await this.routeRequest(service, req);
-                const duration = performance.now() - startTime;
-                PerformanceManager.trackRequest(duration, 200, req.path);
+                PerformanceManager.trackRequest(performance.now() - startTime, 200, req.path);
                 return result;
             } catch (error: unknown) {
-                const duration = performance.now() - startTime;
-                void duration;
                 PerformanceManager.trackError(error, req.path);
                 throw error;
             }
         }, {
             ...this.defaultCircuitBreakerOptions,
             ...options
-        }) as unknown as GatewayCircuitBreakerState & {
-            on(event: 'timeout', listener: (_error: unknown, context: CircuitBreakerContext | undefined) => void): void;
-            on(event: 'failure', listener: (_error: unknown, context: CircuitBreakerContext | undefined) => void): void;
-            on(event: string, listener: (...args: any[]) => void): void;
-        };
+        });
 
         breaker.on('success', () => {
             LogManager.debug(`Circuit breaker success: ${serviceName}`);
         });
 
-        breaker.on('timeout', (_error: unknown, context: CircuitBreakerContext | undefined) => {
+        breaker.on('timeout', () => {
             LogManager.warning(`Circuit breaker timeout: ${serviceName}`);
-            if (context && context.path) {
-                this._markServiceEndpoint(serviceName, context.path, false);
-            }
         });
 
-        breaker.on('failure', (_error: unknown, context: CircuitBreakerContext | undefined) => {
+        breaker.on('failure', (_error: Error, _latencyMs: number, args: [GatewayRequest]) => {
             LogManager.error(`Circuit breaker failure: ${serviceName}`);
-            if (context && context.path) {
-                this._markServiceEndpoint(serviceName, context.path, false);
+            const failedPath = args?.[0]?.path;
+            if (failedPath) {
+                this._markServiceEndpoint(serviceName, failedPath, false);
             }
         });
 
@@ -357,7 +348,7 @@ class GatewayManager {
                 isActive: service.isActive,
                 healthPercentage,
                 circuitBreakerState: breaker ? {
-                    state: breaker.status.state ?? 'unknown',
+                    state: this._getCircuitState(breaker),
                     stats: {
                         successful: breaker.stats.successes,
                         failed: breaker.stats.failures,
@@ -375,6 +366,13 @@ class GatewayManager {
             };
         }
         return health;
+    }
+
+    private _getCircuitState(breaker: GatewayCircuitBreakerState): CircuitState {
+        if (breaker.opened) {
+            return 'open';
+        }
+        return breaker.halfOpen ? 'half-open' : 'closed';
     }
 
     private _markServiceEndpoint(serviceName: string, path: string, isHealthy: boolean): void {
@@ -488,7 +486,7 @@ class GatewayManager {
                 timeout: breaker.stats.timeouts,
                 rejected: breaker.stats.rejects,
                 fallback: breaker.stats.fallbacks,
-                circuitState: breaker.status.state ?? 'unknown',
+                circuitState: this._getCircuitState(breaker),
                 healthyEndpoints: service.endpoints.filter((endpoint) => endpoint.isHealthy).length,
                 totalEndpoints: service.endpoints.length
             };

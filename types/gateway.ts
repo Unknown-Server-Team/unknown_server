@@ -1,18 +1,10 @@
 import type { Request } from 'express';
-import CircuitBreaker from 'opossum';
+import type CircuitBreaker from 'opossum';
 
 export type LoadBalancingStrategy = 'round-robin' | 'least-connections' | 'weighted';
 export type GatewayResponse = unknown;
 
-export interface GatewayRequestHeaders extends Request['headers'] {
-    [key: string]: string | string[] | undefined;
-}
-
-export interface GatewayRequest extends Request {
-    method: string;
-    path: string;
-    headers: GatewayRequestHeaders;
-}
+export type GatewayRequest = Request;
 
 export interface GatewayHandler {
     (req: GatewayRequest): Promise<GatewayResponse>;
@@ -75,31 +67,9 @@ export interface CircuitBreakerOptions {
     volumeThreshold?: number;
 }
 
-export interface CircuitBreakerContext {
-    path?: string;
-}
+export type CircuitState = 'open' | 'half-open' | 'closed';
 
-export interface CircuitBreakerStats {
-    successes: number;
-    failures: number;
-    rejects: number;
-    timeouts: number;
-    fallbacks: number;
-}
-
-export interface CircuitBreakerStatus {
-    state?: string;
-    [key: string]: unknown;
-}
-
-export type GatewayCircuitBreaker = InstanceType<typeof CircuitBreaker>;
-
-export interface GatewayCircuitBreakerState extends GatewayCircuitBreaker {
-    stats: CircuitBreakerStats;
-    status: CircuitBreakerStatus;
-    fire(req: GatewayRequest): Promise<GatewayResponse>;
-    close(): void;
-}
+export type GatewayCircuitBreakerState = CircuitBreaker<[GatewayRequest], GatewayResponse>;
 
 export interface ServiceHealthEndpoint {
     path: string;
@@ -150,9 +120,4 @@ export interface ServiceMeshManagerModule {
 export interface PerformanceManagerModule {
     trackRequest(duration: number, statusCode: number, path: string): void;
     trackError(error: unknown, path: string): void;
-}
-
-export interface GatewayManagerExport {
-    gatewayManager: unknown;
-    default: unknown;
 }
