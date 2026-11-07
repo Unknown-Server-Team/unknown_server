@@ -1,18 +1,15 @@
 import express, { Request, Response, Router } from 'express';
-import { AuthenticatedRequest, UserData, PaginatedResponse } from '../../../types';
-import type { LogManagerModule } from '../../../types/modules';
-import AuthManagerImport from '../../../managers/AuthManager';
-import RoleManagerImport from '../../../managers/RoleManager';
+import type { UserData, PaginatedResponse, UserUpdateData } from '../../../types';
+import type { AuthenticatedRequest } from '../../../types/authManager';
+import AuthManager from '../../../managers/AuthManager';
+import RoleManager from '../../../managers/RoleManager';
+import ValidationManager from '../../../managers/ValidationManager';
 import databaseQueries from '../../../database/mainQueries';
-import LogManagerImport from '../../../managers/LogManager';
-import ValidationMiddlewareImport from '../../../managers/ValidationMiddleware';
+import LogManager from '../../../managers/LogManager';
+import ValidationMiddleware from '../../../managers/ValidationMiddleware';
 import { RatelimitManager } from '../../../managers/RatelimitManager';
 
-const userQueries = databaseQueries.userQueries as Record<string, any>;
-const LogManager = LogManagerImport as unknown as LogManagerModule;
-const AuthManager = AuthManagerImport as unknown as Record<string, any>;
-const RoleManager = RoleManagerImport as unknown as Record<string, any>;
-const ValidationMiddleware = ValidationMiddlewareImport as unknown as Record<string, any>;
+const { userQueries } = databaseQueries;
 
 const router: Router = express.Router();
 
@@ -27,14 +24,8 @@ interface UsersQuery {
     limit?: string;
 }
 
-interface UserUpdateData {
-    name?: string;
-    email?: string;
-    [key: string]: any;
-}
-
 router.get('/',
-    AuthManager.getAuthMiddleware({ roles: ['admin'] }),
+    AuthManager.getAuthMiddleware({ requireVerified: true, roles: ['admin'] }),
     ValidationMiddleware.validateQuery({
         page: { type: 'number', min: 1 },
         limit: { type: 'number', min: 1, max: 100 }
@@ -51,7 +42,7 @@ router.get('/',
             
             const response: PaginatedResponse<UserData> = {
                 success: true,
-                data: users,
+                data: users as unknown as UserData[],
                 pagination: {
                     page,
                     limit,
@@ -130,8 +121,30 @@ router.put('/:id',
                 return;
             }
 
-            const updateData: UserUpdateData = req.body;
-            const updatedUser = await userQueries.updateUser(userId, updateData);
+            const { name, email } = req.body as UserUpdateData;
+            if (email !== undefined && (typeof email !== 'string' || !ValidationManager.validateEmail(email))) {
+                res.status(400).json({
+                    success: false,
+                    error: 'Invalid email address'
+                });
+                return;
+            }
+            if (name !== undefined && (typeof name !== 'string' || !ValidationManager.validateName(name).isValid)) {
+                res.status(400).json({
+                    success: false,
+                    error: 'Invalid name'
+                });
+                return;
+            }
+
+            const updatedUser = await userQueries.updateUser(userId, { name, email });
+            if (!updatedUser) {
+                res.status(404).json({
+                    success: false,
+                    error: 'User not found'
+                });
+                return;
+            }
             
             res.json({
                 success: true,
@@ -151,7 +164,7 @@ router.put('/:id',
 );
 
 router.delete('/:id',
-    AuthManager.getAuthMiddleware({ roles: ['admin'] }),
+    AuthManager.getAuthMiddleware({ requireVerified: true, roles: ['admin'] }),
     ValidationMiddleware.validateId(),
     async (req: Request, res: Response): Promise<void> => {
         try {
