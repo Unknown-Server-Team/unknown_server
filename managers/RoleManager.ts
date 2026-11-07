@@ -194,7 +194,7 @@ class RoleManager {
         }
 
         for (const role of userRoles) {
-            if (await this._checkRoleHierarchy(role.id, targetRole[0].id, new Set<number>())) {
+            if (await this._checkRoleHierarchy(targetRole[0].id, role.id, new Set<number>())) {
                 return true;
             }
         }
@@ -442,17 +442,17 @@ class RoleManager {
 
             if (Array.isArray(userRoles) && userRoles.length > 0) {
                 for (const role of userRoles) {
-                    const parentRoleIds = await this._getAllParentRoleIds(role.id, new Set<number>());
-                    if (parentRoleIds.size > 0) {
-                        const parentPermissions = await db.query(`
+                    const descendantRoleIds = this._getAllDescendantRoleIds(role.id);
+                    if (descendantRoleIds.size > 0) {
+                        const descendantPermissions = await db.query(`
                             SELECT DISTINCT p.*
                             FROM permissions p
                             JOIN role_permissions rp ON p.id = rp.permission_id
                             WHERE rp.role_id IN (?)
-                        `, [Array.from(parentRoleIds)]) as PermissionRecord[];
+                        `, [Array.from(descendantRoleIds)]) as PermissionRecord[];
 
-                        if (Array.isArray(parentPermissions)) {
-                            inheritedPermissions.push(...parentPermissions);
+                        if (Array.isArray(descendantPermissions)) {
+                            inheritedPermissions.push(...descendantPermissions);
                         }
                     }
                 }
@@ -470,16 +470,14 @@ class RoleManager {
         }
     }
 
-    private async _getAllParentRoleIds(roleId: number, visited: Set<number> = new Set<number>()): Promise<Set<number>> {
-        const parents = this.roleHierarchy.get(roleId) || [];
+    private _getAllDescendantRoleIds(roleId: number, visited: Set<number> = new Set<number>([roleId])): Set<number> {
         const result = new Set<number>();
 
-        for (const parentId of parents) {
-            if (!visited.has(parentId)) {
-                visited.add(parentId);
-                result.add(parentId);
-                const grandparents = await this._getAllParentRoleIds(parentId, visited);
-                grandparents.forEach((id) => result.add(id));
+        for (const [childId, parents] of this.roleHierarchy.entries()) {
+            if (parents.includes(roleId) && !visited.has(childId)) {
+                visited.add(childId);
+                result.add(childId);
+                this._getAllDescendantRoleIds(childId, visited).forEach((id) => result.add(id));
             }
         }
 
