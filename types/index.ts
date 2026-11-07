@@ -186,8 +186,13 @@ export interface SessionRecord {
     updated_at: Date;
 }
 
+export interface UserUpdateData {
+    name?: string;
+    email?: string;
+}
+
 export interface UserQueries {
-    createUser(userData: RegistrationData): Promise<unknown>;
+    createUser(userData: RegistrationData): Promise<{ insertId: number }>;
     getUserByEmail(email: string): Promise<UserRecord | undefined>;
     getUserById(id: number): Promise<UserRecord | undefined>;
     getUserByEmailVerificationToken(token: string): Promise<UserRecord | undefined>;
@@ -197,6 +202,7 @@ export interface UserQueries {
     verifyEmail(userId: number): Promise<unknown>;
     updatePassword(userId: number, password: string): Promise<unknown>;
     getUsers(offset?: number, limit?: number): Promise<UserRecord[]>;
+    updateUser(userId: number, data: UserUpdateData): Promise<UserRecord | undefined>;
     getUserCount(): Promise<number>;
     countUsersByRole(roleName: string): Promise<number>;
     deleteUser(userId: number): Promise<boolean>;

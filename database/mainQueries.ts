@@ -4,7 +4,8 @@ import {
     DatabaseQueries, 
     UserRecord, 
     RoleRecord, 
-    RegistrationData 
+    RegistrationData,
+    UserUpdateData
 } from '../types';
 import db from './db';
 import LogManager from '../managers/LogManager';
@@ -137,6 +138,43 @@ async function initializeQueries(): Promise<void> {
                 INDEX idx_audit_action (action),
                 INDEX idx_audit_resource (resource),
                 INDEX idx_audit_created (created_at)
+            )
+        `);
+
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS auth_audit_log (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                action_type VARCHAR(100) NOT NULL,
+                admin_id INT NULL,
+                target_id INT NULL,
+                role_id INT NULL,
+                permission_id INT NULL,
+                metadata JSON,
+                ip_address VARCHAR(45),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_auth_audit_action (action_type),
+                INDEX idx_auth_audit_admin (admin_id),
+                INDEX idx_auth_audit_target (target_id),
+                INDEX idx_auth_audit_created (created_at)
+            )
+        `);
+
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS role_analytics (
+                role_id INT NOT NULL PRIMARY KEY,
+                total_users INT NOT NULL DEFAULT 0,
+                total_actions INT NOT NULL DEFAULT 0,
+                last_used DATETIME,
+                FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE CASCADE
+            )
+        `);
+
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS permission_analytics (
+                permission_id INT NOT NULL PRIMARY KEY,
+                total_uses INT NOT NULL DEFAULT 0,
+                last_used DATETIME,
+                FOREIGN KEY (permission_id) REFERENCES permissions(id) ON DELETE CASCADE
             )
         `);
 
@@ -315,8 +353,10 @@ const roleHierarchyQueries: RoleHierarchyQueries = {
     }
 };
 
+const PUBLIC_USER_COLUMNS = 'id, email, name, email_verified, created_at, updated_at';
+
 const userQueries: UserQueries = {
-    async createUser(userData: RegistrationData): Promise<any> {
+    async createUser(userData: RegistrationData): Promise<{ insertId: number }> {
         const { email, password, name } = userData;
         const result = await db.query(
             'INSERT INTO users (email, password, name) VALUES (?, ?, ?)',
@@ -335,7 +375,7 @@ const userQueries: UserQueries = {
 
     async getUserById(id: number): Promise<UserRecord | undefined> {
         const users = await db.query(
-            'SELECT id, email, name, created_at FROM users WHERE id = ?',
+            `SELECT ${PUBLIC_USER_COLUMNS} FROM users WHERE id = ?`,
             [id]
         );
         return users[0];
@@ -391,10 +431,30 @@ const userQueries: UserQueries = {
 
     async getUsers(offset: number = 0, limit: number = 10): Promise<UserRecord[]> {
         const users = await db.query(
-            'SELECT * FROM users ORDER BY created_at DESC LIMIT ? OFFSET ?',
+            `SELECT ${PUBLIC_USER_COLUMNS} FROM users ORDER BY created_at DESC LIMIT ? OFFSET ?`,
             [limit, offset]
         );
         return users;
+    },
+
+    async updateUser(userId: number, data: UserUpdateData): Promise<UserRecord | undefined> {
+        const assignments: string[] = [];
+        const values: Array<string | number> = [];
+
+        if (typeof data.name === 'string') {
+            assignments.push('name = ?');
+            values.push(data.name);
+        }
+        if (typeof data.email === 'string') {
+            assignments.push('email = ?');
+            values.push(data.email);
+        }
+
+        if (assignments.length > 0) {
+            await db.query(`UPDATE users SET ${assignments.join(', ')} WHERE id = ?`, [...values, userId]);
+        }
+
+        return this.getUserById(userId);
     },
 
     async getUserCount(): Promise<number> {
