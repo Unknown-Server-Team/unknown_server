@@ -2,7 +2,9 @@
   "compilerOptions": {
     "target": "ES2020",
     "module": "commonjs",
+    "moduleResolution": "node",
     "lib": ["ES2020"],
+    "types": ["node"],
     "outDir": "./dist",
     "rootDir": "./",
     "strict": true,
@@ -16,23 +18,22 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "allowJs": true,
-    "checkJs": false,
-    "types": ["node"],
-    "moduleResolution": "node",
-    "experimentalDecorators": true,
-    "emitDecoratorMetadata": true,
-    "baseUrl": "./",
-    "paths": {
-      "@/*": ["./*"]
-    }
+    "checkJs": false
   },
   "include": [
-    "**/*.ts",
-    "**/*.js"
+    "server.ts",
+    "cluster.ts",
+    "config/**/*.ts",
+    "database/**/*.ts",
+    "managers/**/*.ts",
+    "managers/workers/*.js",
+    "routers/**/*.ts",
+    "types/**/*.ts"
   ],
   "exclude": [
     "node_modules",
     "dist",
-    "logs"
+    "logs",
+    "tmp"
   ]
 }
