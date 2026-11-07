@@ -1,17 +1,3 @@
-export interface CliCommand {
-    description: string;
-    subcommands: Record<string, string>;
-}
-
-export interface CliCommands {
-    commands: Record<string, CliCommand>;
-}
-
-export interface CliValidationResult {
-    isValid: boolean;
-    errors: string[];
-}
-
 export interface DocGenerationOptions {
     includePrivateEndpoints?: boolean;
     formatType?: 'markdown' | 'html' | 'json';
