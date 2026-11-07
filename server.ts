@@ -23,6 +23,7 @@ import PerformanceManager from './managers/PerformanceManager';
 import WebsocketManager from './managers/WebsocketManager';
 import AuthMonitor from './managers/AuthMonitor';
 import SessionManager from './managers/SessionManager';
+import RoleManager from './managers/RoleManager';
 import GatewayManager from './managers/GatewayManager';
 import ServiceMeshManager from './managers/ServiceMeshManager';
 import WorkerThreadManager from './managers/WorkerThreadManager';
@@ -253,6 +254,7 @@ const startServer = async (): Promise<void> => {
 
         LogManager.info('Initializing database...');
         await databaseQueries.initializeQueries();
+        await RoleManager.initialize();
 
         if (!isClusterWorker || process.env.NODE_APP_INSTANCE === '0') {
             AuthMonitor.startMonitoring();

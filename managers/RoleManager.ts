@@ -40,10 +40,10 @@ class RoleManager {
     constructor() {
         this.CACHE_TTL = 300;
         this.roleHierarchy = new Map();
-        void this._initializeRoleHierarchy();
     }
 
-    private async _initializeRoleHierarchy(): Promise<void> {
+    async initialize(): Promise<void> {
+        this.roleHierarchy = new Map();
         try {
             const hierarchyData = await db.query(`
                 SELECT parent_role_id, child_role_id
