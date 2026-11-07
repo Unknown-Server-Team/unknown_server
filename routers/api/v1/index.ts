@@ -144,49 +144,45 @@ router.get('/metrics', (req: Request, res: Response) => {
     res.json(response);
 });
 
+interface RouteLayer {
+    route?: {
+        path: string;
+        methods: Record<string, boolean>;
+        stack: Array<{ name: string }>;
+    };
+    name: string;
+    regexp?: RegExp;
+    handle: { stack?: RouteLayer[] };
+}
+
+const mountPathOf = (layer: RouteLayer): string => {
+    const match = /^\^((?:\\\/[^\\?(]+)+)\\\/\?\(\?=/.exec(layer.regexp?.source ?? '');
+    return match ? match[1].replace(/\\\//g, '/') : '';
+};
+
+const joinPath = (basePath: string, routePath: string): string => (
+    routePath === '/' ? basePath || '/' : `${basePath}${routePath}`
+);
+
+const collectRoutes = (stack: RouteLayer[], basePath: string, routes: ApiRoute[]): void => {
+    stack.forEach((layer: RouteLayer) => {
+        if (layer.route) {
+            const path = joinPath(basePath, layer.route.path);
+            const isProtected = layer.route.stack.some((handler) => handler.name === 'authenticate');
+            Object.keys(layer.route.methods)
+                .filter((method: string) => layer.route?.methods[method])
+                .forEach((method: string) => {
+                    routes.push({ path, method: method.toUpperCase(), protected: isProtected });
+                });
+        } else if (layer.name === 'router' && layer.handle.stack) {
+            collectRoutes(layer.handle.stack, basePath + mountPathOf(layer), routes);
+        }
+    });
+};
+
 router.get('/routes', (_req: Request, res: Response) => {
     const routes: ApiRoute[] = [];
-
-    function extractRoutes(router: any, basePath: string = '') {
-        if (!router.stack) return;
-
-        router.stack.forEach((layer: any) => {
-            if (layer.route) {
-                const path = basePath + layer.route.path;
-                Object.keys(layer.route.methods).forEach((method: string) => {
-                    if (layer.route.methods[method]) {
-                        routes.push({
-                            path,
-                            method: method.toUpperCase(),
-                            protected: path.includes('/auth/') || 
-                                      path.includes('/users/') || 
-                                      (layer.route.stack && 
-                                      layer.route.stack.some((s: any) => 
-                                        s.name === 'authenticate' || 
-                                        s.name === 'authorize'
-                                      ))
-                        });
-                    }
-                });
-            } else if (layer.name === 'router') {
-                let newPath = basePath;
-                if (layer.regexp && layer.regexp.fast_slash === false) {
-                    const match = layer.regexp.toString().match(/^\/\^((?:\\\/|[^\/])+)/);
-                    if (match) {
-                        newPath = basePath + match[1].replace(/\\(.)/g, '$1');
-                    }
-                }
-                extractRoutes(layer.handle, newPath);
-            }
-        });
-    }
-
-    extractRoutes(router, '/api/v1');
-
-    extractRoutes(authRouter, '/api/v1/auth');
-
-    extractRoutes(usersRouter, '/api/v1/users');
-    
+    collectRoutes((router as unknown as { stack: RouteLayer[] }).stack, '/api/v1', routes);
     res.json(routes);
 });
 

@@ -203,7 +203,7 @@ class AuthManager {
     }
 
     getAuthMiddleware(options: AuthMiddlewareOptions = { requireVerified: true, roles: [] }): (req: AuthenticatedRequest, res: Response, next: NextFunction) => Promise<Response | void> {
-        return async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<Response | void> => {
+        const authenticate = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<Response | void> => {
             const token = this.extractToken(req);
             if (!token) {
                 return res.status(401).json({ error: 'No token provided' });
@@ -237,6 +237,7 @@ class AuthManager {
             req.userRoles = await RoleManager.getUserRoles(user.id);
             next();
         };
+        return authenticate;
     }
 
     extractToken(req: AuthenticatedRequest): string | null {
