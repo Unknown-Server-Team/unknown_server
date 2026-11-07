@@ -14,9 +14,6 @@ const authCommands = require('./commands/auth');
 const serviceCommands = require('./commands/service');
 const docsCommands = require('./commands/docs');
 
-/**
- * Create a bordered box around text using ASCII characters
- */
 function createBox(text, { padding = 1, borderColor = 'cyan', margin = 1 } = {}) {
   const lines = text.split('\n');
   const contentWidth = Math.max(...lines.map(line => line.length));
@@ -40,9 +37,6 @@ function createBox(text, { padding = 1, borderColor = 'cyan', margin = 1 } = {})
   ].join('\n');
 }
 
-/**
- * Display the welcome banner with styled text
- */
 function displayBanner() {
   console.clear();
   console.log('\n');
@@ -59,9 +53,6 @@ function displayBanner() {
   console.log(createBox(welcomeMessage, { borderColor: 'cyan', margin: 0 }));
 }
 
-/**
- * Show the main interactive menu
- */
 async function showMainMenu() {
   displayBanner();
   
@@ -96,9 +87,6 @@ async function showMainMenu() {
   await showSubMenu(menuChoice);
 }
 
-/**
- * Show submenu based on main menu selection
- */
 async function showSubMenu(category) {
   console.clear();
   displayBanner();
@@ -184,9 +172,6 @@ async function showSubMenu(category) {
   await executeCommand(category, action);
 }
 
-/**
- * Execute the command based on category and action
- */
 async function executeCommand(category, action) {
   try {
     let cmd;

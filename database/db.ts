@@ -1,7 +1,6 @@
 import mysql from 'mysql';
 import LogManager from '../managers/LogManager';
 
-// Database configuration interface
 interface DatabaseConfig {
     host: string;
     port: number;
@@ -13,14 +12,12 @@ interface DatabaseConfig {
     queueLimit: number;
 }
 
-// Database connection interface
 interface DatabaseConnection {
     pool: mysql.Pool;
     query: (sql: string, params?: any[]) => Promise<any>;
     close: () => Promise<void>;
 }
 
-// Create database configuration
 const config: DatabaseConfig = {
     host: process.env.DB_HOST || 'localhost',
     port: parseInt(process.env.DB_PORT || '3306', 10),
@@ -32,10 +29,8 @@ const config: DatabaseConfig = {
     queueLimit: 0
 };
 
-// Create connection pool
 const pool: mysql.Pool = mysql.createPool(config);
 
-// Promisify the pool query method with proper typing
 const query = (sql: string, params?: any[]): Promise<any> => {
     return new Promise((resolve, reject) => {
         pool.query(sql, params, (error: mysql.MysqlError | null, results: any) => {
@@ -48,7 +43,6 @@ const query = (sql: string, params?: any[]): Promise<any> => {
     });
 };
 
-// Close database connection pool
 const close = (): Promise<void> => {
     return new Promise((resolve, reject) => {
         pool.end((err?: mysql.MysqlError) => {
@@ -62,7 +56,6 @@ const close = (): Promise<void> => {
     });
 };
 
-// Export database connection object
 const db: DatabaseConnection = {
     pool,
     query,

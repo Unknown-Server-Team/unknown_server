@@ -5,7 +5,6 @@ const figures = require('figures');
 const ora = require('ora');
 const API = require('../utils/api');
 
-// Service status command
 const status = new Command('status')
     .description('Check service status')
     .option('-v, --verbose', 'Show detailed status')
@@ -37,7 +36,6 @@ const status = new Command('status')
         }
     });
 
-// Add interactive mode support
 status.runInteractive = async function() {
     const spinner = ora('Fetching service status...').start();
     
@@ -87,7 +85,6 @@ status.runInteractive = async function() {
     }
 };
 
-// Service metrics command
 const metrics = new Command('metrics')
     .description('View service metrics')
     .option('-t, --time <period>', 'Time period (hour/day/week)', 'hour')
@@ -130,7 +127,6 @@ const metrics = new Command('metrics')
         }
     });
 
-// Add interactive mode support
 metrics.runInteractive = async function() {
     const periods = ['hour', 'day', 'week'];
     
@@ -198,7 +194,6 @@ metrics.runInteractive = async function() {
     }
 };
 
-// Route information command
 const routes = new Command('routes')
     .description('List API routes')
     .option('-v, --version <version>', 'API version', 'v1')
@@ -210,7 +205,6 @@ const routes = new Command('routes')
                     console.warn(chalk.yellow(`Warning: API version ${options.version} not found in available versions. Available versions: ${versions.versions.join(', ')}`));
                 }
             } catch (versionError) {
-                // Silently continue if versions endpoint is not available
             }
 
             const routes = await API.get(`/${options.version}/routes`);
@@ -238,7 +232,6 @@ const routes = new Command('routes')
         }
     });
 
-// Add interactive mode support
 routes.runInteractive = async function() {
     const spinner = ora('Fetching available API versions...').start();
     

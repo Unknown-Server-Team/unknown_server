@@ -7,7 +7,6 @@ const figures = require('figures');
 const API = require('../utils/api');
 const { validateEmail, validatePassword } = require('../utils/validation');
 
-// User list command
 const list = new Command('list')
     .description('List all users')
     .option('-p, --page <number>', 'Page number', '1')
@@ -23,7 +22,6 @@ const list = new Command('list')
                 return;
             }
             
-            // Create a more visually appealing table
             const table = new Table({
                 head: [
                     chalk.cyan('ID'), 
@@ -32,8 +30,8 @@ const list = new Command('list')
                     chalk.cyan('Verified')
                 ],
                 style: {
-                    head: [], // Empty style to keep our manual styling
-                    border: [] // Empty style to keep borders clean
+                    head: [],
+                    border: []
                 }
             });
             
@@ -53,7 +51,6 @@ const list = new Command('list')
         }
     });
 
-// Interactive version of list command
 list.runInteractive = async () => {
     try {
         const { page, limit } = await inquirer.prompt([
@@ -82,7 +79,6 @@ list.runInteractive = async () => {
             return;
         }
         
-        // Create a more visually appealing table
         const table = new Table({
             head: [
                 chalk.cyan('ID'), 
@@ -91,8 +87,8 @@ list.runInteractive = async () => {
                 chalk.cyan('Verified')
             ],
             style: {
-                head: [], // Empty style to keep our manual styling
-                border: [] // Empty style to keep borders clean
+                head: [],
+                border: []
             }
         });
         
@@ -108,7 +104,6 @@ list.runInteractive = async () => {
         console.log(table.toString());
         console.log(chalk.dim(`\nPage ${page} of users, showing ${users.length} of ${users.length} results`));
         
-        // Option to view detailed information about a specific user
         const { viewDetails } = await inquirer.prompt([
             {
                 type: 'confirm',
@@ -136,7 +131,6 @@ list.runInteractive = async () => {
             const detailsTable = new Table();
             
             Object.entries(userDetails).forEach(([key, value]) => {
-                // Format the value based on its type
                 let displayValue = value;
                 if (Array.isArray(value)) {
                     displayValue = value.join(', ');
@@ -160,7 +154,6 @@ list.runInteractive = async () => {
     }
 };
 
-// Create user command
 const create = new Command('create')
     .description('Create a new user')
     .action(async () => {
@@ -193,7 +186,6 @@ const create = new Command('create')
             console.log(chalk.cyan('ID: ') + response.user.id);
             console.log(chalk.cyan('Email: ') + response.user.email);
             console.log(chalk.cyan('Name: ') + response.user.name);
-            // Check both response formats for roles
             const roles = response.roles || [];
             console.log(chalk.cyan('Roles: ') + chalk.yellow(roles.join(', ')));
         } catch (error) {
@@ -201,12 +193,10 @@ const create = new Command('create')
         }
     });
 
-// Interactive version of create command
 create.runInteractive = async () => {
     try {
         console.log(chalk.cyan.bold('\nCreate a new user:'));
         
-        // Get available roles first
         const spinner = ora('Fetching available roles...').start();
         const roles = await API.get('/v1/auth/roles');
         spinner.stop();
@@ -262,7 +252,6 @@ create.runInteractive = async () => {
     }
 };
 
-// Delete user command
 const deleteUser = new Command('delete')
     .description('Delete a user')
     .argument('<id>', 'User ID to delete')
@@ -289,11 +278,9 @@ const deleteUser = new Command('delete')
         }
     });
 
-// Interactive version of delete command
 deleteUser.runInteractive = async () => {
     let spinner;
     try {
-        // Get list of users first
         spinner = ora('Fetching users...').start();
         const users = await API.get('/v1/users?limit=50');
         spinner.stop();
@@ -338,7 +325,6 @@ deleteUser.runInteractive = async () => {
     }
 };
 
-// Role management command
 const role = new Command('role')
     .description('Manage user roles')
     .argument('<userId>', 'User ID')
@@ -363,10 +349,8 @@ const role = new Command('role')
         }
     });
 
-// Interactive version of role command
 role.runInteractive = async () => {
     try {
-        // Get list of users first
         let spinner = ora('Fetching users...').start();
         const users = await API.get('/v1/users');
         spinner.stop();
@@ -376,7 +360,6 @@ role.runInteractive = async () => {
             return;
         }
         
-        // Get list of available roles
         spinner = ora('Fetching available roles...').start();
         const roles = await API.get('/v1/roles');
         spinner.stop();
@@ -393,12 +376,10 @@ role.runInteractive = async () => {
             }
         ]);
         
-        // Get the current user to show their roles
         spinner = ora('Fetching user details...').start();
         const user = await API.get(`/v1/users/${userId}`);
         spinner.stop();
         
-        // Show current roles
         console.log('\nCurrent roles:');
         if (user.roles && user.roles.length > 0) {
             user.roles.forEach(role => {
@@ -423,7 +404,6 @@ role.runInteractive = async () => {
         let roleChoices = [];
         
         if (action === 'add') {
-            // Filter out roles the user already has
             roleChoices = roles.filter(r => !user.roles?.includes(r.name)).map(r => ({
                 name: `${r.name} - ${r.description || 'No description'}`,
                 value: r.name
@@ -434,7 +414,6 @@ role.runInteractive = async () => {
                 return;
             }
         } else {
-            // Only show roles the user currently has
             roleChoices = user.roles?.map(r => ({
                 name: r,
                 value: r
@@ -465,7 +444,6 @@ role.runInteractive = async () => {
             spinner.succeed(`Role '${selectedRole}' removed from user successfully`);
         }
         
-        // Show updated user roles
         spinner = ora('Fetching updated user details...').start();
         const updatedUser = await API.get(`/v1/users/${userId}`);
         spinner.stop();

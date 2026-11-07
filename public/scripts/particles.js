@@ -79,11 +79,9 @@ if (typeof window !== 'undefined' && !window.ParticleSystem) {
 
         update() {
             this.particles.forEach(particle => {
-                // Update position
                 particle.x += particle.speedX;
                 particle.y += particle.speedY;
 
-                // Mouse interaction
                 if (this.mouse.x) {
                     const dx = this.mouse.x - particle.x;
                     const dy = this.mouse.y - particle.y;
@@ -96,7 +94,6 @@ if (typeof window !== 'undefined' && !window.ParticleSystem) {
                     }
                 }
 
-                // Wrap around screen
                 if (particle.x < 0) particle.x = this.canvas.width;
                 if (particle.x > this.canvas.width) particle.x = 0;
                 if (particle.y < 0) particle.y = this.canvas.height;
@@ -107,10 +104,8 @@ if (typeof window !== 'undefined' && !window.ParticleSystem) {
         draw() {
             this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
             
-            // Draw connections first
             this.drawConnections();
 
-            // Draw particles
             this.particles.forEach(particle => {
                 this.ctx.beginPath();
                 this.ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
@@ -132,7 +127,6 @@ if (typeof window !== 'undefined' && !window.ParticleSystem) {
         }
     }
 
-    // Initialize when DOM is loaded
     window.ParticleSystem = ParticleSystem;
     document.addEventListener('DOMContentLoaded', () => {
         const canvas = document.getElementById('particles');

@@ -1,28 +1,13 @@
-/**
- * Data Processing Worker Thread
- * 
- * This worker thread handles CPU-intensive data processing operations
- * such as data transformation, validation, and complex calculations.
- */
-
 const { workerData, parentPort } = require('worker_threads');
 const crypto = require('crypto');
-// Import mathjs for secure formula evaluation
 const math = require('mathjs');
 
-// Extract task information from worker data
 const { taskId, data, options } = workerData || {};
 
-/**
- * Simplified logger for worker threads
- * @param {string} level - Log level (info, error, warning)
- * @param {string} message - Log message
- */
 function workerLog(level, message, meta = {}) {
     const timestamp = new Date().toISOString();
     const pid = process.pid;
     
-    // Format the log entry
     const logEntry = {
         timestamp,
         level,
@@ -33,15 +18,12 @@ function workerLog(level, message, meta = {}) {
     console.log(JSON.stringify(logEntry));
 }
 
-// Main worker execution function
 async function executeTask() {
     try {
-        // Log the start of processing
         workerLog('info', `Data processing worker: Starting task ${taskId}`);
         
         let result;
         
-        // Process different types of data tasks
         switch (options.operation) {
             case 'validateData':
                 result = await validateData(data, options);
@@ -63,11 +45,9 @@ async function executeTask() {
                 throw new Error(`Unknown operation: ${options.operation}`);
         }
         
-        // Send the result back to the main thread
         parentPort.postMessage({ result });
         
     } catch (error) {
-        // Handle and report any errors
         workerLog('error', `Error executing task ${taskId}`, { 
             error: error.message,
             stack: error.stack
@@ -79,12 +59,6 @@ async function executeTask() {
     }
 }
 
-/**
- * Process user data operations
- * @param {Object} data - The user data to process
- * @param {Object} options - Processing options
- * @returns {Promise<Object>} - The processing result
- */
 async function processUserData(data, options = {}) {
     const { action } = options;
     
@@ -103,21 +77,14 @@ async function processUserData(data, options = {}) {
     }
 }
 
-/**
- * Anonymize user data by masking PII
- * @param {Object} userData - The user data to anonymize
- * @returns {Object} - Anonymized user data
- */
 function anonymizeUserData(userData) {
     const result = { ...userData };
     
-    // Mask email
     if (result.email) {
         const [username, domain] = result.email.split('@');
         result.email = `${username.substring(0, 2)}${'*'.repeat(username.length - 2)}@${domain}`;
     }
     
-    // Mask name
     if (result.name) {
         const nameParts = result.name.split(' ');
         result.name = nameParts.map(part => 
@@ -125,7 +92,6 @@ function anonymizeUserData(userData) {
         ).join(' ');
     }
     
-    // Remove sensitive fields
     delete result.password;
     delete result.password_reset_token;
     delete result.email_verification_token;
@@ -137,15 +103,9 @@ function anonymizeUserData(userData) {
     };
 }
 
-/**
- * Validate user data against schema rules
- * @param {Object} userData - The user data to validate
- * @returns {Object} - Validation results
- */
 function validateUserData(userData) {
     const errors = [];
     
-    // Email validation
     if (userData.email) {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(userData.email)) {
@@ -155,7 +115,6 @@ function validateUserData(userData) {
         errors.push('Email is required');
     }
     
-    // Password validation
     if (userData.password) {
         if (userData.password.length < 8) {
             errors.push('Password must be at least 8 characters long');
@@ -176,7 +135,6 @@ function validateUserData(userData) {
         errors.push('Password is required');
     }
     
-    // Name validation
     if (userData.name) {
         if (userData.name.length < 2) {
             errors.push('Name must be at least 2 characters long');
@@ -196,19 +154,12 @@ function validateUserData(userData) {
     };
 }
 
-/**
- * Generate secure fields for user data
- * @param {Object} userData - The user data
- * @returns {Object} - User data with secure fields
- */
 function generateSecureFields(userData) {
-    // Generate API key if requested
     let apiKey = null;
     if (userData.generateApiKey) {
         apiKey = crypto.randomBytes(16).toString('hex');
     }
     
-    // Generate recovery codes
     const recoveryCodes = [];
     const codeCount = 8;
     for (let i = 0; i < codeCount; i++) {
@@ -227,12 +178,6 @@ function generateSecureFields(userData) {
     };
 }
 
-/**
- * Validate data against schema
- * @param {any} data - The data to validate
- * @param {Object} options - Validation options
- * @returns {Promise<Object>} - Validation results
- */
 async function validateData(data, options = {}) {
     const { schema } = options;
     
@@ -240,21 +185,16 @@ async function validateData(data, options = {}) {
         throw new Error('Validation schema is required');
     }
     
-    // Implement schema validation logic
-    // This is a simplified example
     const errors = [];
     
-    // Process each field in the schema
     Object.entries(schema).forEach(([field, rules]) => {
         const value = data[field];
         
-        // Required check
         if (rules.required && (value === undefined || value === null || value === '')) {
             errors.push(`Field '${field}' is required`);
             return;
         }
         
-        // Type check
         if (value !== undefined && value !== null && rules.type) {
             const actualType = Array.isArray(value) ? 'array' : typeof value;
             
@@ -263,7 +203,6 @@ async function validateData(data, options = {}) {
             }
         }
         
-        // Min/max for strings and arrays
         if ((typeof value === 'string' || Array.isArray(value)) && value !== undefined && value !== null) {
             if (rules.minLength !== undefined && value.length < rules.minLength) {
                 errors.push(`Field '${field}' must have at least ${rules.minLength} ${typeof value === 'string' ? 'characters' : 'items'}`);
@@ -274,7 +213,6 @@ async function validateData(data, options = {}) {
             }
         }
         
-        // Min/max for numbers
         if (typeof value === 'number') {
             if (rules.min !== undefined && value < rules.min) {
                 errors.push(`Field '${field}' must be at least ${rules.min}`);
@@ -285,7 +223,6 @@ async function validateData(data, options = {}) {
             }
         }
         
-        // Pattern matching
         if (typeof value === 'string' && rules.pattern) {
             const regex = new RegExp(rules.pattern);
             if (!regex.test(value)) {
@@ -302,12 +239,6 @@ async function validateData(data, options = {}) {
     };
 }
 
-/**
- * Transform data based on transformation rules
- * @param {any} data - The data to transform
- * @param {Object} options - Transformation options
- * @returns {Promise<Object>} - Transformed data
- */
 async function transformData(data, options = {}) {
     const { transformations } = options;
     
@@ -317,7 +248,6 @@ async function transformData(data, options = {}) {
     
     let result = { ...data };
     
-    // Apply each transformation in sequence
     for (const transform of transformations) {
         switch (transform.type) {
             case 'rename':
@@ -338,7 +268,6 @@ async function transformData(data, options = {}) {
                     } else if (transform.format === 'lowercase') {
                         result[transform.field] = result[transform.field].toString().toLowerCase();
                     } else if (transform.format === 'date' && transform.dateFormat) {
-                        // Simple date formatting - would use day.js in a real implementation
                         const date = new Date(result[transform.field]);
                         result[transform.field] = date.toISOString();
                     }
@@ -348,29 +277,22 @@ async function transformData(data, options = {}) {
             case 'compute':
                 if (transform.formula && transform.target) {
                     try {
-                        // Create a mathjs scope with the current data fields as variables
                         const scope = {};
                         
-                        // Add all properties from result as variables in the math scope
                         Object.entries(result).forEach(([key, value]) => {
-                            // Only add numeric values or values that can be converted to numbers
                             if (typeof value === 'number' || !isNaN(Number(value))) {
                                 scope[key] = typeof value === 'number' ? value : Number(value);
                             } else {
-                                // For non-numeric values, set to 0 to prevent errors
                                 scope[key] = 0;
                             }
                         });
                         
-                        // Replace variable placeholders with their property names for mathjs
                         const parsedFormula = transform.formula.replace(/\$\{([^}]+)\}/g, (match, field) => {
                             return field;
                         });
                         
-                        // Evaluate the formula safely using mathjs
                         result[transform.target] = math.evaluate(parsedFormula, scope);
                         
-                        // Log the successful computation
                         workerLog('info', `Computed field '${transform.target}' using formula: ${transform.formula}`);
                     } catch (error) {
                         workerLog('error', `Error evaluating formula: ${transform.formula}`, { error: error.message });
@@ -387,25 +309,16 @@ async function transformData(data, options = {}) {
     };
 }
 
-/**
- * Calculate statistics on data
- * @param {Array|Object} data - The data to analyze
- * @param {Object} options - Analysis options
- * @returns {Promise<Object>} - Statistics results
- */
 async function calculateStatistics(data, options = {}) {
     const { metrics = ['count', 'sum', 'avg', 'min', 'max'] } = options;
     const { fields } = options;
     const results = {};
     
-    // If data is an array of objects
     if (Array.isArray(data)) {
-        // If no fields specified, auto-detect numeric fields
         const fieldsToAnalyze = fields || Object.keys(data[0] || {}).filter(key => 
             typeof data[0][key] === 'number'
         );
         
-        // Calculate statistics for each field
         fieldsToAnalyze.forEach(field => {
             const values = data.map(item => item[field]).filter(v => typeof v === 'number');
             
@@ -437,7 +350,6 @@ async function calculateStatistics(data, options = {}) {
             results[field] = fieldStats;
         });
     } else if (typeof data === 'object') {
-        // If it's a single object, just return its properties
         const fieldsToAnalyze = fields || Object.keys(data).filter(key => 
             typeof data[key] === 'number'
         );
@@ -454,5 +366,4 @@ async function calculateStatistics(data, options = {}) {
     };
 }
 
-// Start task execution
 executeTask();

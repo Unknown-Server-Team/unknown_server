@@ -50,7 +50,6 @@ const PORT: number = parseInt(process.env.PORT || '3000', 10);
 
 app.set('trust proxy', true);
 
-// I'm losing my mind with CORS -- Perhaps I just need to learn how to multiply.
 app.use(helmet({
     contentSecurityPolicy: {
         directives: {

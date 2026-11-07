@@ -1,13 +1,3 @@
-/**
- * Cluster Manager for Unknown Server
- * 
- * This script enables the server to utilize all available CPU cores by creating
- * worker processes through Node.js cluster module. This significantly improves
- * performance and request handling capacity.
- * 
- * In production, this should be the main entry point rather than server.js directly.
- */
-
 import { config as dotenvConfig } from 'dotenv';
 dotenvConfig();
 
