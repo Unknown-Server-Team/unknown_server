@@ -198,7 +198,7 @@ create.runInteractive = async () => {
         console.log(chalk.cyan.bold('\nCreate a new user:'));
         
         const spinner = ora('Fetching available roles...').start();
-        const roles = await API.get('/v1/auth/roles');
+        const { data: roles } = await API.get('/v1/auth/roles');
         spinner.stop();
 
         const answers = await inquirer.prompt([
@@ -325,34 +325,58 @@ deleteUser.runInteractive = async () => {
     }
 };
 
+const userRolesPath = (userId, roleName) => {
+    const base = `/v1/auth/user/${encodeURIComponent(userId)}/roles`;
+    return roleName ? `${base}/${encodeURIComponent(roleName)}` : base;
+};
+
+const changeUserRole = async (userId, action, roleName) => {
+    const response = action === 'add'
+        ? await API.post(userRolesPath(userId, roleName))
+        : await API.delete(userRolesPath(userId, roleName));
+    return response.data || [];
+};
+
+const printRoleNames = (title, roles) => {
+    console.log(`\n${title}`);
+    if (roles.length > 0) {
+        roles.forEach(r => {
+            console.log(`  ${chalk.green(figures.tick)} ${r.name}`);
+        });
+    } else {
+        console.log(chalk.yellow('  No roles assigned'));
+    }
+};
+
 const role = new Command('role')
     .description('Manage user roles')
     .argument('<userId>', 'User ID')
     .argument('<action>', 'Action to perform (add/remove)')
-    .argument('<role>', 'Role to add/remove')
-    .action(async (userId, action, role) => {
+    .argument('<role>', 'Role name to add/remove')
+    .action(async (userId, action, roleName) => {
+        if (action !== 'add' && action !== 'remove') {
+            console.error(chalk.red('Invalid action. Use "add" or "remove"'));
+            return;
+        }
+
+        const spinner = ora('Managing user role...').start();
         try {
-            const spinner = ora('Managing user role...').start();
-            
-            if (action === 'add') {
-                await API.post(`/v1/auth/user/${userId}/roles/${role}`);
-                spinner.succeed(`Role '${role}' added to user ${userId}`);
-            } else if (action === 'remove') {
-                await API.delete(`/v1/auth/user/${userId}/roles/${role}`);
-                spinner.succeed(`Role '${role}' removed from user ${userId}`);
-            } else {
-                spinner.fail('Invalid action');
-                console.error(chalk.red('Invalid action. Use "add" or "remove"'));
-            }
+            const updatedRoles = await changeUserRole(userId, action, roleName);
+            spinner.succeed(action === 'add'
+                ? `Role '${roleName}' added to user ${userId}`
+                : `Role '${roleName}' removed from user ${userId}`);
+            printRoleNames('Current roles:', updatedRoles);
         } catch (error) {
+            spinner.fail('Failed to manage role');
             console.error(chalk.red('Failed to manage role:'), chalk.red.dim(error.message));
         }
     });
 
 role.runInteractive = async () => {
+    let spinner;
     try {
-        let spinner = ora('Fetching users...').start();
-        const users = await API.get('/v1/users');
+        spinner = ora('Fetching users...').start();
+        const { data: users } = await API.get('/v1/users?limit=100');
         spinner.stop();
         
         if (users.length === 0) {
@@ -361,7 +385,7 @@ role.runInteractive = async () => {
         }
         
         spinner = ora('Fetching available roles...').start();
-        const roles = await API.get('/v1/roles');
+        const { data: roles } = await API.get('/v1/auth/roles');
         spinner.stop();
         
         const { userId } = await inquirer.prompt([
@@ -370,24 +394,17 @@ role.runInteractive = async () => {
                 name: 'userId',
                 message: 'Select a user:',
                 choices: users.map(u => ({ 
-                    name: `${u.email} (${u.id}) - Roles: ${u.roles?.join(', ') || 'none'}`, 
+                    name: `${u.email} (${u.id})`, 
                     value: u.id 
                 }))
             }
         ]);
         
-        spinner = ora('Fetching user details...').start();
-        const user = await API.get(`/v1/users/${userId}`);
+        spinner = ora('Fetching user roles...').start();
+        const { data: userRoles } = await API.get(userRolesPath(userId));
         spinner.stop();
         
-        console.log('\nCurrent roles:');
-        if (user.roles && user.roles.length > 0) {
-            user.roles.forEach(role => {
-                console.log(`  ${chalk.green(figures.tick)} ${role}`);
-            });
-        } else {
-            console.log(chalk.yellow('  No roles assigned'));
-        }
+        printRoleNames('Current roles:', userRoles);
         
         const { action } = await inquirer.prompt([
             {
@@ -401,28 +418,19 @@ role.runInteractive = async () => {
             }
         ]);
         
-        let roleChoices = [];
-        
-        if (action === 'add') {
-            roleChoices = roles.filter(r => !user.roles?.includes(r.name)).map(r => ({
+        const assigned = new Set(userRoles.map(r => r.name));
+        const roleChoices = action === 'add'
+            ? roles.filter(r => !assigned.has(r.name)).map(r => ({
                 name: `${r.name} - ${r.description || 'No description'}`,
                 value: r.name
-            }));
-            
-            if (roleChoices.length === 0) {
-                console.log(chalk.yellow('\nUser already has all available roles.'));
-                return;
-            }
-        } else {
-            roleChoices = user.roles?.map(r => ({
-                name: r,
-                value: r
-            })) || [];
-            
-            if (roleChoices.length === 0) {
-                console.log(chalk.yellow('\nUser has no roles to remove.'));
-                return;
-            }
+            }))
+            : userRoles.map(r => ({ name: r.name, value: r.name }));
+        
+        if (roleChoices.length === 0) {
+            console.log(chalk.yellow(action === 'add'
+                ? '\nUser already has all available roles.'
+                : '\nUser has no roles to remove.'));
+            return;
         }
         
         const { selectedRole } = await inquirer.prompt([
@@ -435,28 +443,14 @@ role.runInteractive = async () => {
         ]);
         
         spinner = ora(`${action === 'add' ? 'Adding' : 'Removing'} role...`).start();
+        const updatedRoles = await changeUserRole(userId, action, selectedRole);
+        spinner.succeed(action === 'add'
+            ? `Role '${selectedRole}' added to user successfully`
+            : `Role '${selectedRole}' removed from user successfully`);
         
-        if (action === 'add') {
-            await API.post(`/v1/auth/user/${userId}/roles/${selectedRole}`);
-            spinner.succeed(`Role '${selectedRole}' added to user successfully`);
-        } else {
-            await API.delete(`/v1/auth/user/${userId}/roles/${selectedRole}`);
-            spinner.succeed(`Role '${selectedRole}' removed from user successfully`);
-        }
-        
-        spinner = ora('Fetching updated user details...').start();
-        const updatedUser = await API.get(`/v1/users/${userId}`);
-        spinner.stop();
-        
-        console.log('\nUpdated roles:');
-        if (updatedUser.roles && updatedUser.roles.length > 0) {
-            updatedUser.roles.forEach(role => {
-                console.log(`  ${chalk.green(figures.tick)} ${role}`);
-            });
-        } else {
-            console.log(chalk.yellow('  No roles assigned'));
-        }
+        printRoleNames('Updated roles:', updatedRoles);
     } catch (error) {
+        if (spinner) spinner.fail('Failed to manage role');
         console.error(chalk.red('Failed to manage role:'), chalk.red.dim(error.message));
     }
 };

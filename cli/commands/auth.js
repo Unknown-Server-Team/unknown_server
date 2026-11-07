@@ -119,6 +119,18 @@ token.runInteractive = async function() {
     }
 };
 
+const printRoles = (roles) => {
+    console.table(roles.map(r => ({
+        ID: r.id,
+        Name: r.name,
+        Description: r.description || ''
+    })));
+};
+
+const fetchAllRoles = async () => (await API.get('/v1/auth/roles')).data;
+
+const fetchUserRoles = async (userId) => (await API.get(`/v1/auth/user/${encodeURIComponent(userId)}/roles`)).data;
+
 const roles = new Command('roles')
     .description('Role management commands')
     .option('-l, --list', 'List all roles')
@@ -126,19 +138,9 @@ const roles = new Command('roles')
     .action(async (options) => {
         try {
             if (options.list) {
-                const roles = await API.get('/v1/auth/roles');
-                console.table(roles.map(r => ({
-                    ID: r.id,
-                    Name: r.name,
-                    Description: r.description
-                })));
+                printRoles(await fetchAllRoles());
             } else if (options.user) {
-                const roles = await API.get(`/v1/auth/user/${options.user}/roles`);
-                console.table(roles.map(r => ({
-                    ID: r.id,
-                    Name: r.name,
-                    Description: r.description
-                })));
+                printRoles(await fetchUserRoles(options.user));
             } else {
                 console.log(chalk.yellow('Please specify an action (--list or --user)'));
             }
@@ -168,18 +170,14 @@ roles.runInteractive = async function() {
             spinner.text = 'Fetching all roles...';
             spinner.start();
             
-            const roles = await API.get('/v1/auth/roles');
+            const allRoles = await fetchAllRoles();
             spinner.succeed('Roles retrieved');
             
-            if (roles.length === 0) {
+            if (allRoles.length === 0) {
                 console.log(chalk.yellow('\nNo roles found'));
             } else {
                 console.log(chalk.bold('\nAvailable Roles:'));
-                console.table(roles.map(r => ({
-                    ID: r.id,
-                    Name: r.name,
-                    Description: r.description
-                })));
+                printRoles(allRoles);
             }
         } else if (action === 'user') {
             const { userId } = await inquirer.prompt([
@@ -187,25 +185,22 @@ roles.runInteractive = async function() {
                     type: 'input',
                     name: 'userId',
                     message: 'Enter user ID:',
-                    prefix: chalk.yellow(figures.pointer)
+                    prefix: chalk.yellow(figures.pointer),
+                    validate: value => /^[1-9]\d*$/.test(value) ? true : 'User ID must be a positive integer'
                 }
             ]);
             
             spinner.text = `Fetching roles for user ${userId}...`;
             spinner.start();
             
-            const roles = await API.get(`/v1/auth/user/${userId}/roles`);
+            const userRoles = await fetchUserRoles(userId);
             spinner.succeed('User roles retrieved');
             
-            if (roles.length === 0) {
+            if (userRoles.length === 0) {
                 console.log(chalk.yellow(`\nNo roles found for user ${userId}`));
             } else {
                 console.log(chalk.bold(`\nRoles for User ${userId}:`));
-                console.table(roles.map(r => ({
-                    ID: r.id,
-                    Name: r.name,
-                    Description: r.description
-                })));
+                printRoles(userRoles);
             }
         }
     } catch (error) {
