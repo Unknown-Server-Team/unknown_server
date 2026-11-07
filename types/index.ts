@@ -189,12 +189,6 @@ export interface ServiceConfig {
     maxRetries?: number;
 }
 
-export interface ServiceMeshConfig {
-    name: string;
-    url: string;
-    version: string;
-}
-
 export interface AuditEventData {
     action_type: string;
     admin_id?: number;

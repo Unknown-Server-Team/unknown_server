@@ -16,9 +16,9 @@ import crypto from 'crypto';
 import os from 'os';
 import expressLayouts from 'express-ejs-layouts';
 
-import { ServiceMeshConfig, EnvironmentConfig } from './types';
+import type { EnvironmentConfig } from './types';
 import type { GatewayHandler, ServiceRegistrationOptions } from './types/gateway';
-import type { RouteConfig } from './types/serviceMesh';
+import type { MeshServiceConfig, RouteConfig } from './types/serviceMesh';
 import DocGenerator from './managers/utils/DocGenerator';
 import LogManager from './managers/LogManager';
 import PerformanceManager from './managers/PerformanceManager';
@@ -43,6 +43,29 @@ function hasMutableHeaders(value: unknown): value is { headers: Record<string, s
     return typeof candidate.headers === 'object' && candidate.headers !== null;
 }
 const apiGatewayHandler = apiRouter as unknown as GatewayHandler;
+
+const AUTH_API_PATH = '/api/v1/auth';
+const USERS_API_PATH = '/api/v1/users';
+const API_HEALTH_PATH = '/api/v1/health';
+const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '0.0.0.0']);
+
+const defaultPortFor = (url: URL): string => (url.protocol === 'https:' ? '443' : '80');
+
+const isOwnServiceUrl = (serviceUrl: string, port: number): boolean => {
+    try {
+        const target = new URL(serviceUrl);
+        const targetPort = target.port || defaultPortFor(target);
+        if (LOOPBACK_HOSTS.has(target.hostname) && targetPort === String(port)) {
+            return true;
+        }
+        if (process.env.APP_URL) {
+            return new URL(process.env.APP_URL).origin === target.origin;
+        }
+        return false;
+    } catch {
+        return false;
+    }
+};
 
 const isClusterWorker: boolean = cluster.isWorker;
 
@@ -204,7 +227,7 @@ const startServer = async (): Promise<void> => {
 
         const authServiceConfig: ServiceRegistrationOptions = {
             endpoints: [
-                { path: '/api/auth', handler: apiGatewayHandler },
+                { path: AUTH_API_PATH, handler: apiGatewayHandler },
             ],
             healthCheck: async (): Promise<boolean> => {
                 try {
@@ -225,7 +248,7 @@ const startServer = async (): Promise<void> => {
 
         const usersServiceConfig: ServiceRegistrationOptions = {
             endpoints: [
-                { path: '/api/users', handler: apiGatewayHandler },
+                { path: USERS_API_PATH, handler: apiGatewayHandler },
             ],
             cacheTTL: 300,
             maxRetries: 3
@@ -233,17 +256,19 @@ const startServer = async (): Promise<void> => {
 
         GatewayManager.registerService('users', usersServiceConfig);
 
-        const authMeshConfig: ServiceMeshConfig = {
+        const authServiceUrl = process.env.AUTH_SERVICE_URL?.trim() || `http://localhost:${PORT}`;
+        const authMeshConfig: MeshServiceConfig = {
             name: 'auth-service',
-            url: process.env.AUTH_SERVICE_URL || `http://localhost:${PORT}`,
+            url: authServiceUrl,
+            healthCheckPath: API_HEALTH_PATH,
             version: APP_VERSION
         };
 
         ServiceMeshManager.registerService(authMeshConfig);
 
         const proxyConfig: RouteConfig = {
-            target: '/api/auth',
-            routes: ['/api/auth'],
+            target: authServiceUrl,
+            routes: [AUTH_API_PATH],
             loadBalancingStrategy: 'round-robin',
             middleware: [
                 async (req: unknown) => {
@@ -260,7 +285,11 @@ const startServer = async (): Promise<void> => {
             ]
         };
 
-        ServiceMeshManager.setupServiceProxy('auth-service', proxyConfig);
+        if (isOwnServiceUrl(authServiceUrl, PORT)) {
+            LogManager.info('auth-service is served by this process; mesh proxying is disabled', { url: authServiceUrl });
+        } else {
+            ServiceMeshManager.setupServiceProxy('auth-service', proxyConfig);
+        }
 
         LogManager.info('Initializing database...');
         await databaseQueries.initializeQueries();
