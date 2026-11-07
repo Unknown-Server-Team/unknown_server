@@ -11,6 +11,7 @@ import type {
     PermissionChangeData,
     MonitoringPayload,
     SecurityEventPayload,
+    AuthEventPayload,
     RoomPayload,
     ConnectionPayload,
     ErrorPayload,
@@ -217,6 +218,16 @@ class WebsocketManager {
             timestamp: new Date()
         };
         this.broadcastToRoom(this.monitoringRoom || '', securityEvent);
+    }
+
+    notifyAuthEvent(eventType: string, data: unknown): void {
+        const authEvent: AuthEventPayload = {
+            type: 'auth:event',
+            eventType,
+            data,
+            timestamp: new Date()
+        };
+        this.broadcastToRoom(this.monitoringRoom || '', authEvent);
     }
 
     verifyAuthority(ws: ExtendedWebSocket, requiredPermissions: string[]): boolean {

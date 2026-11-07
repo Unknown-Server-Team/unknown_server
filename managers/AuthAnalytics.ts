@@ -2,6 +2,7 @@ import type {
     UsageCacheEntry,
     AnalyticsCache,
     AuditEventData,
+    AuthTrackingDetails,
     AuditFilters,
     PaginationOptions,
     AuditLogResult,
@@ -46,6 +47,17 @@ class AuthAnalytics {
         usage.count++;
         usage.users.add(userId);
         this.analyticsCache.permissionUsage.set(key, usage);
+    }
+
+    track(event: string, details: AuthTrackingDetails = {}): void {
+        const userId = typeof details.userId === 'number' ? details.userId : null;
+        void this.logAuditEvent({
+            action_type: event,
+            admin_id: userId,
+            target_id: userId,
+            metadata: details,
+            ip_address: details.ip ?? null
+        });
     }
 
     async logAuditEvent(data: AuditEventData): Promise<void> {

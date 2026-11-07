@@ -62,6 +62,13 @@ export interface SecurityEventPayload {
     timestamp: Date;
 }
 
+export interface AuthEventPayload {
+    type: 'auth:event';
+    eventType: string;
+    data: unknown;
+    timestamp: Date;
+}
+
 export interface RoomPayload {
     type: string;
     data: unknown;

@@ -10,8 +10,9 @@ import type {
     AuthenticatedRequest,
     AuthMiddlewareOptions,
     CreateUserInput,
-    UserQueriesModule
+    AuthResult
 } from '../types/authManager';
+import type { RegistrationData, UserRecord } from '../types';
 import type { RoleManagerModule, EmailManagerModule, DatabaseModule } from '../types/modules';
 import LogManager from './LogManager';
 import EmailManagerImport from './EmailManager';
@@ -22,7 +23,7 @@ import WorkerThreadManagerImport from './WorkerThreadManager';
 
 const EmailManager = EmailManagerImport as unknown as EmailManagerModule;
 const RoleManager = RoleManagerImport as unknown as RoleManagerModule;
-const { userQueries } = databaseQueries as unknown as { userQueries: UserQueriesModule };
+const { userQueries } = databaseQueries;
 const db = dbImport as unknown as DatabaseModule;
 const WorkerThreadManager = WorkerThreadManagerImport as unknown as WorkerThreadManagerModule;
 
@@ -116,7 +117,7 @@ class AuthManager {
     async initiateEmailVerification(user: VerificationEmailUser): Promise<void> {
         const token = await this.generateVerificationToken();
         const expires = new Date(Date.now() + 24 * 60 * 60 * 1000);
-        await userQueries.setVerificationToken(user.id, token, expires);
+        await userQueries.setEmailVerificationToken(user.id, token, expires);
         await EmailManager.sendVerificationEmail(user, token);
     }
 
@@ -137,20 +138,68 @@ class AuthManager {
         return true;
     }
 
-    async resetPassword(token: string, newPassword: string): Promise<boolean> {
-        const user = await userQueries.getUserByResetToken(token);
+    async resetPassword(token: string, newPassword: string): Promise<UserRecord | null> {
+        const user = await userQueries.getUserByPasswordResetToken(token);
         if (!user) {
-            return false;
+            return null;
         }
 
         const hashedPassword = await this.hashPassword(newPassword);
         await userQueries.updatePassword(user.id, hashedPassword);
-        return true;
+        return user;
     }
 
-    async verifyEmail(token: string): Promise<boolean> {
-        const user = await userQueries.verifyEmail(token);
-        return !!user;
+    async verifyEmail(token: string): Promise<UserRecord | null> {
+        const user = await userQueries.getUserByEmailVerificationToken(token);
+        if (!user) {
+            return null;
+        }
+
+        await userQueries.verifyEmail(user.id);
+        return user;
+    }
+
+    async register(data: RegistrationData): Promise<AuthResult> {
+        const existing = await userQueries.getUserByEmail(data.email);
+        if (existing) {
+            return { success: false, message: 'Email already exists' };
+        }
+
+        const userId = await this.createUser({
+            email: data.email,
+            password: data.password,
+            name: data.name,
+            roles: data.roles
+        });
+
+        const user = await userQueries.getUserById(userId);
+        if (!user) {
+            return { success: false, message: 'Failed to load created user' };
+        }
+
+        try {
+            await this.initiateEmailVerification(user);
+        } catch (error: unknown) {
+            LogManager.warning('Failed to send verification email', { userId, error: error instanceof Error ? error.message : String(error) });
+        }
+
+        const token = await this.generateToken(user);
+        return { success: true, user, token };
+    }
+
+    async login(email: string, password: string): Promise<AuthResult> {
+        const record = await userQueries.getUserByEmail(email);
+        if (!record || !record.password || !(await this.comparePassword(password, record.password))) {
+            return { success: false, message: 'Invalid email or password' };
+        }
+
+        const user = await userQueries.getUserById(record.id);
+        if (!user) {
+            return { success: false, message: 'Invalid email or password' };
+        }
+
+        const token = await this.generateToken(user);
+        return { success: true, user, token };
     }
 
     getAuthMiddleware(options: AuthMiddlewareOptions = { requireVerified: true, roles: [] }): (req: AuthenticatedRequest, res: Response, next: NextFunction) => Promise<Response | void> {

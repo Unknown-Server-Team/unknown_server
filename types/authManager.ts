@@ -1,11 +1,12 @@
 import type { Request } from 'express';
+import type { RoleRecord, UserRecord } from './index';
 
 export interface VerificationEmailUser {
     id: number;
     email: string;
     name?: string | null;
     email_verified?: boolean;
-    roles?: string[];
+    roles?: RoleRecord[];
 }
 
 export interface WorkerEncryptionPayload {
@@ -27,16 +28,11 @@ export interface WorkerThreadManagerModule {
     executeTask(taskType: string, data: WorkerEncryptionPayload, options?: WorkerTaskOptions): Promise<EncryptionResult>;
 }
 
-export interface UserQueriesModule {
-    setVerificationToken(userId: number, token: string, expires: Date): Promise<unknown>;
-    getUserByEmail(email: string): Promise<VerificationEmailUser | null>;
-    setPasswordResetToken(userId: number, token: string, expires: Date): Promise<unknown>;
-    getUserByResetToken(token: string): Promise<VerificationEmailUser | null>;
-    updatePassword(userId: number, password: string): Promise<unknown>;
-    verifyEmail(token: string): Promise<VerificationEmailUser | null>;
-    getUserById(id: number): Promise<VerificationEmailUser | null>;
-    createUser(userData: { email: string; password: string; name: string }): Promise<{ insertId?: number }>;
-    deleteUser(userId: number): Promise<unknown>;
+export interface AuthResult {
+    success: boolean;
+    message?: string;
+    user?: UserRecord;
+    token?: string;
 }
 
 export interface JwtPayload {

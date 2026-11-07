@@ -15,12 +15,18 @@ export interface AnalyticsCache {
 
 export interface AuditEventData {
     action_type: string;
-    admin_id: number;
-    target_id: number;
+    admin_id: number | null;
+    target_id: number | null;
     role_id?: number | null;
     permission_id?: number | null;
     metadata?: Record<string, unknown>;
     ip_address?: string | null;
+}
+
+export interface AuthTrackingDetails {
+    userId?: number;
+    ip?: string;
+    [key: string]: unknown;
 }
 
 export interface AuditFilters {
