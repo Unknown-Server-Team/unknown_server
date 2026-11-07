@@ -15,10 +15,10 @@ async function renderMarkdown(filePath: string): Promise<string> {
     }
 }
 
-function renderDocumentation(filePath: string, title: string) {
+function renderDocumentation(fileName: string, title: string) {
     return async (_req: Request, res: Response) => {
         try {
-            const markdown = await renderMarkdown(path.join(__dirname, filePath));
+            const markdown = await renderMarkdown(path.join(process.cwd(), 'docs', fileName));
             res.render('documentation', { 
                 title,
                 content: markdown
@@ -29,12 +29,12 @@ function renderDocumentation(filePath: string, title: string) {
     };
 }
 
-router.get('/api', renderDocumentation('../../docs/api.md', 'API Reference'));
+router.get('/api', renderDocumentation('api.md', 'API Reference'));
 
-router.get('/deployment', renderDocumentation('../../docs/deployment.md', 'Deployment Guide'));
+router.get('/deployment', renderDocumentation('deployment.md', 'Deployment Guide'));
 
-router.get('/security', renderDocumentation('../../docs/security.md', 'Security Guide'));
+router.get('/security', renderDocumentation('security.md', 'Security Guide'));
 
-router.get('/roles-and-permissions', renderDocumentation('../../docs/roles-and-permissions.md', 'Roles and Permissions Guide'));
+router.get('/roles-and-permissions', renderDocumentation('roles-and-permissions.md', 'Roles and Permissions Guide'));
 
 export = router;
