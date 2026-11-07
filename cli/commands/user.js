@@ -7,51 +7,117 @@ const figures = require('figures');
 const API = require('../utils/api');
 const { validateEmail, validatePassword } = require('../utils/validation');
 
+const MAX_PAGE_SIZE = 100;
+
+const fetchUsersPage = async (page, limit) => {
+    const response = await API.get(`/v1/users?page=${encodeURIComponent(page)}&limit=${encodeURIComponent(limit)}`);
+    return {
+        users: Array.isArray(response.data) ? response.data : [],
+        pagination: response.pagination || { page: Number(page), limit: Number(limit), total: 0, pages: 0 }
+    };
+};
+
+const fetchAllUsers = async () => {
+    const users = [];
+    let page = 1;
+    let pages = 1;
+    do {
+        const result = await fetchUsersPage(page, MAX_PAGE_SIZE);
+        users.push(...result.users);
+        pages = result.pagination.pages;
+        page++;
+    } while (page <= pages);
+    return users;
+};
+
+const userRolesPath = (userId, roleName) => {
+    const base = `/v1/auth/user/${encodeURIComponent(userId)}/roles`;
+    return roleName ? `${base}/${encodeURIComponent(roleName)}` : base;
+};
+
+const fetchUserRoles = async (userId) => (await API.get(userRolesPath(userId))).data || [];
+
+const withRoles = async (users) => Promise.all(users.map(async (u) => {
+    try {
+        return { ...u, roles: (await fetchUserRoles(u.id)).map(r => r.name) };
+    } catch (error) {
+        return { ...u, roles: null };
+    }
+}));
+
+const formatRoles = (roles) => {
+    if (roles === null) {
+        return chalk.dim('unavailable');
+    }
+    return roles.length > 0 ? chalk.yellow(roles.join(', ')) : chalk.dim('none');
+};
+
+const printUsersTable = (users) => {
+    const table = new Table({
+        head: [
+            chalk.cyan('ID'),
+            chalk.cyan('Email'),
+            chalk.cyan('Name'),
+            chalk.cyan('Roles'),
+            chalk.cyan('Verified')
+        ],
+        style: {
+            head: [],
+            border: []
+        }
+    });
+
+    users.forEach(u => {
+        table.push([
+            u.id,
+            u.email,
+            u.name || chalk.dim('-'),
+            formatRoles(u.roles),
+            u.email_verified ? chalk.green(figures.tick) : chalk.red(figures.cross)
+        ]);
+    });
+
+    console.log(table.toString());
+};
+
+const printPageSummary = (users, pagination) => {
+    const pages = Math.max(pagination.pages, 1);
+    console.log(chalk.dim(`\nPage ${pagination.page} of ${pages}, showing ${users.length} of ${pagination.total} users`));
+};
+
+const showUsersPage = async (page, limit, spinner) => {
+    const { users, pagination } = await fetchUsersPage(page, limit);
+    const detailed = await withRoles(users);
+    spinner.stop();
+
+    if (detailed.length === 0) {
+        console.log(chalk.yellow(pagination.total > 0
+            ? `\nNo users on page ${pagination.page}; there are ${pagination.pages} page(s).`
+            : '\nNo users found.'));
+        return detailed;
+    }
+
+    printUsersTable(detailed);
+    printPageSummary(detailed, pagination);
+    return detailed;
+};
+
 const list = new Command('list')
-    .description('List all users')
+    .description('List users')
     .option('-p, --page <number>', 'Page number', '1')
-    .option('-l, --limit <number>', 'Items per page', '10')
+    .option('-l, --limit <number>', `Items per page (max ${MAX_PAGE_SIZE})`, '10')
     .action(async (options) => {
+        const spinner = ora('Fetching users...').start();
         try {
-            const spinner = ora('Fetching users...').start();
-            const users = await API.get(`/v1/users?page=${options.page}&limit=${options.limit}`);
-            spinner.stop();
-            
-            if (users.length === 0) {
-                console.log(chalk.yellow('\nNo users found.'));
-                return;
-            }
-            
-            const table = new Table({
-                head: [
-                    chalk.cyan('ID'), 
-                    chalk.cyan('Email'), 
-                    chalk.cyan('Role'), 
-                    chalk.cyan('Verified')
-                ],
-                style: {
-                    head: [],
-                    border: []
-                }
-            });
-            
-            users.forEach(u => {
-                table.push([
-                    u.id,
-                    u.email,
-                    chalk.yellow(u.roles.join(', ')),
-                    u.email_verified ? chalk.green(figures.tick) : chalk.red(figures.cross)
-                ]);
-            });
-            
-            console.log(table.toString());
-            console.log(chalk.dim(`\nPage ${options.page} of users, showing ${users.length} of ${users.length} results`));
+            await showUsersPage(options.page, options.limit, spinner);
         } catch (error) {
+            spinner.stop();
             console.error(chalk.red('Failed to fetch users:'), chalk.red.dim(error.message));
         }
     });
 
 list.runInteractive = async () => {
+    let spinner;
     try {
         const { page, limit } = await inquirer.prompt([
             {
@@ -66,44 +132,17 @@ list.runInteractive = async () => {
                 name: 'limit',
                 message: 'Items per page:',
                 default: 10,
-                validate: value => value > 0 ? true : 'Limit must be greater than 0'
+                validate: value => value > 0 && value <= MAX_PAGE_SIZE ? true : `Limit must be between 1 and ${MAX_PAGE_SIZE}`
             }
         ]);
-        
-        const spinner = ora('Fetching users...').start();
-        const users = await API.get(`/v1/users?page=${page}&limit=${limit}`);
-        spinner.succeed('Users fetched successfully');
-        
+
+        spinner = ora('Fetching users...').start();
+        const users = await showUsersPage(page, limit, spinner);
+
         if (users.length === 0) {
-            console.log(chalk.yellow('\nNo users found.'));
             return;
         }
-        
-        const table = new Table({
-            head: [
-                chalk.cyan('ID'), 
-                chalk.cyan('Email'), 
-                chalk.cyan('Role'), 
-                chalk.cyan('Verified')
-            ],
-            style: {
-                head: [],
-                border: []
-            }
-        });
-        
-        users.forEach(u => {
-            table.push([
-                u.id,
-                u.email,
-                chalk.yellow(u.roles.join(', ')),
-                u.email_verified ? chalk.green(figures.tick) : chalk.red(figures.cross)
-            ]);
-        });
-        
-        console.log(table.toString());
-        console.log(chalk.dim(`\nPage ${page} of users, showing ${users.length} of ${users.length} results`));
-        
+
         const { viewDetails } = await inquirer.prompt([
             {
                 type: 'confirm',
@@ -112,7 +151,7 @@ list.runInteractive = async () => {
                 default: false
             }
         ]);
-        
+
         if (viewDetails) {
             const { userId } = await inquirer.prompt([
                 {
@@ -122,36 +161,48 @@ list.runInteractive = async () => {
                     choices: users.map(u => ({ name: `${u.email} (${u.id})`, value: u.id }))
                 }
             ]);
-            
-            const spinner = ora('Fetching user details...').start();
-            const userDetails = await API.get(`/v1/users/${userId}`);
+
+            spinner = ora('Fetching user details...').start();
+            const { data: userDetails } = await API.get(`/v1/users/${encodeURIComponent(userId)}`);
+            const roles = await fetchUserRoles(userId);
             spinner.stop();
-            
+
             console.log('\n' + chalk.cyan.bold('User Details:'));
             const detailsTable = new Table();
-            
-            Object.entries(userDetails).forEach(([key, value]) => {
+
+            Object.entries({ ...userDetails, roles: roles.map(r => r.name) }).forEach(([key, value]) => {
                 let displayValue = value;
                 if (Array.isArray(value)) {
-                    displayValue = value.join(', ');
-                } else if (typeof value === 'boolean') {
+                    displayValue = value.length > 0 ? value.join(', ') : chalk.dim('None');
+                } else if (typeof value === 'boolean' || key === 'email_verified') {
                     displayValue = value ? chalk.green('Yes') : chalk.red('No');
                 } else if (value === null || value === undefined) {
                     displayValue = chalk.dim('Not set');
                 } else if (typeof value === 'object') {
                     displayValue = JSON.stringify(value);
                 }
-                
-                detailsTable.push({ 
-                    [chalk.cyan(key.replace(/_/g, ' ').charAt(0).toUpperCase() + key.replace(/_/g, ' ').slice(1))]: displayValue 
+
+                const label = key.replace(/_/g, ' ');
+                detailsTable.push({
+                    [chalk.cyan(label.charAt(0).toUpperCase() + label.slice(1))]: displayValue
                 });
             });
-            
+
             console.log(detailsTable.toString());
         }
     } catch (error) {
+        if (spinner) spinner.stop();
         console.error(chalk.red('Failed to fetch users:'), chalk.red.dim(error.message));
     }
+};
+
+const printCreatedUser = async (user) => {
+    const [detailed] = await withRoles([user]);
+    console.log('\n' + chalk.green.bold('User Details:'));
+    console.log(chalk.cyan('ID: ') + user.id);
+    console.log(chalk.cyan('Email: ') + user.email);
+    console.log(chalk.cyan('Name: ') + (user.name || chalk.dim('Not set')));
+    console.log(chalk.cyan('Roles: ') + formatRoles(detailed.roles));
 };
 
 const create = new Command('create')
@@ -181,13 +232,7 @@ const create = new Command('create')
             const spinner = ora('Creating user...').start();
             const response = await API.post('/v1/auth/register', answers);
             spinner.succeed('User created successfully!');
-            
-            console.log('\n' + chalk.green.bold('User Details:'));
-            console.log(chalk.cyan('ID: ') + response.user.id);
-            console.log(chalk.cyan('Email: ') + response.user.email);
-            console.log(chalk.cyan('Name: ') + response.user.name);
-            const roles = response.roles || [];
-            console.log(chalk.cyan('Roles: ') + chalk.yellow(roles.join(', ')));
+            await printCreatedUser(response.user);
         } catch (error) {
             console.error(chalk.red('Failed to create user:'), chalk.red.dim(error.message));
         }
@@ -235,14 +280,7 @@ create.runInteractive = async () => {
         try {
             const response = await API.post('/v1/auth/register', answers);
             createSpinner.succeed('User created successfully!');
-            
-            console.log('\n' + chalk.green.bold('User Details:'));
-            console.log(chalk.cyan('ID: ') + response.user.id);
-            console.log(chalk.cyan('Email: ') + response.user.email);
-            console.log(chalk.cyan('Name: ') + response.user.name);
-            console.log(chalk.cyan('Roles: ') + chalk.yellow((response.roles || []).join(', ') || 'No roles assigned'));
-            
-            console.log(chalk.dim('\nA verification email has been sent to the user.'));
+            await printCreatedUser(response.user);
         } catch (error) {
             createSpinner.fail('Failed to create user');
             throw error;
@@ -255,26 +293,31 @@ create.runInteractive = async () => {
 const deleteUser = new Command('delete')
     .description('Delete a user')
     .argument('<id>', 'User ID to delete')
-    .action(async (id) => {
+    .option('-y, --yes', 'Skip the confirmation prompt')
+    .action(async (id, options) => {
         let spinner;
         try {
-            const confirm = await inquirer.prompt([
-                {
-                    type: 'confirm',
-                    name: 'sure',
-                    message: `Are you sure you want to delete user ${id}?`,
-                    default: false
+            if (!options.yes) {
+                const { sure } = await inquirer.prompt([
+                    {
+                        type: 'confirm',
+                        name: 'sure',
+                        message: `Are you sure you want to delete user ${id}?`,
+                        default: false
+                    }
+                ]);
+                if (!sure) {
+                    console.log(chalk.cyan('User deletion cancelled.'));
+                    return;
                 }
-            ]);
-
-            if (confirm.sure) {
-                spinner = ora('Deleting user...').start();
-                await API.delete(`/v1/users/${id}`);
-                spinner.succeed('User deleted successfully!');
             }
+
+            spinner = ora('Deleting user...').start();
+            await API.delete(`/v1/users/${encodeURIComponent(id)}`);
+            spinner.succeed(`User ${id} deleted successfully!`);
         } catch (error) {
-            console.error(chalk.red('Failed to delete user:'), chalk.red.dim(error.message));
             if (spinner) spinner.fail('Failed to delete user');
+            console.error(chalk.red('Failed to delete user:'), chalk.red.dim(error.message));
         }
     });
 
@@ -282,26 +325,26 @@ deleteUser.runInteractive = async () => {
     let spinner;
     try {
         spinner = ora('Fetching users...').start();
-        const users = await API.get('/v1/users?limit=50');
+        const users = await fetchAllUsers();
         spinner.stop();
-        
+
         if (users.length === 0) {
             console.log(chalk.yellow('\nNo users available to delete.'));
             return;
         }
-        
+
         const { userId } = await inquirer.prompt([
             {
                 type: 'list',
                 name: 'userId',
                 message: 'Select the user to delete:',
-                choices: users.map(u => ({ 
-                    name: `${u.email} (${u.id})`, 
-                    value: u.id 
+                choices: users.map(u => ({
+                    name: `${u.email} (${u.id})`,
+                    value: u.id
                 }))
             }
         ]);
-        
+
         const { confirm } = await inquirer.prompt([
             {
                 type: 'confirm',
@@ -310,24 +353,18 @@ deleteUser.runInteractive = async () => {
                 default: false
             }
         ]);
-        
+
         if (confirm) {
             spinner = ora('Deleting user...').start();
-            await API.delete(`/v1/users/${userId}`);
+            await API.delete(`/v1/users/${encodeURIComponent(userId)}`);
             spinner.succeed(`User ${userId} deleted successfully!`);
         } else {
             console.log(chalk.cyan('User deletion cancelled.'));
-            if (spinner) spinner.stop();
         }
     } catch (error) {
-        console.error(chalk.red('Failed to delete user:'), chalk.red.dim(error.message));
         if (spinner) spinner.fail('Failed to delete user');
+        console.error(chalk.red('Failed to delete user:'), chalk.red.dim(error.message));
     }
-};
-
-const userRolesPath = (userId, roleName) => {
-    const base = `/v1/auth/user/${encodeURIComponent(userId)}/roles`;
-    return roleName ? `${base}/${encodeURIComponent(roleName)}` : base;
 };
 
 const changeUserRole = async (userId, action, roleName) => {
@@ -376,7 +413,7 @@ role.runInteractive = async () => {
     let spinner;
     try {
         spinner = ora('Fetching users...').start();
-        const { data: users } = await API.get('/v1/users?limit=100');
+        const users = await fetchAllUsers();
         spinner.stop();
         
         if (users.length === 0) {
@@ -401,7 +438,7 @@ role.runInteractive = async () => {
         ]);
         
         spinner = ora('Fetching user roles...').start();
-        const { data: userRoles } = await API.get(userRolesPath(userId));
+        const userRoles = await fetchUserRoles(userId);
         spinner.stop();
         
         printRoleNames('Current roles:', userRoles);
