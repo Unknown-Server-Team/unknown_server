@@ -2,7 +2,21 @@
 
 All notable changes to Unknown Server will be documented in this file.
 
-## [2.7.0] - 2025-01-26 - Complete Full Backend TypeScript Migration 
+## [3.5.1] - 2026-04-17
+
+### Changed
+- Completed the TypeScript migration: all server-side JavaScript sources were replaced by their TypeScript counterparts and the interim migration reports were removed
+- Updated nodemailer to 7.x
+- Application version set to 3.5.1 in `.env.example` and the README badge
+
+### Added
+- Redis-backed caching in `CacheManager` with automatic fallback to the in-memory cache when Redis is not configured or unreachable
+- `@types/mysql` type definitions
+
+### Fixed
+- Type errors in `WebsocketManager` and `DocGenerator`
+
+## [2.7.0] - 2025-08-14 - Complete Full Backend TypeScript Migration 
 
 ### 🎉 MAJOR MILESTONE - Complete Backend TypeScript Migration
 - **FULL BACKEND CONVERSION**: Successfully migrated 40+ JavaScript files to TypeScript (83% complete)
@@ -57,7 +71,7 @@ All notable changes to Unknown Server will be documented in this file.
 - **Error Handling**: Comprehensive error types and proper exception management
 - **Performance Monitoring**: Built-in metrics and monitoring for all critical operations
 
-## [2.6.0] - 2025-01-26 - Full TypeScript Migration (Phases 1-4)
+## [2.6.0] - 2025-08-14 - Full TypeScript Migration (Phases 1-4)
 
 ### Major Features Added
 - **Complete TypeScript Migration Foundation (16/49 files converted)**
