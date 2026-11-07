@@ -296,32 +296,34 @@ const startServer = async (): Promise<void> => {
             }, 300000);
         }
 
+        let shuttingDown = false;
         const shutdown = async (): Promise<void> => {
+            if (shuttingDown) {
+                return;
+            }
+            shuttingDown = true;
             LogManager.info(`Process ${process.pid} received shutdown signal`);
 
-            if (metricsInterval && (!isClusterWorker || process.env.NODE_APP_INSTANCE === '0')) {
+            if (metricsInterval) {
                 clearInterval(metricsInterval);
             }
-            
+
+            const forceExitTimer = setTimeout(() => {
+                LogManager.error(`Force closing server ${process.pid} after timeout`);
+                process.exit(1);
+            }, 5000);
+            forceExitTimer.unref();
+
             WebsocketManager.close();
-            
+
             await WorkerThreadManager.shutdownAll();
 
             await db.close();
 
             server.close(() => {
                 LogManager.success(`Server ${process.pid} shut down successfully`);
-                if (!isClusterWorker) {
-                    process.exit(0);
-                }
+                process.exit(0);
             });
-
-            setTimeout(() => {
-                LogManager.error(`Force closing server ${process.pid} after timeout`);
-                if (!isClusterWorker) {
-                    process.exit(1);
-                }
-            }, 5000);
         };
 
         process.on('SIGTERM', shutdown);

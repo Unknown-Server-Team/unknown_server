@@ -15,8 +15,6 @@ import cluster, { Worker } from 'cluster';
 import os from 'os';
 import LogManager from './managers/LogManager';
 
-import './server';
-
 interface WorkerMemoryStats {
     heapUsed: number;
     heapTotal: number;
@@ -79,6 +77,7 @@ if (cluster.isPrimary) {
     LogManager.info(`Starting ${WORKERS} worker processes...`);
 
     const workers = new Set<Worker>();
+    let shuttingDown = false;
 
     for (let i = 0; i < WORKERS; i++) {
         const worker = cluster.fork({
@@ -92,6 +91,10 @@ if (cluster.isPrimary) {
 
     cluster.on('exit', (worker: Worker, code: number, signal: string) => {
         workers.delete(worker);
+        if (shuttingDown) {
+            LogManager.info(`Worker ${worker.process.pid} exited during shutdown`);
+            return;
+        }
         LogManager.warning(`Worker ${worker.process.pid} died with code ${code} and signal ${signal}`);
 
         setTimeout(() => {
@@ -141,8 +144,12 @@ if (cluster.isPrimary) {
         }
     });
 
-    const handleShutdown = (): void => {
-        LogManager.info('Received SIGTERM signal, shutting down gracefully...');
+    const handleShutdown = (signal: NodeJS.Signals): void => {
+        if (shuttingDown) {
+            return;
+        }
+        shuttingDown = true;
+        LogManager.info(`Received ${signal} signal, shutting down gracefully...`);
 
         for (const worker of workers) {
             if (!worker.isDead()) {
@@ -177,10 +184,12 @@ if (cluster.isPrimary) {
 
 } else {
     LogManager.info(`Worker ${process.pid} started`);
+    void import('./server');
 
     process.on('message', (msg: string | WorkerMessage) => {
         if (msg === 'shutdown') {
             LogManager.info(`Worker ${process.pid} received shutdown signal`);
+            process.kill(process.pid, 'SIGTERM');
         } else if (typeof msg === 'object' && msg.type === 'stats:request') {
             if (msg.statsType === 'memory') {
                 const memoryStats = process.memoryUsage();
