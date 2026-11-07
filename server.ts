@@ -233,7 +233,7 @@ const startServer = async (): Promise<void> => {
 
         const authMeshConfig: ServiceMeshConfig = {
             name: 'auth-service',
-            url: process.env.AUTH_SERVICE_URL || 'http://localhost:3000',
+            url: process.env.AUTH_SERVICE_URL || `http://localhost:${PORT}`,
             version: '1.0.0'
         };
 
