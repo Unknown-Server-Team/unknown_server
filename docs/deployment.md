@@ -2,8 +2,8 @@
 
 ## Prerequisites
 
-- Node.js 16.x or higher
-- NPM 7.x or higher
+- Node.js 18.x or higher
+- NPM 8.x or higher
 - PostgreSQL 13.x or higher (or your preferred database)
 - Redis (optional, for caching)
 - NGINX 1.18.0 or higher (for production deployment)
@@ -27,12 +27,12 @@
 
 ## Installation
 
-1. Install dependencies:
+1. Install dependencies (TypeScript is needed for the build step):
    ```bash
-   npm install --production
+   npm install
    ```
 
-2. Build assets (if needed):
+2. Compile the TypeScript sources into `dist/`:
    ```bash
    npm run build
    ```

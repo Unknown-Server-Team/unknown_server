@@ -5,9 +5,8 @@
 - Some actions may result in infinite loading messages when failing
 - Random undefined texts appearing in CLI selections
 
-## Authentication System
-- Registration system not functioning properly due to interaction errors between related managers
-- Some authentication operations may fail or behave unexpectedly
+## CLI Role Management
+- The CLI role commands call `/api/v1/auth/roles` and `/api/v1/auth/user/:id/roles` endpoints that the server does not implement yet
 
 ## Windows-Specific Issues
 - When using PM2 to run the project, blank CMD screens might appear randomly

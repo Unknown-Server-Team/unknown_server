@@ -4,8 +4,8 @@
 This guide will help you get started with the Unknown Server API.
 
 ## Prerequisites
-- Node.js 16.x or higher
-- NPM 7.x or higher
+- Node.js 18.x or higher
+- NPM 8.x or higher
 - Basic knowledge of RESTful APIs
 
 ## Installation
@@ -28,7 +28,7 @@ curl -X POST http://localhost:3000/api/v1/auth/login -H "Content-Type: applicati
 
 2. Use the returned token for subsequent API calls:
 ```bash
-curl -X GET http://localhost:3000/api/v1/users/profile -H "Authorization: Bearer YOUR_TOKEN_HERE"
+curl -X GET http://localhost:3000/api/v1/auth/me -H "Authorization: Bearer YOUR_TOKEN_HERE"
 ```
 
 ## Next Steps
