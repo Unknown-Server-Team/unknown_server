@@ -27,9 +27,11 @@ npm install -g pm2  # Timeout: 60+ seconds
 - `DB_USER` - MySQL database user  
 - `DB_NAME` - MySQL database name
 - `DB_PASSWORD` - MySQL database password
-- `VERSION` - Application version (e.g., "2.5.1")
 - `JWT_SECRET` - JWT signing secret
 - `APP_URL` - Application URL (e.g., "http://localhost:3000")
+
+**Optional Variables:**
+- `VERSION` - Optional override for the application version reported by the server (defaults to the `version` in package.json)
 
 **Important**: Server requires MySQL database connection. Without it, server starts but crashes during database initialization (~2 seconds).
 

@@ -220,7 +220,7 @@ export interface EnvironmentConfig {
     DB_HOST: string;
     DB_USER: string;
     DB_NAME: string;
-    VERSION: string;
+    VERSION?: string;
     JWT_SECRET: string;
     APP_URL: string;
     PORT?: string;

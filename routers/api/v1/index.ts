@@ -5,6 +5,7 @@ import authRouter from './auth';
 import usersRouter from './users';
 import rolesRouter from './roles';
 import PerformanceManager from '../../../managers/PerformanceManager';
+import { APP_VERSION } from '../../../config/version';
 
 interface ApiRoute {
     path: string;
@@ -61,6 +62,7 @@ router.get('/health', (_req: Request, res: Response) => {
     res.json({
         status: 'healthy',
         version: 'v1',
+        appVersion: APP_VERSION,
         timestamp: new Date().toISOString()
     });
 });

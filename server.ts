@@ -8,6 +8,7 @@ import compression from 'compression';
 import fileUpload from 'express-fileupload';
 import swaggerUi from 'swagger-ui-express';
 import swaggerSpecs, { swaggerCustomCss } from './config/swagger';
+import { APP_VERSION } from './config/version';
 import DocumentationValidator from './managers/DocumentationValidator';
 import cluster from 'cluster';
 import { createServer, Server } from 'http';
@@ -49,6 +50,7 @@ const app = express();
 const PORT: number = parseInt(process.env.PORT || '3000', 10);
 
 app.set('trust proxy', true);
+app.locals.appVersion = APP_VERSION;
 
 app.use(helmet({
     contentSecurityPolicy: {
@@ -155,7 +157,7 @@ app.use(errorHandler);
 
 const startServer = async (): Promise<void> => {
     try {
-        const requiredEnvVars: (keyof EnvironmentConfig)[] = ['DB_HOST', 'DB_USER', 'DB_NAME', 'VERSION', 'JWT_SECRET', 'APP_URL'];
+        const requiredEnvVars: (keyof EnvironmentConfig)[] = ['DB_HOST', 'DB_USER', 'DB_NAME', 'JWT_SECRET', 'APP_URL'];
         const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName] || process.env[varName]?.trim() === '');
         
         if (missingEnvVars.length > 0) {
@@ -234,7 +236,7 @@ const startServer = async (): Promise<void> => {
         const authMeshConfig: ServiceMeshConfig = {
             name: 'auth-service',
             url: process.env.AUTH_SERVICE_URL || `http://localhost:${PORT}`,
-            version: '1.0.0'
+            version: APP_VERSION
         };
 
         ServiceMeshManager.registerService(authMeshConfig);
@@ -250,7 +252,7 @@ const startServer = async (): Promise<void> => {
                     }
 
                     req.headers['x-request-id'] = crypto.randomBytes(16).toString('hex');
-                    req.headers['x-service-version'] = '1.0.0';
+                    req.headers['x-service-version'] = APP_VERSION;
                     if (isClusterWorker) {
                         req.headers['x-worker-id'] = process.pid.toString();
                     }

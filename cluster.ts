@@ -25,7 +25,7 @@ const numCPUs: number = os.cpus().length;
 const WORKERS: number = parseInt(process.env.SERVER_WORKERS || numCPUs.toString(), 10);
 
 const checkRequiredEnvVars = (): void => {
-    const requiredEnvVars: string[] = ['DB_HOST', 'DB_USER', 'DB_NAME', 'VERSION', 'JWT_SECRET', 'APP_URL'];
+    const requiredEnvVars: string[] = ['DB_HOST', 'DB_USER', 'DB_NAME', 'JWT_SECRET', 'APP_URL'];
     const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName] || process.env[varName]?.trim() === '');
 
     if (missingEnvVars.length > 0) {

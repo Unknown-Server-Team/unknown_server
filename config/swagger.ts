@@ -1,13 +1,14 @@
 import swaggerJsdoc from 'swagger-jsdoc';
 import path from 'path';
 import type { SwaggerSpec } from '../types/documentation';
+import { APP_VERSION } from './version';
 
 const options: swaggerJsdoc.Options = {
     definition: {
         openapi: '3.0.0',
         info: {
             title: 'Unknown Server API Documentation',
-            version: process.env.VERSION || '1.0.0',
+            version: APP_VERSION,
             description: 'Complete API documentation for all versions',
             license: {
                 name: 'MIT',
