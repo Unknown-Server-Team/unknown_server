@@ -33,7 +33,7 @@ class WorkerThreadManager {
         return new Promise<ResultType>((resolve, reject): void => {
             try {
                 const workerPath = this._getWorkerPath(taskType);
-                const taskId = `${taskType}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                const taskId = `${taskType}-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
                 const worker = new Worker(workerPath, {
                     workerData: {
                         taskId,
@@ -114,9 +114,7 @@ class WorkerThreadManager {
     private _getWorkerPath(taskType: string): string {
         const workerPaths: Record<string, string> = {
             encryption: path.join(__dirname, 'workers', 'encryption.worker.js'),
-            compression: path.join(__dirname, 'workers', 'compression.worker.js'),
             dataProcessing: path.join(__dirname, 'workers', 'dataProcessing.worker.js'),
-            imageProcessing: path.join(__dirname, 'workers', 'imageProcessing.worker.js'),
             default: path.join(__dirname, 'workers', 'generic.worker.js')
         };
 
