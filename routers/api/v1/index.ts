@@ -3,6 +3,7 @@ import os from 'os';
 import { RatelimitManager } from '../../../managers/RatelimitManager';
 import authRouter from './auth';
 import usersRouter from './users';
+import rolesRouter from './roles';
 import PerformanceManager from '../../../managers/PerformanceManager';
 
 interface ApiRoute {
@@ -51,6 +52,8 @@ const router: Router = express.Router();
 router.use(RatelimitManager.createApiLimiter());
 
 router.use('/auth', authRouter);
+
+router.use('/auth', rolesRouter);
 
 router.use('/users', usersRouter);
 

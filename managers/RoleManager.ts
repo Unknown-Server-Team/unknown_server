@@ -85,6 +85,16 @@ class RoleManager {
         }
     }
 
+    async getRoleByName(name: string): Promise<RoleRecord | null> {
+        try {
+            const roles = await db.query('SELECT * FROM roles WHERE name = ?', [name]) as RoleRecord[];
+            return roles[0] || null;
+        } catch (error: unknown) {
+            LogManager.error('Failed to get role by name', error);
+            throw error;
+        }
+    }
+
     async getUserRoles(userId: number): Promise<RoleRecord[]> {
         const cacheKey = `user:${userId}:roles`;
         const cached = await CacheManager.get(cacheKey);
