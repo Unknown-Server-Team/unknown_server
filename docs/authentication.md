@@ -1,78 +1,129 @@
 # Authentication Guide
 
 ## Overview
-This guide explains how authentication works in the Unknown Server API.
+The Unknown Server API authenticates requests with JSON Web Tokens (JWT). Tokens are issued by the register and login endpoints and must be sent as a Bearer token on every protected request.
 
-## Authentication Methods
-The API supports multiple authentication methods:
+## Endpoints
+All authentication endpoints live under `/api/v1/auth`.
 
-### 1. JWT Authentication
-The primary authentication method uses JSON Web Tokens (JWT).
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/api/v1/auth/register` | No | Create an account and receive a token |
+| POST | `/api/v1/auth/login` | No | Exchange email and password for a token |
+| GET | `/api/v1/auth/me` | Bearer | Current user with roles and permissions |
+| GET | `/api/v1/auth/verify-email/{token}` | No | Confirm an email address |
+| POST | `/api/v1/auth/forgot-password` | No | Request a password reset email |
+| POST | `/api/v1/auth/reset-password/{token}` | No | Set a new password with a reset token |
 
-#### Login
+## Registration
+```http
+POST /api/v1/auth/register
+Content-Type: application/json
 ```
-POST /api/v1/auth/login
-```
+
 Request body:
 ```json
 {
-  "username": "your-username",
-  "password": "your-password"
+  "email": "user@example.com",
+  "password": "Str0ng!Password",
+  "name": "Jane Doe"
 }
 ```
 
-Response:
+Passwords need at least 8 characters with an uppercase letter, a lowercase letter, a digit and a special character. New accounts receive the `user` role. Requests carrying a valid `x-cli-api-key` header (matching `CLI_API_KEY`) may also pass a `roles` array.
+
+Response (`201`, `409` if the email is taken):
 ```json
 {
-  "success": true,
+  "message": "User registered successfully",
   "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "expiresIn": 3600
+  "user": {
+    "id": 1,
+    "email": "user@example.com",
+    "name": "Jane Doe",
+    "email_verified": false
+  }
 }
 ```
 
-#### Using JWT Tokens
-Include the token in the Authorization header:
+A verification email is sent when SMTP is configured.
+
+## Login
+```http
+POST /api/v1/auth/login
+Content-Type: application/json
 ```
+
+Request body:
+```json
+{
+  "email": "user@example.com",
+  "password": "Str0ng!Password"
+}
+```
+
+Response (`401` on invalid credentials):
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "user": {
+    "id": 1,
+    "email": "user@example.com",
+    "name": "Jane Doe",
+    "email_verified": true
+  },
+  "expiresIn": 86400
+}
+```
+
+The token lifetime is controlled by `JWT_EXPIRATION` (default `24h`). Login also sets an HttpOnly `sessionId` cookie used for session tracking; it is not accepted in place of the Bearer token.
+
+## Using Tokens
+Include the token in the Authorization header:
+```http
 Authorization: Bearer YOUR_TOKEN_HERE
 ```
 
-### 2. Session Authentication
-For web applications, session-based authentication is also supported.
+Most protected endpoints also require a verified email address and respond with `403` and `"verificationRequired": true` otherwise. There is no refresh or logout endpoint; request a new token by logging in again.
 
-#### Login
-```
-POST /api/v1/auth/session/login
-```
-
-#### Logout
-```
-POST /api/v1/auth/session/logout
+## Current User
+```http
+GET /api/v1/auth/me
+Authorization: Bearer YOUR_TOKEN_HERE
 ```
 
-## Token Refresh
-To refresh an expiring token:
-```
-POST /api/v1/auth/refresh
-```
+Returns `{ "user": {...}, "roles": [...], "permissions": [...] }`. This endpoint does not require a verified email.
 
-Header:
-```
-Authorization: Bearer YOUR_CURRENT_TOKEN
+## Email Verification
+```http
+GET /api/v1/auth/verify-email/{token}
 ```
 
 ## Password Reset
-To request a password reset:
-```
-POST /api/v1/auth/password-reset
+Request a reset email. The response is the same whether or not the address exists:
+```http
+POST /api/v1/auth/forgot-password
+Content-Type: application/json
+
+{"email": "user@example.com"}
 ```
 
-To complete a password reset:
+Complete the reset with the token from the email:
+```http
+POST /api/v1/auth/reset-password/{token}
+Content-Type: application/json
+
+{"password": "N3w!Password"}
 ```
-POST /api/v1/auth/password-reset/complete
-```
+
+## Rate Limits
+- Login: 5 requests per 15 minutes per IP
+- Registration: 3 requests per hour per IP
+- Forgot and reset password: 3 requests per hour per IP
+- All `/api/v1` routes additionally share a limit of 60 requests per minute per IP
 
 ## Security Best Practices
 1. Always use HTTPS
-2. Store tokens securely (HttpOnly cookies for web apps)
-3. Implement token refresh strategies
-4. Use short expiration times for sensitive operations
+2. Store tokens securely and never put them in URLs
+3. Keep `JWT_EXPIRATION` short for sensitive deployments
+4. Use a long, random `JWT_SECRET`
