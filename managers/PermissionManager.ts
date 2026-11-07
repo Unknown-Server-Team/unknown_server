@@ -29,7 +29,7 @@ class PermissionManager {
         }
 
         try {
-            const [permissions] = await db.query<[PermissionRecord[]]>('SELECT * FROM permissions');
+            const permissions = await db.query<PermissionRecord[]>('SELECT * FROM permissions');
             await CacheManager.set(cacheKey, permissions, this.CACHE_TTL);
             return permissions;
         } catch (error: unknown) {
@@ -46,7 +46,7 @@ class PermissionManager {
         }
 
         try {
-            const [permissions] = await db.query<[PermissionRecord[]]>(
+            const permissions = await db.query<PermissionRecord[]>(
                 `
                 SELECT p.*
                 FROM permissions p
@@ -71,7 +71,7 @@ class PermissionManager {
         }
 
         try {
-            const [permissions] = await db.query<[PermissionRecord[]]>(
+            const permissions = await db.query<PermissionRecord[]>(
                 `
                 SELECT DISTINCT p.*
                 FROM permissions p
@@ -91,7 +91,7 @@ class PermissionManager {
 
     async hasPermission(userId: number, permissionName: string): Promise<boolean> {
         try {
-            const [result] = await db.query<[CountRow[]]>(
+            const result = await db.query<CountRow[]>(
                 `
                 SELECT COUNT(*) as count
                 FROM permissions p
@@ -110,7 +110,7 @@ class PermissionManager {
 
     async hasAnyPermission(userId: number, permissionNames: string[]): Promise<boolean> {
         try {
-            const [result] = await db.query<[CountRow[]]>(
+            const result = await db.query<CountRow[]>(
                 `
                 SELECT COUNT(*) as count
                 FROM permissions p
@@ -135,7 +135,7 @@ class PermissionManager {
             );
 
             await CacheManager.del(`role:${roleId}:permissions`);
-            const [userRoles] = await db.query<[UserRoleRow[]]>(
+            const userRoles = await db.query<UserRoleRow[]>(
                 'SELECT user_id FROM user_roles WHERE role_id = ?',
                 [roleId]
             );
@@ -158,7 +158,7 @@ class PermissionManager {
             );
 
             await CacheManager.del(`role:${roleId}:permissions`);
-            const [userRoles] = await db.query<[UserRoleRow[]]>(
+            const userRoles = await db.query<UserRoleRow[]>(
                 'SELECT user_id FROM user_roles WHERE role_id = ?',
                 [roleId]
             );
