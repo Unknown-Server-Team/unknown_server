@@ -63,20 +63,29 @@ export class MarkdownValidator {
 
     private static validateCodeBlocks(content: string): string[] {
         const errors: string[] = [];
+        const fenceRegex = /^\s{0,3}(`{3,}|~{3,})(.*)$/;
+        let openFence: string | null = null;
+        let blockIndex = 0;
 
-        const codeBlockRegex = /```\s*\n[\s\S]*?\n```/g;
-        const matches = content.match(codeBlockRegex);
+        for (const line of content.split(/\r?\n/)) {
+            const match = fenceRegex.exec(line);
+            if (!match) {
+                continue;
+            }
 
-        if (matches) {
-            matches.forEach((block, index) => {
-                if (block.startsWith('```\n')) {
-                    errors.push(`Code block ${index + 1} is missing language specification`);
+            const [, fence, info] = match;
+            if (openFence === null) {
+                blockIndex++;
+                openFence = fence;
+                if (!info.trim()) {
+                    errors.push(`Code block ${blockIndex} is missing language specification`);
                 }
-            });
+            } else if (fence[0] === openFence[0] && fence.length >= openFence.length && !info.trim()) {
+                openFence = null;
+            }
         }
 
-        const backtickCount = (content.match(/```/g) || []).length;
-        if (backtickCount % 2 !== 0) {
+        if (openFence !== null) {
             errors.push('Unmatched code block delimiters (```)');
         }
 

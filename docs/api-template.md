@@ -104,7 +104,7 @@ List users (requires admin role)
 ## Websocket Events
 
 For real-time updates, connect to:
-```
+```text
 ws://server/api/{version}/ws
 ```
 
@@ -162,3 +162,4 @@ users = client.users.list(
     page=1,
     limit=10
 )
+```
