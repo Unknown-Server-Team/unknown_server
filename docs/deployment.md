@@ -4,26 +4,29 @@
 
 - Node.js 20.x or higher
 - NPM 8.x or higher
-- PostgreSQL 13.x or higher (or your preferred database)
-- Redis (optional, for caching)
+- MySQL 5.7+ or MariaDB 10.3+
+- Redis (optional; an in-memory cache is used when it is not configured)
 - NGINX 1.18.0 or higher (for production deployment)
 
 ## Environment Setup
 
 1. Clone the repository
-2. Copy `.env.example` to `.env`
-3. Configure environment variables:
-   ```
+2. Copy `.env.example` to `.env`; it lists every variable the server reads
+3. Configure at least the mandatory variables:
+   ```env
    NODE_ENV=production
    PORT=3000
+   APP_URL=https://your-domain.com
    DB_HOST=your-db-host
-   DB_PORT=5432
+   DB_PORT=3306
    DB_NAME=your-db-name
    DB_USER=your-db-user
    DB_PASSWORD=your-db-password
-   SESSION_SECRET=your-secure-session-secret
+   JWT_SECRET=a-long-random-secret
    CORS_ORIGIN=https://your-domain.com
    ```
+
+The server logs a warning at startup when any of `DB_HOST`, `DB_USER`, `DB_NAME`, `JWT_SECRET` or `APP_URL` is missing.
 
 ## Installation
 
@@ -46,155 +49,86 @@ The database tables are automatically created when the application starts up. Th
 3. Initialize default roles and permissions
 4. Set up initial role permissions
 
-Just make sure your database connection settings are properly configured in the `.env` file.
+The database and its user must exist beforehand; just make sure the connection settings in `.env` are correct. The `mysql` driver does not support MySQL 8's default `caching_sha2_password` plugin, so create the user with `mysql_native_password` on MySQL 8.
 
 ## Security Configuration
 
-1. Configure NGINX (See [NGINX Deployment Guide](./nginx-deployment.md))
-   - Set up SSL/TTLS with modern ciphers
-   - Configure security headers:
-     - HSTS
-     - CSP
-     - X-Frame-Options
-     - X-Content-Type-Options
-     - Permissions Policy
-   - Enable rate limiting:
-     - Global: 30 r/m
-     - API: 5-10 r/m
-     - Static: Unlimited
-   - Set up connection limits:
-     - 10 concurrent per IP
-     - 32 keepalive connections
-     - 100 keepalive requests
-
-2. Multi-layer Cache Configuration
-   - Proxy cache for static files (1 year)
-   - API response caching (10 minutes)
-   - Cache bypass for authenticated requests
-   - Stale cache usage on errors
-
-3. NGINX Performance Optimization
-   - Worker process auto-scaling
-   - Increased file descriptors
-   - Efficient event processing
-   - Buffer size optimization
-   - Compression settings
-
-2. Enable HTTPS through NGINX reverse proxy
-3. Configure security headers in both NGINX and `server.js`
-4. Set up multi-layer rate limiting:
-   - NGINX level rate limiting
-   - Application level rate limiting
-5. Configure CORS properly
-6. Set up file upload limits
-7. Enable DDoS protection through NGINX
+1. Put the server behind NGINX for TLS termination (see the [NGINX Deployment Guide](./nginx-deployment.md))
+2. Security headers are set by Helmet in `server.ts`
+3. Application-level rate limiting is built in; add NGINX limits if you need proxy-level protection
+4. Set `CORS_ORIGIN` to a comma-separated list of allowed origins
+5. Uploads are limited to 50MB per file by the application
+6. Set `CLI_API_KEY` only if you use the CLI to assign roles during registration
 
 ## Production Deployment
 
 ### Application Server
-1. Install PM2:
+1. Install PM2 and start the server:
    ```bash
    npm install -g pm2
-   pm2 start ecosystem.config.js
+   npm run start:pm2:prod
    pm2 save
    ```
 
 2. Configure NGINX:
-   - Copy nginx.conf to /etc/nginx/sites-available/
-   - Create symbolic link to sites-enabled
+   - Copy `config/nginx.conf` to `/etc/nginx/nginx.conf`
    - Test and reload NGINX
 
-### Using Docker
+### Clustering Without PM2
 ```bash
-docker build -t unknown-server .
-docker run -p 3000:3000 unknown-server
-```
-
-### Using Docker Compose
-```bash
-docker-compose up -d
+npm run cluster
 ```
 
 ## Monitoring & Maintenance
 
-1. Set up logging:
-   - Application logs in `/logs/application-*.log`
-   - Error logs in `/logs/error-*.log`
+1. Logging:
+   - Set `LOG_TO_FILE=true` to write `logs/application-<date>.log` and `logs/error-<date>.log`
+   - `LOG_RETENTION_DAYS` controls how long rotated files are kept
    - NGINX logs in `/var/log/nginx/`
 
-2. Monitor metrics:
-   - `/api/health` for basic health check
-   - `/api/metrics` for detailed metrics (admin only)
-   - NGINX metrics and status
+2. Monitoring endpoints:
+   - `/api/health` for a basic health check
+   - `/api/metrics` for detailed performance metrics; it is unauthenticated, so restrict it at the proxy in production
+   - `/api/v1/routes` lists the registered v1 routes
 
 3. Regular maintenance:
-   - Check application logs
-   - Monitor NGINX logs
+   - Check application and NGINX logs
    - Review auth analytics
    - Check SSL certificates
-   - Update security configurations
-   - Monitor proxy performance
    - Review rate limiting effectiveness
 
 ## Performance Monitoring
 
-1. Configure monitoring thresholds:
-   ```
-   MEMORY_WARNING_THRESHOLD=0.85
-   CPU_WARNING_THRESHOLD=0.8
-   SLOW_RESPONSE_TIME=1000
-   REQUEST_RATE_WARNING=1000
-   ERROR_RATE_WARNING=0.1
-   ```
+Warning thresholds are configured with:
+```env
+MEMORY_WARNING_THRESHOLD=85
+HIGH_CPU_USAGE=80
+SLOW_RESPONSE_TIME=1000
+```
 
-2. Set up monitoring endpoints:
-   - `/api/metrics` for detailed performance data
-   - `/api/health` for basic health checks
-   - `/api/analytics` for system analytics
+`MEMORY_WARNING_THRESHOLD` and `HIGH_CPU_USAGE` are percentages; `SLOW_RESPONSE_TIME` is in milliseconds.
 
-3. Monitor critical metrics:
-   - CPU usage per core
-   - Memory allocation patterns
-   - Request rate analysis
-   - Response time tracking
-   - Error rate monitoring
+## Rate Limiting
 
-## Rate Limiting Configuration
+Rate limits are defined in code rather than environment variables:
+- All `/api/v1` routes: 60 requests per minute per IP
+- Login: 5 requests per 15 minutes per IP
+- Registration and password reset: 3 requests per hour per IP
+- Profile updates: 5 requests per 15 minutes per IP
 
-1. Token Bucket Settings:
-   ```
-   RATE_LIMIT_WINDOW=900000
-   RATE_LIMIT_MAX_TOKENS=100
-   RATE_LIMIT_REFILL_RATE=0.1
-   BURST_MULTIPLIER=2
-   ```
-
-2. DDoS Protection:
-   - Configure request thresholds
-   - Set burst detection rules
-   - Enable IP tracking
-   - Configure automated responses
-
-3. IP Management:
-   - Set up whitelist/blacklist rules
-   - Configure automated IP blocking
-   - Set block duration rules
-   - Enable notifications
+The limiter also rejects request bursts and blocks IPs that look like a flood until the process restarts.
 
 ## Scaling
 
 ### Horizontal Scaling
-1. Set up NGINX load balancer
-2. Configure sticky sessions
-3. Use Redis for session store
-4. Scale WebSocket connections
-5. Configure proxy caching
+1. Set up an NGINX load balancer
+2. Configure sticky sessions for WebSocket clients
+3. Configure Redis (`REDIS_URL` or `REDIS_HOST`) so cache entries are shared between instances
 
 ### Vertical Scaling
-1. Optimize Node.js settings
-2. Tune database configuration
-3. Configure caching properly
-4. Optimize NGINX worker processes
+1. Set `SERVER_WORKERS` and `MAX_WORKER_THREADS`
+2. Tune the database configuration
+3. Optimize NGINX worker processes
 
 ## Backup & Recovery
 
@@ -203,29 +137,19 @@ docker-compose up -d
    - Store backups in a secure location
 
 2. Application data:
-   - Back up uploads directory
    - Store logs externally
-   - Save configuration files
-   - Back up NGINX configuration
+   - Save configuration files, including `.env`
+   - Back up the NGINX configuration
 
 ## Troubleshooting
 
 Common issues and solutions:
-1. Connection timeouts (check NGINX proxy_read_timeout)
-2. Memory leaks (monitor Node.js and NGINX processes)
-3. Session issues (verify proxy headers)
-4. WebSocket problems (check NGINX WebSocket configuration)
-5. SSL/TLS issues (verify certificate configuration)
-6. Cache problems (check proxy cache settings)
-7. Rate limiting issues (review both NGINX and application limits)
-
-## Support
-
-For additional support:
-1. Check documentation
-2. Review issues on GitHub
-3. Contact maintainers
-4. See NGINX configuration guide
+1. Connection timeouts (check NGINX `proxy_read_timeout`)
+2. Memory growth (monitor the Node.js processes and `/api/metrics`)
+3. Wrong client IPs in logs (verify the `X-Forwarded-For` proxy header)
+4. WebSocket problems (check the NGINX upgrade headers)
+5. SSL/TLS issues (verify the certificate configuration)
+6. Unexpected 429 responses (review the application rate limits above)
 
 ## Service Mesh Configuration
 
@@ -234,18 +158,13 @@ The server registers the `auth` and `users` gateway services on `/api/v1/auth` a
 
 When `AUTH_SERVICE_URL` points at another server, requests to `/api/v1/auth` are proxied there with their method, path, query string, body and status code intact. When it is unset or points at this server, the mesh only tracks health and requests are handled locally.
 
-```env
-# Service Mesh Configuration
-MESH_HEALTH_CHECK_INTERVAL=10000
-MESH_METRIC_COLLECTION_INTERVAL=5000
-MESH_MAX_CONCURRENT_REQUESTS=100
-MESH_RETRY_ATTEMPTS=3
-```
+`AUTH_SERVICE_URL` is the only mesh setting read from the environment. The other mesh defaults are set in `ServiceMeshManager`: health checks every 10 seconds, metrics every 5 seconds, and 3 retry attempts for idempotent requests.
 
-## Load Balancing Strategies
+### Load Balancing Strategies
 - round-robin (default)
 - least-connections
 - random
+- weighted
 
 Configure in the service registration:
 ```js
@@ -253,12 +172,6 @@ ServiceMeshManager.setupServiceProxy('service-name', {
   loadBalancingStrategy: 'round-robin'
 });
 ```
-
-### Health Checks
-- Default interval: 10 seconds
-- Customizable health check endpoints
-- Automatic service recovery
-- Status monitoring and alerts
 
 ### Metrics Collection
 - Request count tracking
@@ -269,18 +182,4 @@ ServiceMeshManager.setupServiceProxy('service-name', {
 ## Gateway Configuration
 
 ### Circuit Breaker Settings
-```env
-# Circuit Breaker Configuration
-CIRCUIT_BREAKER_TIMEOUT=5000
-CIRCUIT_BREAKER_ERROR_THRESHOLD=50
-CIRCUIT_BREAKER_RESET_TIMEOUT=30000
-CIRCUIT_BREAKER_VOLUME_THRESHOLD=10
-```
-
-## Service Configuration
-- Health check endpoints
-- Retry policies
-- Cache TTL settings
-- Timeout configuration
-- Error thresholds
-- Recovery settings
+Circuit breakers wrap each gateway service with these defaults from `GatewayManager`: 3 second timeout, opening at a 50% error rate after at least 10 requests, and a 30 second reset timeout. They are not configurable through environment variables.
