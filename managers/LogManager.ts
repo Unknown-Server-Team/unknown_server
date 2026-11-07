@@ -11,8 +11,15 @@ import DailyRotateFile from 'winston-daily-rotate-file';
 import type { LogMetadata, LogInfo } from '../types/index';
 
 const LOG_DIR = path.join(process.cwd(), 'logs');
+const LOG_TO_FILE = process.env.LOG_TO_FILE !== 'false';
+const LOG_RETENTION = `${parseInt(process.env.LOG_RETENTION_DAYS || '14', 10) || 14}d`;
+const LOG_LEVELS = ['error', 'warn', 'info', 'debug'];
+const CONFIGURED_LEVEL = (process.env.LOG_LEVEL || '').toLowerCase();
+const LOG_LEVEL = LOG_LEVELS.includes(CONFIGURED_LEVEL)
+    ? CONFIGURED_LEVEL
+    : (process.env.NODE_ENV === 'production' ? 'info' : 'debug');
 
-if (!fs.existsSync(LOG_DIR)) {
+if (LOG_TO_FILE && !fs.existsSync(LOG_DIR)) {
     fs.mkdirSync(LOG_DIR, { recursive: true });
 }
 
@@ -96,7 +103,7 @@ class LogManager {
         });
 
         return winston.createLogger({
-            level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
+            level: LOG_LEVEL,
             format: winston.format.combine(
                 winston.format.timestamp(),
                 winston.format.metadata({ fillExcept: ['message', 'level', 'timestamp'] })
@@ -105,27 +112,29 @@ class LogManager {
                 new winston.transports.Console({
                     format: logFormat
                 }),
-                new DailyRotateFile({
-                    dirname: LOG_DIR,
-                    filename: 'application-%DATE%.log',
-                    datePattern: 'YYYY-MM-DD',
-                    maxFiles: '14d',
-                    format: winston.format.combine(
-                        winston.format.timestamp(),
-                        winston.format.json()
-                    )
-                }),
-                new DailyRotateFile({
-                    dirname: LOG_DIR,
-                    filename: 'error-%DATE%.log',
-                    datePattern: 'YYYY-MM-DD',
-                    level: 'error',
-                    maxFiles: '14d',
-                    format: winston.format.combine(
-                        winston.format.timestamp(),
-                        winston.format.json()
-                    )
-                })
+                ...(LOG_TO_FILE ? [
+                    new DailyRotateFile({
+                        dirname: LOG_DIR,
+                        filename: 'application-%DATE%.log',
+                        datePattern: 'YYYY-MM-DD',
+                        maxFiles: LOG_RETENTION,
+                        format: winston.format.combine(
+                            winston.format.timestamp(),
+                            winston.format.json()
+                        )
+                    }),
+                    new DailyRotateFile({
+                        dirname: LOG_DIR,
+                        filename: 'error-%DATE%.log',
+                        datePattern: 'YYYY-MM-DD',
+                        level: 'error',
+                        maxFiles: LOG_RETENTION,
+                        format: winston.format.combine(
+                            winston.format.timestamp(),
+                            winston.format.json()
+                        )
+                    })
+                ] : [])
             ]
         });
     }
@@ -134,8 +143,13 @@ class LogManager {
         this.logger.info(message, meta);
     }
 
-    error(message: string, error: Error | null = null): void {
-        const meta: ErrorMetadata | Record<string, never> = error ? { error: { message: error.message, stack: error.stack } } : {};
+    error(message: string, error: unknown = null): void {
+        let meta: ErrorMetadata | LogMetadata = {};
+        if (error instanceof Error) {
+            meta = { error: { message: error.message, stack: error.stack } };
+        } else if (error !== null && error !== undefined) {
+            meta = { error } as LogMetadata;
+        }
         this.logger.error(message, meta);
     }
 
