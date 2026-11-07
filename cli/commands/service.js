@@ -194,6 +194,32 @@ metrics.runInteractive = async function() {
     }
 };
 
+const routeGroup = (routePath, version) => {
+    const prefix = `/api/${version}/`;
+    const rest = routePath.startsWith(prefix) ? routePath.slice(prefix.length) : routePath.replace(/^\/+/, '');
+    return rest.split('/')[0] || 'root';
+};
+
+const printRoutes = (routes, version) => {
+    const groupedRoutes = routes.reduce((acc, route) => {
+        const group = routeGroup(route.path, version);
+        if (!acc[group]) acc[group] = [];
+        acc[group].push(route);
+        return acc;
+    }, {});
+
+    for (const [group, groupRoutes] of Object.entries(groupedRoutes)) {
+        console.log(chalk.cyan(`\n${group.toUpperCase()} Endpoints:`));
+        console.table(
+            groupRoutes.map(r => ({
+                Method: r.method.toUpperCase(),
+                Path: r.path,
+                Protected: r.protected ? '✓' : '✗'
+            }))
+        );
+    }
+};
+
 const routes = new Command('routes')
     .description('List API routes')
     .option('-v, --version <version>', 'API version', 'v1')
@@ -210,23 +236,7 @@ const routes = new Command('routes')
             const routes = await API.get(`/${options.version}/routes`);
             console.log(chalk.bold(`\nAPI Routes (${options.version}):`));
             
-            const groupedRoutes = routes.reduce((acc, route) => {
-                const group = route.path.split('/')[1];
-                if (!acc[group]) acc[group] = [];
-                acc[group].push(route);
-                return acc;
-            }, {});
-
-            for (const [group, routes] of Object.entries(groupedRoutes)) {
-                console.log(chalk.cyan(`\n${group.toUpperCase()} Endpoints:`));
-                console.table(
-                    routes.map(r => ({
-                        Method: r.method.toUpperCase(),
-                        Path: r.path,
-                        Protected: r.protected ? '✓' : '✗'
-                    }))
-                );
-            }
+            printRoutes(routes, options.version);
         } catch (error) {
             console.error(chalk.red('Failed to fetch routes:', error.message));
         }
@@ -266,23 +276,7 @@ routes.runInteractive = async function() {
         
         console.log(chalk.bold(`\nAPI Routes (${selectedVersion}):`));
         
-        const groupedRoutes = routes.reduce((acc, route) => {
-            const group = route.path.split('/')[1];
-            if (!acc[group]) acc[group] = [];
-            acc[group].push(route);
-            return acc;
-        }, {});
-
-        for (const [group, routes] of Object.entries(groupedRoutes)) {
-            console.log(chalk.cyan(`\n${group.toUpperCase()} Endpoints:`));
-            console.table(
-                routes.map(r => ({
-                    Method: r.method.toUpperCase(),
-                    Path: r.path,
-                    Protected: r.protected ? '✓' : '✗'
-                }))
-            );
-        }
+        printRoutes(routes, selectedVersion);
     } catch (error) {
         spinner.fail('Failed to fetch routes');
         console.error(chalk.red('Error:', error.message));
