@@ -1,38 +1,52 @@
+import nodemailer from 'nodemailer';
+import type { SentMessageInfo, Transporter } from 'nodemailer';
 import type {
-    MailInfo,
-    NodemailerModule,
-    Transporter,
     EmailTemplateData,
     EmailTemplates,
     EmailUser
 } from '../types/email';
 import type { LogManagerModule, VersionManagerModule } from '../types/modules';
-import nodemailer from 'nodemailer';
 import LogManagerImport from './LogManager';
 import VersionManagerImport from './VersionManager';
 
-const typedNodemailer = nodemailer as unknown as NodemailerModule;
 const LogManager = LogManagerImport as unknown as LogManagerModule;
 const VersionManager = VersionManagerImport as unknown as VersionManagerModule;
 
+const DEFAULT_SMTP_PORT = 587;
+
 class EmailManager {
-    private transporter: Transporter;
+    private transporter: Transporter<SentMessageInfo> | null;
     private templates: EmailTemplates;
 
     constructor() {
-        this.transporter = typedNodemailer.createTransport({
-            host: process.env.SMTP_HOST,
-            port: process.env.SMTP_PORT,
-            secure: process.env.SMTP_SECURE === 'true',
-            auth: {
-                user: process.env.SMTP_USER,
-                pass: process.env.SMTP_PASS
-            }
-        });
+        this.transporter = this.createTransporter();
         this.templates = {
             verification: this.getDefaultVerificationTemplate(),
             passwordReset: this.getDefaultPasswordResetTemplate()
         };
+    }
+
+    isConfigured(): boolean {
+        return this.transporter !== null;
+    }
+
+    private createTransporter(): Transporter<SentMessageInfo> | null {
+        const host = process.env.SMTP_HOST?.trim();
+        if (!host) {
+            LogManager.warning('SMTP_HOST is not set; outgoing email is disabled');
+            return null;
+        }
+
+        const parsedPort = Number.parseInt(process.env.SMTP_PORT || '', 10);
+        const user = process.env.SMTP_USER;
+        const pass = process.env.SMTP_PASS;
+
+        return nodemailer.createTransport({
+            host,
+            port: Number.isNaN(parsedPort) ? DEFAULT_SMTP_PORT : parsedPort,
+            secure: process.env.SMTP_SECURE === 'true',
+            auth: user && pass ? { user, pass } : undefined
+        });
     }
 
     getActiveApiVersion(): string {
@@ -48,9 +62,14 @@ class EmailManager {
         }
     }
 
-    async sendEmail(to: string, subject: string, html: string): Promise<MailInfo> {
+    async sendEmail(to: string, subject: string, html: string): Promise<SentMessageInfo | null> {
+        if (!this.transporter) {
+            LogManager.warning('Email not sent because SMTP is not configured', { subject });
+            return null;
+        }
+
         try {
-            const info = await this.transporter.sendMail({
+            const info: SentMessageInfo = await this.transporter.sendMail({
                 from: `"${process.env.SMTP_FROM_NAME}" <${process.env.SMTP_FROM_EMAIL}>`,
                 to,
                 subject,
@@ -64,7 +83,7 @@ class EmailManager {
         }
     }
 
-    async sendVerificationEmail(user: EmailUser, token: string): Promise<MailInfo> {
+    async sendVerificationEmail(user: EmailUser, token: string): Promise<SentMessageInfo | null> {
         try {
             const apiVersion = this.getActiveApiVersion();
             const verificationUrl = `${process.env.APP_URL}/api/${apiVersion}/auth/verify-email/${token}`;
@@ -81,7 +100,7 @@ class EmailManager {
         }
     }
 
-    async sendPasswordResetEmail(user: EmailUser, token: string): Promise<MailInfo> {
+    async sendPasswordResetEmail(user: EmailUser, token: string): Promise<SentMessageInfo | null> {
         try {
             this.getActiveApiVersion();
             const resetUrl = `${process.env.APP_URL}/reset-password/${token}`;
