@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from 'express';
+import type { Request } from 'express';
 
 declare global {
     namespace Express {
@@ -33,42 +33,11 @@ export interface RegistrationData {
     roles?: string[];
 }
 
-export interface AuthResponse {
-    token: string;
-    user: UserData;
-    expiresIn?: number;
-}
-
-export interface LoginResponse extends AuthResponse {}
-
-export interface RegistrationResponse extends AuthResponse {}
-
-export interface RoleData {
-    id: number;
-    name: string;
-    description?: string;
-    permissions?: PermissionData[];
-}
-
-export interface PermissionData {
-    id: number;
-    name: string;
-    resource: string;
-    action: string;
-    description?: string;
-}
-
 export interface AuthResult {
     success: boolean;
     message?: string;
     user?: UserData;
     token?: string;
-}
-
-export interface TokenVerificationResult {
-    success: boolean;
-    user?: UserData;
-    expired?: boolean;
 }
 
 export interface AuthenticatedRequest extends Omit<Request, 'user'> {
@@ -121,8 +90,6 @@ export interface ValidationSchema {
     };
 }
 
-export type MiddlewareFunction = (req: Request, res: Response, next: NextFunction) => void | Promise<void>;
-
 export interface LogMetadata {
     [key: string]: unknown;
 }
@@ -132,12 +99,6 @@ export interface LogInfo extends LogMetadata {
     message: string;
     timestamp: string;
     metadata: LogMetadata;
-}
-
-export interface ApiVersion {
-    version: string;
-    deprecated: boolean;
-    deprecationDate?: Date;
 }
 
 export interface DatabaseConnection {
@@ -173,15 +134,6 @@ export interface PermissionRecord {
     resource: string;
     action: string;
     description?: string;
-    created_at: Date;
-    updated_at: Date;
-}
-
-export interface SessionRecord {
-    id: string;
-    user_id: number;
-    data: string;
-    expires: Date;
     created_at: Date;
     updated_at: Date;
 }
@@ -222,25 +174,6 @@ export interface DatabaseQueries {
     roleHierarchyQueries: RoleHierarchyQueries;
 }
 
-export interface WorkerTask {
-    operation: string;
-    data: unknown;
-    options?: unknown;
-}
-
-export interface WorkerResult {
-    success: boolean;
-    result?: unknown;
-    error?: string;
-}
-
-export interface ServerConfig {
-    port: number;
-    maxWorkerThreads?: number;
-    isClusterWorker: boolean;
-    workerId?: number;
-}
-
 export interface ServiceConfig {
     endpoints: Array<{
         path: string;
@@ -262,13 +195,6 @@ export interface ServiceMeshConfig {
     version: string;
 }
 
-export interface ServiceProxyConfig {
-    target: string;
-    routes: string[];
-    loadBalancingStrategy?: 'round-robin' | 'least-connections' | 'random';
-    middleware?: Array<(req: unknown) => void>;
-}
-
 export interface AuditEventData {
     action_type: string;
     admin_id?: number;
@@ -277,29 +203,6 @@ export interface AuditEventData {
     permission_id?: number;
     metadata?: unknown;
     ip_address?: string;
-}
-
-export interface AuditLogFilters {
-    action_type?: string;
-    admin_id?: number;
-    target_id?: number;
-    dateFrom?: string;
-    dateTo?: string;
-}
-
-export interface RoleAnalyticsData {
-    id: number;
-    role_id: number;
-    total_users: number;
-    total_actions: number;
-    last_used: Date;
-}
-
-export interface PermissionAnalyticsData {
-    id: number;
-    permission_id: number;
-    total_uses: number;
-    last_used: Date;
 }
 
 export interface AnalyticsReport {

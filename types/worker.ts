@@ -41,24 +41,3 @@ export interface WorkerThreadStats {
 export interface WorkerThreadOptions {
     maxWorkers?: number;
 }
-
-export interface GenericWorkerData {
-    taskId: string;
-    data: unknown;
-    options: Record<string, unknown>;
-}
-
-export interface WorkerLogEntry {
-    timestamp: string;
-    level: string;
-    message: string;
-    [key: string]: unknown;
-}
-
-export interface GenericWorkerResult {
-    processed: boolean;
-    originalData: unknown;
-    appliedOptions: Record<string, unknown>;
-    timestamp: string;
-    workerId: number;
-}

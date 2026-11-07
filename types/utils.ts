@@ -16,8 +16,3 @@ export interface MarkdownValidationResult {
     errors: string[];
     warnings?: string[];
 }
-
-export interface MarkdownValidatorModule {
-    validateFile(filePath: string, options?: ValidationOptions): Promise<MarkdownValidationResult>;
-    validateContent(content: string, options?: ValidationOptions): MarkdownValidationResult;
-}

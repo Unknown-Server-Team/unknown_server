@@ -1,6 +1,5 @@
 export type QueryScalar = string | number | boolean | null | Date;
 export type QueryValue = QueryScalar | QueryValue[];
-export type QueryParams = QueryValue[];
 export type RoleChangeAction = 'assign' | 'remove';
 
 export interface CountRow {
