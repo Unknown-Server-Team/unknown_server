@@ -1,15 +1,6 @@
 import swaggerJsdoc from 'swagger-jsdoc';
 import path from 'path';
-import DocumentationValidator from '../managers/DocumentationValidator';
-import VersionManager from '../managers/VersionManager';
-import LogManager from '../managers/LogManager';
-import type { SwaggerSpec, ValidationSummary } from '../types/documentation';
-
-type SwaggerUiSpec = SwaggerSpec & {
-    customCss?: string;
-};
-
-const supportedVersions: string[] = VersionManager.getSupportedVersions();
+import type { SwaggerSpec } from '../types/documentation';
 
 const options: swaggerJsdoc.Options = {
     definition: {
@@ -62,26 +53,12 @@ const options: swaggerJsdoc.Options = {
             { sessionAuth: [] }
         ]
     },
-    apis: [
-        path.join(process.cwd(), 'routers/api/*.js'),
-        path.join(process.cwd(), 'routers/api/*.ts'),
-        ...supportedVersions.flatMap(version => [
-            path.join(process.cwd(), `routers/api/${version}/**/*.js`),
-            path.join(process.cwd(), `routers/api/${version}/**/*.ts`)
-        ]),
-        path.join(process.cwd(), 'managers/*.js'),
-        path.join(process.cwd(), 'managers/*.ts')
-    ]
+    apis: [path.join(process.cwd(), 'config/openapi/*.yaml')]
 };
 
-const specs = swaggerJsdoc(options) as SwaggerUiSpec;
+const specs = swaggerJsdoc(options) as SwaggerSpec;
 
-const validation: ValidationSummary = DocumentationValidator.validateVersionedDocs(specs);
-if (!validation.isValid) {
-    LogManager.warning('API Documentation validation failed', { errors: validation.errors });
-}
-
-specs.customCss = `
+export const swaggerCustomCss = `
     .swagger-ui {
         background-color: #1a1a1a;
         color: #ffffff;
@@ -136,4 +113,4 @@ specs.customCss = `
     }
 `;
 
-export = specs;
+export default specs;

@@ -1,0 +1,121 @@
+paths:
+  /api/v1/health:
+    get:
+      tags:
+        - System
+      summary: Get API health status
+      description: Returns the current health status and performance metrics of the API
+      responses:
+        200:
+          description: Health check information
+  /api/v1/metrics:
+    get:
+      tags:
+        - System
+      summary: Get API performance metrics
+      description: Returns detailed performance metrics of the API
+      parameters:
+        - in: query
+          name: period
+          schema:
+            type: string
+            enum: [hour, day, week]
+          description: Time period for metrics data
+      responses:
+        200:
+          description: Performance metrics
+  /api/v1/routes:
+    get:
+      tags:
+        - System
+      summary: Get all API routes
+      description: Returns information about all available API routes
+      responses:
+        200:
+          description: List of API routes
+  /api/v1/users:
+    get:
+      summary: Get list of users
+      tags: [Users]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+      responses:
+        200:
+          description: List of users
+  /api/v1/users/{id}:
+    get:
+      summary: Get user by ID
+      tags: [Users]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        200:
+          description: User details
+        403:
+          description: Insufficient permissions
+        404:
+          description: User not found
+    put:
+      summary: Update user profile
+      tags: [Users]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                email:
+                  type: string
+                  format: email
+      responses:
+        200:
+          description: Profile updated successfully
+        403:
+          description: Insufficient permissions
+    delete:
+      summary: Delete user
+      tags: [Users]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        200:
+          description: User deleted successfully
+        403:
+          description: Insufficient permissions

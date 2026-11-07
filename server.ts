@@ -7,7 +7,8 @@ import helmet from 'helmet';
 import compression from 'compression';
 import fileUpload from 'express-fileupload';
 import swaggerUi from 'swagger-ui-express';
-import swaggerSpecs from './config/swagger';
+import swaggerSpecs, { swaggerCustomCss } from './config/swagger';
+import DocumentationValidator from './managers/DocumentationValidator';
 import cluster from 'cluster';
 import { createServer, Server } from 'http';
 import crypto from 'crypto';
@@ -115,7 +116,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 app.use('/api-docs', swaggerUi.serve);
 app.get('/api-docs', swaggerUi.setup(swaggerSpecs, {
     explorer: true,
-    customCss: '.swagger-ui .topbar { display: none }',
+    customCss: `${swaggerCustomCss}\n.swagger-ui .topbar { display: none }`,
     customSiteTitle: "Unknown Server API Documentation"
 }));
 
@@ -183,6 +184,10 @@ const startServer = async (): Promise<void> => {
             await DocGenerator.initialize();
 
             LogManager.info('Validating API documentation...');
+            const specValidation = DocumentationValidator.validateVersionedDocs(swaggerSpecs);
+            if (!specValidation.isValid) {
+                LogManager.warning('API specification validation issues:', { errors: specValidation.errors });
+            }
             const docValidation = await DocGenerator.validateAllDocs();
             if (!docValidation.isValid) {
                 LogManager.warning('Documentation validation issues:', { errors: docValidation.errors });

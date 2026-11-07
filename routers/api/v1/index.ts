@@ -54,18 +54,6 @@ router.use('/auth', authRouter);
 
 router.use('/users', usersRouter);
 
-/**
- * @swagger
- * /api/v1/health:
- *   get:
- *     tags:
- *       - System
- *     summary: Get API health status
- *     description: Returns the current health status and performance metrics of the API
- *     responses:
- *       200:
- *         description: Health check information
- */
 router.get('/health', (_req: Request, res: Response) => {
     res.json({
         status: 'healthy',
@@ -74,25 +62,6 @@ router.get('/health', (_req: Request, res: Response) => {
     });
 });
 
-/**
- * @swagger
- * /api/v1/metrics:
- *   get:
- *     tags:
- *       - System
- *     summary: Get API performance metrics
- *     description: Returns detailed performance metrics of the API
- *     parameters:
- *       - in: query
- *         name: period
- *         schema:
- *           type: string
- *           enum: [hour, day, week]
- *         description: Time period for metrics data
- *     responses:
- *       200:
- *         description: Performance metrics
- */
 router.get('/metrics', (req: Request, res: Response) => {
     const period = (req.query.period as string) || 'hour';
 
@@ -175,18 +144,6 @@ router.get('/metrics', (req: Request, res: Response) => {
     res.json(response);
 });
 
-/**
- * @swagger
- * /api/v1/routes:
- *   get:
- *     tags:
- *       - System
- *     summary: Get all API routes
- *     description: Returns information about all available API routes
- *     responses:
- *       200:
- *         description: List of API routes
- */
 router.get('/routes', (_req: Request, res: Response) => {
     const routes: ApiRoute[] = [];
 

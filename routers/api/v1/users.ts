@@ -33,32 +33,6 @@ interface UserUpdateData {
     [key: string]: any;
 }
 
-/**
- * @swagger
- * /api/v1/users:
- *   get:
- *     summary: Get list of users
- *     tags: [Users]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *           minimum: 1
- *           default: 1
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           minimum: 1
- *           maximum: 100
- *           default: 10
- *     responses:
- *       200:
- *         description: List of users
- */
 router.get('/',
     AuthManager.getAuthMiddleware({ roles: ['admin'] }),
     ValidationMiddleware.validateQuery({
@@ -99,28 +73,6 @@ router.get('/',
     }
 );
 
-/**
- * @swagger
- * /api/v1/users/{id}:
- *   get:
- *     summary: Get user by ID
- *     tags: [Users]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *     responses:
- *       200:
- *         description: User details
- *       403:
- *         description: Insufficient permissions
- *       404:
- *         description: User not found
- */
 router.get('/:id',
     AuthManager.getAuthMiddleware(),
     ValidationMiddleware.validateId(),
@@ -161,38 +113,6 @@ router.get('/:id',
     }
 );
 
-/**
- * @swagger
- * /api/v1/users/{id}:
- *   put:
- *     summary: Update user profile
- *     tags: [Users]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               name:
- *                 type: string
- *               email:
- *                 type: string
- *                 format: email
- *     responses:
- *       200:
- *         description: Profile updated successfully
- *       403:
- *         description: Insufficient permissions
- */
 router.put('/:id',
     AuthManager.getAuthMiddleware(),
     ValidationMiddleware.validateId(),
@@ -230,26 +150,6 @@ router.put('/:id',
     }
 );
 
-/**
- * @swagger
- * /api/v1/users/{id}:
- *   delete:
- *     summary: Delete user
- *     tags: [Users]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *     responses:
- *       200:
- *         description: User deleted successfully
- *       403:
- *         description: Insufficient permissions
- */
 router.delete('/:id',
     AuthManager.getAuthMiddleware({ roles: ['admin'] }),
     ValidationMiddleware.validateId(),
