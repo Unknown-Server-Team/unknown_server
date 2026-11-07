@@ -17,6 +17,13 @@ import LogManagerImport from './LogManager';
 
 const LogManager = LogManagerImport as unknown as LogManagerModule;
 
+const numberFromEnv = (name: string, fallback: number): number => {
+    const value = Number(process.env[name]);
+    return Number.isFinite(value) && value > 0 ? value : fallback;
+};
+
+const percentFromEnv = (name: string, fallbackPercent: number): number => numberFromEnv(name, fallbackPercent) / 100;
+
 class PerformanceManager {
     private startTime: [number, number];
     private metrics: PerformanceMetrics;
@@ -40,9 +47,9 @@ class PerformanceManager {
             alerts: new Map<string, number>()
         };
         this.thresholds = {
-            memoryWarning: 0.85,
-            slowResponseTime: 1000,
-            highCpuUsage: 0.8,
+            memoryWarning: percentFromEnv('MEMORY_WARNING_THRESHOLD', 85),
+            slowResponseTime: numberFromEnv('SLOW_RESPONSE_TIME', 1000),
+            highCpuUsage: percentFromEnv('HIGH_CPU_USAGE', 80),
             requestRateWarning: 1000,
             errorRateWarning: 0.1,
             alertCooldown: 300000

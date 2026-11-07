@@ -69,7 +69,11 @@ app.use(helmet({
     crossOriginResourcePolicy: false
 }));
 
-app.use(cors());
+const corsOrigins = (process.env.CORS_ORIGIN || '')
+    .split(',')
+    .map((origin: string) => origin.trim())
+    .filter(Boolean);
+app.use(cors({ origin: corsOrigins.length > 0 ? corsOrigins : true }));
 
 app.use((_req: Request, res: Response, next: NextFunction) => {
     res.setHeader('Cross-Origin-Opener-Policy', 'unsafe-none');

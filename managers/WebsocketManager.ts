@@ -532,7 +532,7 @@ class WebsocketManager {
                 ws.isAlive = false;
                 ws.ping();
             }
-        }, 30000);
+        }, parseInt(process.env.WS_HEARTBEAT_INTERVAL || '30000', 10) || 30000);
 
         this.wss?.on('close', () => {
             clearInterval(interval);
